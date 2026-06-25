@@ -28,7 +28,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| Consolidated the 10-file `utils/` surface into 3 (`pdda.sh` dispatcher + `pdda-lib.sh` + `pdda-doc-ready.sh`); behavior verified identical against a findings fixture, and all docs updated to the `pdda.sh <check>` form. | Keep the contract and install manifest in lockstep as PDDA evolves. Open a real `PROJECT/**` doc before the next substantive change instead of rebuilding ad hoc notes inside this ledger. |
+| Added root `install.sh` (installs the PDDA surface into a foreign repo in a clean zero state) and rewrote `README.md` for operator onboarding; `PDDA-INSTALL.md` + `ROUTER.md` updated in lockstep. | Re-auth `gh`, open the tracking issue, rename the working doc to `GH-<n>-…`, then merge the branch. |
 
 ## Ledger
 
@@ -38,7 +38,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
-- No active `PROJECT/2-WORKING` docs.
+- **Root `install.sh` + operator onboarding** (2026-06-25) - installer that provisions a foreign repo to a clean zero state; README rewritten for onboarding. Tracking issue pending `gh` re-auth. -> [PROJECT/2-WORKING/INSTALL-SCRIPT-AND-ONBOARDING.md](PROJECT/2-WORKING/INSTALL-SCRIPT-AND-ONBOARDING.md)
 
 ### Completed
 

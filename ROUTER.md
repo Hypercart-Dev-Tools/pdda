@@ -11,8 +11,10 @@ This file is the first entry point for an AI agent working in this repo: it tell
 - `CHANGELOG.md` = the end-of-iteration running log (first-class PDDA artifact; governed by `PROJECT/PDDA.md`)
 - `PROJECT/PDDA.md` = the canonical PDDA contract and automation rules
 - `utils/PDDA-INSTALL.md` = the extraction/install manifest for target repos
+- `install.sh` = the executable installer (automates `utils/PDDA-INSTALL.md`; keep the two in lockstep)
 - `utils/pdda.sh` = the unified runnable surface (dispatcher + every deterministic check + `run`)
 - `utils/pdda-doc-ready.sh` = the opt-in LLM readiness review; `utils/pdda-lib.sh` = shared helpers
+- `utils/pdda-run.sh` + `utils/pdda-check-*.sh` = thin compatibility wrappers that delegate to `utils/pdda.sh`; keep them shipped so older repo docs and agents do not break mid-migration
 
 ## Startup sequence
 
@@ -31,6 +33,7 @@ This file is the first entry point for an AI agent working in this repo: it tell
 - Do not copy `PROJECT/PDDA-ACTIVITY.jsonl` history into target repos; target repos start with a fresh activity log.
 - Every active doc in `PROJECT/2-WORKING/` must be reflected by a pointer in `ROADMAP.md` — a one-line ledger entry that links it. A working doc that should not appear opts out with `roadmap_exempt: true` in its frontmatter. Enforced by `utils/pdda.sh roadmap-coverage`; governance lives in `PROJECT/PDDA.md` -> "ROADMAP.md contract".
 - Every captured GitHub issue doc in `PROJECT/1-INBOX/GH-*.md` must also be parked in `ROADMAP.md` as a one-line queue entry immediately at intake, then promoted or removed later. Enforced by `utils/pdda.sh roadmap-coverage`; governance lives in `PROJECT/PDDA.md` -> "GitHub issue intake" + "ROADMAP.md contract".
+- The long-term canonical deterministic surface is `utils/pdda.sh`; wrappers remain for compatibility, not as a second implementation path.
 - Do not override deterministic PDDA findings with prose.
 - Do not report a win you did not verify with the relevant script or test.
 - Update `CHANGELOG.md` at the end of each iteration; its governance lives in `PROJECT/PDDA.md` — do not re-specify CHANGELOG rules in `AGENTS.md` or elsewhere.
@@ -59,7 +62,8 @@ utils/pdda.sh help        # list every command
 
 ## Routing hints
 
-- If the task is about extraction or first install into another repo, start in `utils/PDDA-INSTALL.md`.
+- If the task is about installing PDDA into another repo, run `install.sh <target>`; for the
+  underlying spec or a by-hand/adapted install, start in `utils/PDDA-INSTALL.md`.
 - If the task is about document quality, active-doc lifecycle, roadmap sprawl, or automation policy, start in `PROJECT/PDDA.md`.
 - If the task is about repo-local maintenance state, start in `ROADMAP.md`.
 - If the task is about the changelog, provenance, or end-of-iteration logging, the governance is in `PROJECT/PDDA.md` (the "CHANGELOG.md — end-of-iteration record" contract).

@@ -5,6 +5,20 @@ This file is the portable install manifest for PDDA.
 Use it when an LLM agent needs to extract the PDDA files from this repo and install them into a
 different repo without guessing which files are canonical.
 
+## Fastest path: `install.sh`
+
+For a normal install, the repo-root `install.sh` automates this entire manifest — copy the runtime,
+create the lifecycle tree, synthesize the blank seed files, `chmod`, and run a verification pass:
+
+```bash
+./install.sh /path/to/target-repo          # observe mode, idempotent
+./install.sh --with-startup-docs --mode light /path/to/target-repo
+```
+
+The rest of this document is the canonical spec `install.sh` implements — read on when you need to
+install by hand, adapt to a non-standard layout, or keep the script honest. Keep the two in lockstep:
+a change to the install surface updates both.
+
 ## Purpose
 
 PDDA installs two things:

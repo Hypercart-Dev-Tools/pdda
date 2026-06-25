@@ -1,5 +1,29 @@
 # CHANGELOG.md
 
+## 2026-06-25
+
+### Root `install.sh` + operator onboarding
+
+Added a repo-root `install.sh` that installs the PDDA surface into a *foreign* repo in a clean,
+ready-to-use zero state, and rewrote `README.md` to lead with operator onboarding.
+
+- `install.sh` is the executable form of `utils/PDDA-INSTALL.md`: it copies the canonical-4 runtime
+  (`utils/pdda.sh`, `utils/pdda-lib.sh`, `utils/pdda-doc-ready.sh`, `PROJECT/PDDA.md`), creates the
+  `PROJECT/**` lifecycle tree, and **synthesizes blank seed** `ROADMAP.md` / `CHANGELOG.md` /
+  `PROJECT/PDDA-ACTIVITY.jsonl` / `.pdda-mode` — it never copies this repo's own ledger/history into a
+  target. It `chmod`s the scripts and runs `pdda.sh run` as a post-install smoke test.
+- Idempotent: runtime + contract are refreshed on re-run, but existing seeds and real `PROJECT/**`
+  docs are kept unless `--force`. Flags: `--force`, `--with-startup-docs`, `--mode observe|light|full`.
+  Refuses to target the pdda source repo itself.
+- This repo stays a **live dogfood demo**: its own `ROADMAP.md` / `CHANGELOG.md` / `PROJECT/**` are
+  not zeroed; only target repos start blank. This change was itself tracked via a `PROJECT/2-WORKING`
+  doc + a ROADMAP pointer (the issue-first GitHub step is deferred until `gh` auth is restored).
+- Lockstep doc updates: `utils/PDDA-INSTALL.md` (new "Fastest path: install.sh" section) and
+  `ROUTER.md` (canonical-files list + routing hint).
+
+Verification: `./install.sh <throwaway-target>` → target `pdda.sh run` exits 0 (fresh + idempotent
+re-run + `--force`/`--with-startup-docs`/`--mode` exercised); `./utils/pdda.sh run` green in this repo.
+
 ## 2026-06-24
 
 ### BREAKING: consolidated `utils/` to 3 files
