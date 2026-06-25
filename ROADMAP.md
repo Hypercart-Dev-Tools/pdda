@@ -15,7 +15,7 @@ goal: >
      NOT allowed: phase checklists, build steps, deep execution notes — put those in the project doc.
      Carve-out: a SHORT exception note is OK only when omitting it would hide an operationally critical fact.
      Coverage rule: every PROJECT/2-WORKING doc must be reflected here by a pointer (or opt out with roadmap_exempt: true).
-     Enforced by utils/pdda-check-roadmap.sh + utils/pdda-check-roadmap-coverage.sh (deterministic) + utils/pdda-doc-ready.sh ROADMAP rubric (LLM). -->
+     Enforced by `pdda.sh roadmap` + `pdda.sh roadmap-coverage` (deterministic) + utils/pdda-doc-ready.sh ROADMAP rubric (LLM). -->
 
 # PDDA Standalone Roadmap
 
@@ -28,7 +28,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| Standalone baseline reset complete: repo-facing docs now describe `pdda` itself, the install manifest matches the shipped suite, and scaffolding uses the expected `blank.md` convention. | Keep the contract and install manifest in lockstep as PDDA evolves. Open a real `PROJECT/**` doc before the next substantive change instead of rebuilding ad hoc notes inside this ledger. |
+| Consolidated the 10-file `utils/` surface into 3 (`pdda.sh` dispatcher + `pdda-lib.sh` + `pdda-doc-ready.sh`); behavior verified identical against a findings fixture, and all docs updated to the `pdda.sh <check>` form. | Keep the contract and install manifest in lockstep as PDDA evolves. Open a real `PROJECT/**` doc before the next substantive change instead of rebuilding ad hoc notes inside this ledger. |
 
 ## Ledger
 
@@ -43,6 +43,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 ### Completed
 
 - **Standalone baseline established** (2026-06-24) - repo-facing docs now describe `pdda` itself, placeholder scaffolding is normalized, and the install manifest matches the shipped scripts. -> [PROJECT/PDDA.md](PROJECT/PDDA.md) and [utils/PDDA-INSTALL.md](utils/PDDA-INSTALL.md)
+- **`utils/` consolidated to 3 files** (2026-06-24) - the 7 per-check scripts + `pdda-run.sh` collapsed into one `pdda.sh` dispatcher (`pdda.sh run` / `pdda.sh <check>`); `pdda-lib.sh` and the opt-in `pdda-doc-ready.sh` stay separate. Breaking change to the install contract; old filenames removed. -> [utils/PDDA-INSTALL.md](utils/PDDA-INSTALL.md)
 
 ### Deferred
 
