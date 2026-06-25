@@ -1,6 +1,7 @@
 # AGENTS.md
 
 See `ROUTER.md` for repo startup order and canonical files.
+See `GUIDING-PRINCIPLES.md` for the repo's north star — the goals and tradeoff lens these rules serve.
 
 ## Operating principles
 
