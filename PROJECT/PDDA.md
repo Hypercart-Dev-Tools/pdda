@@ -57,8 +57,12 @@ Every doc in `PROJECT/2-WORKING` should have:
 ```
 
 3. clear phase or work sections if the doc is a plan
-4. QA gates or acceptance criteria after each phase if the plan is multi-phase
-5. repo-relative paths only; no hardcoded absolute local paths
+4. a table of contents (`## Table of contents`) listing each phase, if the plan is multi-phase — so a
+   cold agent can see the full phase span and jump to the live one without scrolling the whole body
+5. QA gates or acceptance criteria after each phase if the plan is multi-phase
+6. for any discovery or spike phase, its findings written **back into this doc** before its QA gate can
+   pass (see [Discovery & spike phases](#discovery--spike-phases))
+7. repo-relative paths only; no hardcoded absolute local paths
 
 Recommended fields when relevant:
 
@@ -80,6 +84,37 @@ PDDA therefore treats the exact header names as a contract, not a style preferen
 exactly `What was just completed | What's next` — there is no alias/compatibility window. (One was
 specced with a `2026-07-31` cutover, but a single-repo system controls its own docs: no doc here used
 an old alias, so a dated, silently-changing branch guarded nothing and was removed 2026-06-22.)
+
+## Discovery & spike phases
+
+Discovery and spike phases exist to *learn* — reverse-engineer an existing system, probe an unknown,
+prove or kill a risky approach before committing the plan to it. Their output is knowledge, and under
+Principle #1 (*docs are the runtime state, not a record of it*) that knowledge is project state. If it
+lives only in an agent's context or a throwaway scratch note, a cold agent resuming the plan cannot see
+what was learned, why a path was chosen or abandoned, or what the spike actually proved — and the work
+gets re-done.
+
+Contract: **a phase tagged as discovery or spike must write its findings back into the originating plan
+doc before its QA gate can pass.** Concretely, that phase's section (or a clearly linked sibling
+section in the same doc) must capture:
+
+- **what was investigated** — the system/area reverse-engineered or the question the spike asked
+- **what was found** — the concrete mechanics learned, with repo-relative pointers (`file:line`) where
+  the finding lives in code, not a vague summary
+- **what it changes** — how the finding confirms, redirects, or kills the plan's later phases; an
+  unfinished "we'll know after the spike" left dangling is itself the gap
+
+This satisfies Principle #4 (*one canonical place per fact*): the originating plan is that place. A
+spike whose findings sit in chat is the exact drift PDDA exists to prevent. The QA gate for a
+discovery/spike phase therefore includes "findings are written back to this doc" as an acceptance
+criterion alongside the phase's normal checks.
+
+Enforcement is **advisory (LLM layer, warn-capped)** — `pdda-doc-ready.sh` flags a discovery/spike
+phase whose findings were not written back. "Did the agent actually capture what it learned" is a
+judgment a regex cannot make honestly, so it stays with the LLM reviewer and, like every finding from
+that layer, never blocks a build (see [LLM-assisted doc readiness review](#2-llm-assisted-doc-readiness-review)).
+To tag a phase, name it plainly (e.g. `## Phase 2 — Discovery: …` / `## Phase 3 — Spike: …`) or set
+`doc_type: research` / a phase-level marker the reviewer can see.
 
 ## Bug-fix doc stance
 
@@ -284,6 +319,8 @@ It should check for:
 
 - phased plans missing QA gates after a phase
 - phase sections with actions but no observable acceptance criteria
+- multi-phase plans missing a table of contents listing each phase
+- discovery or spike phases whose findings were not written back into the plan doc
 - status tables that are technically present but stale versus the body
 - docs that bury the next action in prose instead of making it explicit
 - plans that duplicate detail already meant to live in another canonical doc
@@ -477,6 +514,8 @@ A doc is "automation ready" when:
 - it has the exact status table
 - the next action is singular and explicit
 - each phase has a visible QA gate
+- a multi-phase plan has a table of contents listing its phases
+- any discovery or spike phase has its findings written back into the doc
 - links to canonical related docs are present where needed
 - there are no hardcoded absolute paths
 - `ROADMAP.md` is pointing at it rather than duplicating it
