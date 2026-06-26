@@ -36,7 +36,7 @@ check_frontmatter() {
   pdda_reset_counts
   local CHECK_NAME="pdda-check-frontmatter" rc=0
   local REQUIRED_KEYS="title status created updated owner goal"
-  local file key value date_key
+  local file key value date_key rating_key
 
   while IFS= read -r file; do
     if ! pdda_has_frontmatter "$file"; then
@@ -76,6 +76,27 @@ check_frontmatter() {
         fi
       fi
     done
+
+    # Optional triage ratings (PDDA.md "Triage ratings for medium-large work"). Validate ONLY when
+    # present: whether a doc SHOULD carry them depends on it being medium-large — a judgment the LLM
+    # layer flags, not this script. But a present value out of range is unambiguous => error. Effort,
+    # complexity, and risk are integers 1 (low) .. 5 (highest); phases is a positive integer.
+    for rating_key in effort complexity risk; do
+      if pdda_frontmatter_has_key "$file" "$rating_key"; then
+        value="$(pdda_trim "$(pdda_frontmatter_value "$file" "$rating_key")")"
+        if ! printf '%s' "$value" | grep -Eq '^[1-5]$'; then
+          pdda_record_finding error "$CHECK_NAME" "$file" 1 "frontmatter rating '$rating_key' must be an integer 1-5 (got '$value')" "fix-rating-value"
+          rc=1
+        fi
+      fi
+    done
+    if pdda_frontmatter_has_key "$file" "phases"; then
+      value="$(pdda_trim "$(pdda_frontmatter_value "$file" "phases")")"
+      if ! printf '%s' "$value" | grep -Eq '^[1-9][0-9]*$'; then
+        pdda_record_finding error "$CHECK_NAME" "$file" 1 "frontmatter 'phases' must be a positive integer (got '$value')" "fix-phases-value"
+        rc=1
+      fi
+    fi
   done < <(pdda_list_working_docs)
 
   pdda_emit_summary "$CHECK_NAME" "$rc"
