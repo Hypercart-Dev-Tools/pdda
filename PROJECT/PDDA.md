@@ -71,6 +71,71 @@ Recommended fields when relevant:
 - `branch`
 - `non_goals`
 - `gh_issue`
+- `effort`, `complexity`, `risk`, `phases` — triage ratings; **required for medium-large work** (see
+  [Triage ratings for medium-large work](#triage-ratings-for-medium-large-work))
+
+## Triage ratings for medium-large work
+
+So automation can pick *which* task to pursue without re-reading every plan, every newly recorded
+**medium-large** task or project carries four triage fields in its frontmatter:
+
+| Field | Range | Meaning |
+|---|---|---|
+| `effort` | integer `1`–`5` | how much work — `1` low, `5` highest |
+| `complexity` | integer `1`–`5` | how intricate / how many moving parts — `1` low, `5` highest |
+| `risk` | integer `1`–`5` | blast radius + uncertainty — `1` safe/contained, `5` one-way-door or unknown |
+| `phases` | positive integer | total number of phases in the plan |
+
+```yaml
+effort: 2
+complexity: 3
+risk: 1
+phases: 4
+```
+
+`risk` should track the repo's existing reversibility scale (`Easy / Costly / One-way door`,
+`AGENTS.md` #3): `1`–`2` ≈ Easy, `3` ≈ Costly, `4`–`5` ≈ one-way door / high uncertainty. It is not a
+parallel notion of danger — it is that scale expressed as a number.
+
+**Scope.** Required for medium-large work (project plans, experiments, features, multi-phase efforts).
+Genuinely small/trivial docs (a typo, a path repoint, a ≤2–3 line bug-fix — the same floor as the
+issue-first SOP) do not need them. "Medium-large" is a judgment, so *presence* is enforced by the LLM
+layer, not a regex (below).
+
+### How to combine them — derive, don't store
+
+There is deliberately **no stored composite "score" field.** A frozen aggregate would (a) drift from
+the three numbers it came from, violating Principle #4 (*one canonical place per fact*), and (b) bake a
+weighting choice into every doc that you then cannot re-tune without rewriting them. Compute the
+selection signal **live, at selection time**, from the raw fields:
+
+- **`risk` is a gate, not an addend.** A trivial-but-risky task (`effort 1`, `complexity 1`, `risk 5`)
+  is easy to *do* but exactly what automation should not auto-pick — folding risk into a linear sum
+  lets it slip through mid-ranked. Gate on it instead.
+- **`effort` and `complexity` are correlated** (complex work is usually effortful), so summing them is
+  a rough "size" proxy, not two independent signals — treat the sum as one ease axis, not two.
+
+Reference selection rule (tune the thresholds per repo):
+
+```text
+eligible      = risk <= 2                 # hard safety gate; risk >= 4 => route to a human
+ease          = effort + complexity       # 2..10, lower = easier
+pick          = among eligible, lowest ease, then fewest phases as the tiebreak
+```
+
+This keeps the raw ratings canonical and queryable while letting the "what's the easiest *safe* thing
+to grab" logic live in one place that can evolve. (See the resolved `priority` note under
+[Proposed extensions](#proposed-extensions-not-yet-locked).)
+
+### How this is enforced
+
+- **deterministic (values)** — `pdda.sh frontmatter` validates the fields **only when present**:
+  `effort`/`complexity`/`risk` must be integers `1`–`5`, `phases` a positive integer. A present-but-bad
+  value is unambiguous, so it `error`s. The script does **not** force presence — it cannot know whether
+  a doc is "medium-large."
+- **LLM (presence)** — `pdda-doc-ready.sh` flags a medium-large plan that is *missing* the triage
+  ratings. Whether a doc is medium-large is a judgment, so it stays advisory/warn-capped like every
+  other readiness finding.
 
 ## Why the two-column status header matters
 
@@ -156,6 +221,9 @@ Capture a tracked issue as a doc in `PROJECT/1-INBOX/` using this convention:
   `<number>` resolves against `origin` (a single canonical repo), so the bare number is unambiguous.
 - **Minimum frontmatter:** `gh_issue`, `source` (the full issue URL), `title`, `status`
   (`Proposed (1-INBOX — not yet active)`), `created`, and `doc_type` (`feedback` or `bugfix`).
+  For medium-large captures, also include the triage ratings `effort`, `complexity`, `risk`, `phases`
+  at capture time, so the queue can be triaged before promotion (see
+  [Triage ratings for medium-large work](#triage-ratings-for-medium-large-work)).
 - **Body:** transcribe the issue's actionable substance (the asks / acceptance criteria), not the whole
   thread. The live issue stays the discussion surface; this doc is the in-repo capture and back-reference.
 
@@ -237,6 +305,9 @@ Minimum behavior:
 - verify required keys exist
 - flag empty required values
 - flag invalid or missing dates
+- when the triage ratings are present, validate their values — `effort`/`complexity`/`risk` must be
+  integers `1`–`5`, `phases` a positive integer (presence itself is judged by the LLM layer; see
+  [Triage ratings for medium-large work](#triage-ratings-for-medium-large-work))
 
 #### D. `pdda.sh hardcoded-paths`
 
@@ -321,6 +392,7 @@ It should check for:
 - phase sections with actions but no observable acceptance criteria
 - multi-phase plans missing a table of contents listing each phase
 - discovery or spike phases whose findings were not written back into the plan doc
+- medium-large plans missing the triage ratings (`effort`, `complexity`, `risk`, `phases`)
 - status tables that are technically present but stale versus the body
 - docs that bury the next action in prose instead of making it explicit
 - plans that duplicate detail already meant to live in another canonical doc
@@ -534,7 +606,10 @@ A doc is "automation ready" when:
 These are likely useful for full automation, but they are still policy choices:
 
 - a `doc_type` field such as `project`, `bugfix`, `research`, `feedback`, `roadmap`
-- a `priority` field if you want deterministic triage beyond folder placement
+- ~~a `priority` field if you want deterministic triage beyond folder placement~~ **superseded** by the
+  `effort`/`complexity`/`risk`/`phases` [triage ratings](#triage-ratings-for-medium-large-work), which
+  give richer triage than a single priority scalar — automation derives the selection signal from them
+  rather than storing one frozen number
 - a `pdda_hold: true` override for docs that should remain in `2-WORKING` despite inactivity
 - a second generated PDDA summary artifact beyond the activity log
 

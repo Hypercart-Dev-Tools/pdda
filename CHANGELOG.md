@@ -1,5 +1,28 @@
 # CHANGELOG.md
 
+## 2026-06-26
+
+### Triage ratings for medium-large work (effort / complexity / risk / phases)
+
+Added four frontmatter triage fields so automation can select *which* task to pursue without
+re-reading every plan: `effort`, `complexity`, `risk` (integers 1–5) and `phases` (positive integer).
+Required for medium-large tasks/projects; trivial docs are exempt.
+
+- **No stored composite score.** The combined "easiness" signal is **derived at selection time**, not
+  persisted — a frozen aggregate would drift from its components (violating Principle #4, one canonical
+  place per fact) and bake in a weighting that couldn't be re-tuned without rewriting docs. PDDA.md
+  documents the reference rule: `risk` is a hard safety **gate** (`risk <= 2` eligible; `>= 4` ⇒
+  human), `effort + complexity` is the ease axis (they correlate, so summed as one size proxy), with
+  `phases` as the tiebreak.
+- **Split enforcement.** `pdda.sh frontmatter` now validates the rating *values* when present (1–5
+  range; phases a positive int) — unambiguous, so blocking-capable. *Presence* on a medium-large doc is
+  a judgment, so it's flagged by the warn-capped LLM layer (`pdda-doc-ready.sh`), never a regex.
+- Supersedes the previously-proposed single `priority` scalar; added to the GH-issue-intake minimum
+  frontmatter for medium-large captures so the queue can be triaged before promotion.
+
+Verification: `./utils/pdda.sh run` green; new validator unit-checked against good/bad rating docs via
+`PDDA_WORKING_DIR` (4 range errors on bad values, clean on valid 1–5).
+
 ## 2026-06-25
 
 ### Plan contract: TOC + discovery/spike write-back
