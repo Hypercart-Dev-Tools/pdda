@@ -149,14 +149,21 @@ PDDA should have two classes of automation:
 
 Implementation note:
 
-- the deterministic shell scripts currently live under `utils/`
-- the aggregate runner is `utils/pdda-run.sh`
+- the automation ships as a single dispatcher, `utils/pdda.sh`, which sources shared helpers from
+  `utils/pdda-lib.sh`
+- every deterministic check is a subcommand: `pdda.sh frontmatter`, `pdda.sh status-table`,
+  `pdda.sh hardcoded-paths`, `pdda.sh roadmap`, `pdda.sh roadmap-coverage`, `pdda.sh changelog`,
+  `pdda.sh stale`
+- the aggregate runner is `pdda.sh run` (it runs the deterministic checks in order, then the LLM
+  review)
+- each finding still carries a stable `check` id (e.g. `pdda-check-frontmatter`) in stdout and the
+  activity log, independent of how the check is invoked
 
-### 1. Deterministic hygiene scripts
+### 1. Deterministic hygiene checks
 
 These catch issues where the answer should be the same every time.
 
-#### A. `pdda-stale-working-docs.sh`
+#### A. `pdda.sh stale`
 
 Purpose:
 - inspect docs in `PROJECT/2-WORKING`
@@ -176,7 +183,7 @@ Why flag-only (design call, 2026-06-22):
   guess cost nothing but an ignorable line. An opt-in move can be re-added later behind `pdda_hold` +
   `full` mode if it ever earns the miles.
 
-#### B. `pdda-check-status-table.sh`
+#### B. `pdda.sh status-table`
 
 Purpose:
 - verify every doc in `PROJECT/2-WORKING` contains the exact two-column status table
@@ -186,7 +193,7 @@ Minimum behavior:
 - fail if the table headers are not exactly `What was just completed` and `What's next`
 - fail if either first-row cell is blank
 
-#### C. `pdda-check-frontmatter.sh`
+#### C. `pdda.sh frontmatter`
 
 Purpose:
 - ensure active docs expose the minimum machine-readable metadata
@@ -196,7 +203,7 @@ Minimum behavior:
 - flag empty required values
 - flag invalid or missing dates
 
-#### D. `pdda-check-hardcoded-paths.sh`
+#### D. `pdda.sh hardcoded-paths`
 
 Purpose:
 - catch absolute machine-specific paths before they fossilize into plans
@@ -209,7 +216,7 @@ Expected exceptions:
 - quoted terminal output
 - explicitly marked transcript blocks
 
-#### E. `pdda-check-roadmap.sh`
+#### E. `pdda.sh roadmap`
 
 Purpose:
 - enforce the `ROADMAP.md` pointer/ledger contract deterministically (the cheap, hourly guard that
@@ -223,12 +230,12 @@ Minimum behavior:
 
 Expected exceptions:
 - fenced `console` / `text` / `transcript` blocks and blockquote lines (the carve-out exception note)
-  are not scanned — same convention as `pdda-check-hardcoded-paths.sh`
+  are not scanned — same convention as `pdda.sh hardcoded-paths`
 
 The fuzzy judgment ("deep execution notes that belong elsewhere") stays with the LLM layer below; this
 script only catches the unambiguous signals.
 
-#### F. `pdda-check-changelog.sh`
+#### F. `pdda.sh changelog`
 
 Purpose:
 - nudge that `CHANGELOG.md` (the first-class end-of-iteration record) was updated this iteration
@@ -244,12 +251,12 @@ Why warn-only:
 - "did you update the changelog" is a reminder, not a correctness gate — blocking a build because a
   human hasn't written the prose yet is the wrong kind of friction (the calibration principle)
 
-#### G. `pdda-check-roadmap-coverage.sh`
+#### G. `pdda.sh roadmap-coverage`
 
 Purpose:
 - enforce the *coverage* direction of the `ROADMAP.md` contract: every active doc in `PROJECT/2-WORKING`
   must be reflected by a pointer in `ROADMAP.md`, so the ledger can never silently fall behind the
-  working set. This is the inverse of `pdda-check-roadmap.sh` (which keeps execution detail from leaking
+  working set. This is the inverse of `pdda.sh roadmap` (which keeps execution detail from leaking
   *into* the roadmap); together they guard the pointer/working-set relationship in both directions.
 
 Minimum behavior:
@@ -261,7 +268,7 @@ Minimum behavior:
 
 Expected exceptions:
 - a working doc that should not appear in the ledger opts out with `roadmap_exempt: true` in its
-  frontmatter (mirrors the `pdda_hold` escape hatch in `pdda-stale-working-docs.sh`); the check then
+  frontmatter (mirrors the `pdda_hold` escape hatch in `pdda.sh stale`); the check then
   emits `info` (skip) for that doc
 
 ### 2. LLM-assisted doc readiness review
@@ -353,9 +360,9 @@ Coverage rule:
   quietly disappear and later be duplicated.
 
 How this is enforced (so it cannot quietly rot in either direction):
-- **deterministic (no leak in)** — `utils/pdda-check-roadmap.sh` errors on task checklists / `### Checklist` /
+- **deterministic (no leak in)** — `pdda.sh roadmap` errors on task checklists / `### Checklist` /
   `### QA checklist` headings and warns on size sprawl (runs hourly, free, no model needed)
-- **deterministic (no gap missing)** — `utils/pdda-check-roadmap-coverage.sh` errors when either an
+- **deterministic (no gap missing)** — `pdda.sh roadmap-coverage` errors when either an
   active `PROJECT/2-WORKING` doc has no pointer here, or a captured `PROJECT/1-INBOX/GH-*.md` doc is
   not parked here as a queue entry (honors `roadmap_exempt: true`)
 - **LLM** — `utils/pdda-doc-ready.sh` reviews `ROADMAP.md` against the full pointer contract for the
@@ -396,7 +403,7 @@ Recording a bet (when a change is consequential):
   bet*; this contract owns the *where and how*, so governance is not fragmented across the two files.)
 
 How this is enforced (a nudge, not a gate):
-- **deterministic** — `utils/pdda-check-changelog.sh` **warns** (never `error`, so it never blocks —
+- **deterministic** — `pdda.sh changelog` **warns** (never `error`, so it never blocks —
   even in `full`) when the newest dated entry predates the latest git commit by more than
   `PDDA_CHANGELOG_STALE_DAYS` days (default `0`), i.e. an iteration shipped without a changelog entry
 - whether an entry is actually *substantive* stays a human / LLM judgment, not a regex
@@ -417,19 +424,20 @@ Each script run should append:
 
 Run the deterministic checks every hour in this order:
 
-1. `pdda-check-frontmatter.sh`
-2. `pdda-check-status-table.sh`
-3. `pdda-check-hardcoded-paths.sh`
-4. `pdda-check-roadmap.sh`
-5. `pdda-check-roadmap-coverage.sh`
-6. `pdda-check-changelog.sh`
-7. `pdda-stale-working-docs.sh`
+1. `pdda.sh frontmatter`
+2. `pdda.sh status-table`
+3. `pdda.sh hardcoded-paths`
+4. `pdda.sh roadmap`
+5. `pdda.sh roadmap-coverage`
+6. `pdda.sh changelog`
+7. `pdda.sh stale`
 
 Then run:
 
-8. `pdda-doc-ready.sh`
+8. `pdda.sh doc-ready`
 
-(`utils/pdda-run.sh` runs exactly this sequence and applies the active `PDDA_MODE` gate.)
+(`pdda.sh run` runs exactly this sequence and applies the active `PDDA_MODE` gate. Scheduling the
+single aggregate command is the recommended hourly cron entry.)
 
 Reason for the order:
 
@@ -519,5 +527,5 @@ If the goal is "get project docs onto rails quickly," the safest v1 is:
 - forbid hardcoded absolute paths
 - run deterministic checks hourly
 - let the LLM reviewer flag readiness issues
-- keep `ROADMAP.md` pointer-only (deterministic `pdda-check-roadmap.sh` + the LLM rubric guard it)
+- keep `ROADMAP.md` pointer-only (deterministic `pdda.sh roadmap` + the LLM rubric guard it)
 - append all script activity to `PROJECT/PDDA-ACTIVITY.jsonl`

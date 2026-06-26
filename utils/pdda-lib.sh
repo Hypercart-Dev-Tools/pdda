@@ -34,7 +34,7 @@ pdda_resolve_mode() {
   esac
 }
 PDDA_MODE="$(pdda_resolve_mode)"
-# Stale docs are flag-only in every mode (see pdda-stale-working-docs.sh), so no mode mutates the tree.
+# Stale docs are flag-only in every mode (see `pdda.sh stale`), so no mode mutates the tree.
 # PDDA_DRY_RUN stays a reserved knob for any future opt-in move re-added behind pdda_hold + full.
 
 # Gate a check's raw exit code by mode: only "full" lets an error block (non-zero exit). observe and

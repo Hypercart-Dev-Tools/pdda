@@ -5,6 +5,20 @@ This file is the portable install manifest for PDDA.
 Use it when an LLM agent needs to extract the PDDA files from this repo and install them into a
 different repo without guessing which files are canonical.
 
+## Fastest path: `install.sh`
+
+For a normal install, the repo-root `install.sh` automates this entire manifest — copy the runtime,
+create the lifecycle tree, synthesize the blank seed files, `chmod`, and run a verification pass:
+
+```bash
+./install.sh /path/to/target-repo          # observe mode, idempotent
+./install.sh --with-startup-docs --mode light /path/to/target-repo
+```
+
+The rest of this document is the canonical spec `install.sh` implements — read on when you need to
+install by hand, adapt to a non-standard layout, or keep the script honest. Keep the two in lockstep:
+a change to the install surface updates both.
+
 ## Purpose
 
 PDDA installs two things:
@@ -31,16 +45,13 @@ Extract these files verbatim from this repo into the target repo at the same rel
 ```text
 PROJECT/PDDA.md
 utils/pdda-lib.sh
-utils/pdda-run.sh
-utils/pdda-check-frontmatter.sh
-utils/pdda-check-status-table.sh
-utils/pdda-check-hardcoded-paths.sh
-utils/pdda-check-roadmap.sh
-utils/pdda-check-roadmap-coverage.sh
-utils/pdda-check-changelog.sh
-utils/pdda-stale-working-docs.sh
+utils/pdda.sh
 utils/pdda-doc-ready.sh
 ```
+
+`utils/pdda.sh` is the unified entry point — it carries every deterministic check plus the aggregate
+`run` as subcommands (`pdda.sh run`, `pdda.sh frontmatter`, `pdda.sh roadmap`, ...). `utils/pdda-lib.sh`
+holds the shared helpers it sources; `utils/pdda-doc-ready.sh` is the opt-in LLM readiness layer.
 
 ## Files to create in the target repo
 
@@ -78,10 +89,10 @@ Create a fresh empty file instead.
 2. Copy the canonical install-set files verbatim to the same relative paths in the target repo. -> expect `PROJECT/PDDA.md` and all shipped `utils/pdda-*.sh` files to exist.
 3. Create baseline `ROADMAP.md` and `CHANGELOG.md` files if the target repo does not already have them. -> expect the roadmap contract to have a file to guard and the changelog check to warn less.
 4. Create an empty `PROJECT/PDDA-ACTIVITY.jsonl` if it does not exist. -> expect a zero- or low-byte log file, not this repo's historical log.
-5. Make the shell scripts executable. -> expect `chmod +x utils/pdda-*.sh utils/pdda-run.sh` to succeed.
+5. Make the shell scripts executable. -> expect `chmod +x utils/pdda.sh utils/pdda-doc-ready.sh utils/pdda-lib.sh` to succeed.
 6. Optionally create a repo-root `.pdda-mode` file with `observe` for first install. -> expect a non-destructive first run.
 7. If the target repo uses a different doc layout, set environment overrides instead of editing the scripts first. -> expect the checks to honor the env vars below.
-8. Run `utils/pdda-run.sh` in the target repo. -> expect report-only behavior in `observe` mode and an append to `PROJECT/PDDA-ACTIVITY.jsonl`.
+8. Run `utils/pdda.sh run` in the target repo. -> expect report-only behavior in `observe` mode and an append to `PROJECT/PDDA-ACTIVITY.jsonl`.
 
 ## Environment overrides
 
@@ -140,9 +151,9 @@ If you are an install agent extracting PDDA into another repo, follow this exact
 Run these commands in the target repo:
 
 ```bash
-chmod +x utils/pdda-*.sh utils/pdda-run.sh
+chmod +x utils/pdda.sh utils/pdda-doc-ready.sh utils/pdda-lib.sh
 printf 'observe\n' > .pdda-mode
-utils/pdda-run.sh
+utils/pdda.sh run
 ```
 
 Expected result:
