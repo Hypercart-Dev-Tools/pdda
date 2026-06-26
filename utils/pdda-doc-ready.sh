@@ -39,6 +39,10 @@ flag ONLY readiness gaps. Do NOT rewrite it, do NOT invent technical claims, and
 frontmatter/status-table/hardcoded-path issues (separate deterministic checks own those). Flag:
 - a phased plan with a phase that has no QA gate / acceptance criteria after it
 - a phase that lists actions but no observable acceptance criteria
+- a multi-phase plan with no table of contents listing its phases
+- a discovery or spike phase (named "Discovery"/"Spike", or doc_type research) whose findings were NOT
+  written back into this doc — i.e. it reverse-engineered or probed something but left no captured
+  findings (what was investigated, what was found, what it changes for later phases)
 - a status table that is present but stale versus the body
 - the next action buried in prose instead of stated explicitly
 - detail duplicated from another canonical doc

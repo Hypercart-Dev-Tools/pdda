@@ -2,6 +2,29 @@
 
 ## 2026-06-25
 
+### Plan contract: TOC + discovery/spike write-back
+
+Extended the active-doc contract in `PROJECT/PDDA.md` with two governance clauses, and wired both into
+the LLM readiness rubric. No change to the deterministic checks or the install surface.
+
+- **Table of contents** is now a required contract item for *multi-phase* plans (item 4): a
+  `## Table of contents` listing each phase, so a cold agent sees the full phase span and jumps to the
+  live one without scrolling. Added to the readiness rubric and the automation-ready checklist.
+- **Discovery & spike phases** get a new dedicated contract section: a phase tagged discovery/spike
+  must write its findings (what was investigated, what was found with `file:line` pointers, what it
+  changes for later phases) **back into the originating plan doc** before its QA gate can pass. Grounded
+  in Principle #1 (docs are runtime state) and #4 (one canonical place per fact) — a spike whose
+  findings live only in chat is the exact drift PDDA exists to prevent.
+- **Enforcement is advisory (LLM layer, warn-capped).** `pdda-doc-ready.sh` now flags a multi-phase
+  plan with no TOC and a discovery/spike phase whose findings were not written back. "Did the agent
+  actually capture what it learned" is a judgment a regex cannot make honestly, so it stays with the
+  reviewer and never blocks a build — consistent with how QA-gate readiness is already enforced.
+
+Verification: `./utils/pdda.sh run` green in this repo (deterministic checks unaffected; the LLM layer
+self-skips when no `PDDA_LLM_BIN` is configured).
+
+## 2026-06-25
+
 ### Root `install.sh` + operator onboarding
 
 Added a repo-root `install.sh` that installs the PDDA surface into a *foreign* repo in a clean,
