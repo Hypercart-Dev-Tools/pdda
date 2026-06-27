@@ -26,8 +26,9 @@ cd pdda
 ```
 
 That copies the runtime + contract, creates the `PROJECT/**` lifecycle tree, drops blank seed
-`ROADMAP.md` / `CHANGELOG.md` / activity-log / `.pdda-mode` files (it never copies this repo's own
-content), makes the scripts executable, and runs `pdda.sh run` so you see it working immediately.
+`ROADMAP.md` / `CHANGELOG.md` / `PROJECT/PDDA-ACTIVITY.jsonl` / `.pdda-mode` files (it never copies
+this repo's own content), makes the scripts executable, and runs `pdda.sh run` so you see it working
+immediately.
 
 Installer options:
 
@@ -84,6 +85,7 @@ Wire `./utils/pdda.sh run` into a pre-commit hook, CI, or an hourly cron once yo
 
 This repo's job is to keep the PDDA contract and the shipped surface in lockstep:
 
+- `GUIDING-PRINCIPLES.md` — the north star the goals and design tradeoffs answer to
 - `PROJECT/PDDA.md` — the document contract and enforcement model (the source of truth)
 - `utils/pdda.sh` — unified entry point: dispatcher for every deterministic check + `pdda.sh run`
   (shared helpers in `utils/pdda-lib.sh`)
@@ -91,5 +93,6 @@ This repo's job is to keep the PDDA contract and the shipped surface in lockstep
 - `install.sh` — the executable installer (keep in lockstep with `utils/PDDA-INSTALL.md`)
 - `utils/PDDA-INSTALL.md` — the extraction/install manifest for target repos
 
-Read `ROUTER.md` first for the startup order, then `AGENTS.md` for the operating principles. Verify
-any change with `./utils/pdda.sh run` before reporting it done.
+Read `ROUTER.md` first for the startup order, then `GUIDING-PRINCIPLES.md` for the north star, then
+`AGENTS.md` for the operating principles. Verify any change with `./utils/pdda.sh run` before
+reporting it done.
