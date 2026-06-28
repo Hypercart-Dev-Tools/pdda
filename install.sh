@@ -31,7 +31,8 @@ Options:
   --force                Overwrite existing seed files (ROADMAP.md, CHANGELOG.md, .pdda-mode,
                          blank.md placeholders). Runtime scripts + PROJECT/PDDA.md are always
                          refreshed. Never touches your real PROJECT/** docs.
-  --with-startup-docs    Also install adapted ROUTER.md + AGENTS.md (operator read-order scaffold).
+  --with-startup-docs    Also install adapted ROUTER.md + AGENTS.md + the /pdda re-orient skill
+                         (operator read-order scaffold).
   --mode <m>             Initial .pdda-mode: observe (default) | light | full.
   -h, --help             This message.
 
@@ -116,6 +117,7 @@ chmod +x "$TARGET/utils/pdda.sh" "$TARGET/utils/pdda-lib.sh" "$TARGET/utils/pdda
 if [ "$WITH_STARTUP_DOCS" -eq 1 ]; then
   copy_runtime "ROUTER.md"
   copy_runtime "AGENTS.md"
+  copy_runtime ".claude/skills/pdda/SKILL.md"
 fi
 
 say ""

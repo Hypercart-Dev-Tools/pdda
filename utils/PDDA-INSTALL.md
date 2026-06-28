@@ -26,9 +26,11 @@ PDDA installs two things:
 - the canonical document contract in `PROJECT/PDDA.md`
 - the runnable shell checks in `utils/pdda-*.sh`
 
-This standalone repo also carries repo-local startup docs (`ROUTER.md`, `AGENTS.md`, `README.md`) so
-the installer source stays self-consistent, but those files are not part of the target-repo install
-surface unless the target explicitly wants them.
+This standalone repo also carries repo-local startup docs (`ROUTER.md`, `AGENTS.md`, `README.md`) and
+the `/pdda` re-orient skill (`.claude/skills/pdda/SKILL.md`) so the installer source stays
+self-consistent, but those files are not part of the target-repo install surface unless the target
+explicitly wants them. `install.sh --with-startup-docs` ships `ROUTER.md`, `AGENTS.md`, and the
+`/pdda` skill together as the agent read-order scaffold.
 
 Do not install deprecated PDDA companion docs from `PROJECT/4-MISC/`.
 

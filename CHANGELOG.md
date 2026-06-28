@@ -1,5 +1,28 @@
 # CHANGELOG.md
 
+## 2026-06-27
+
+### Agent startup: imperative AGENTS.md trigger + `/pdda` re-orient skill
+
+Closed the gap between the auto-loaded `AGENTS.md` and the `ROUTER.md` startup sequence, and added a
+thin re-orientation lever for mid-session inflection points.
+
+- **Imperative startup directive.** `AGENTS.md` (which agent harnesses auto-load) now *instructs* the
+  agent to follow the `ROUTER.md` startup sequence on first action, rather than only pointing at it.
+  This makes the read-order self-executing without the user typing "read ROUTER.md", and needs no new
+  surface — the harness already loads the file.
+- **`/pdda` skill (`.claude/skills/pdda/SKILL.md`).** A deliberately dumb read-and-report pass for the
+  one case the auto-load can't cover: explicit re-orientation on task switch, resume, post-compact, or
+  context drift. It walks `ROUTER.md`, names the next canonical file, and runs `pdda.sh run` for state.
+  It re-specifies no contract — points at where each fact lives.
+- **Ships via `--with-startup-docs`.** Bundled with `ROUTER.md`/`AGENTS.md` (it's only useful when
+  those exist in the target), so no new installer flag. `install.sh`, `utils/PDDA-INSTALL.md`, and the
+  `ROUTER.md` routing hints updated in lockstep.
+
+Verification: `bash -n install.sh` clean; `./utils/pdda.sh run` green (pre-existing BLANK.md dogfood
+findings only, non-blocking in observe); end-to-end `install.sh --with-startup-docs` into a temp repo
+confirmed `ROUTER.md`, `AGENTS.md`, and `.claude/skills/pdda/SKILL.md` all land in the target.
+
 ## 2026-06-26
 
 ### Triage ratings for medium-large work (effort / complexity / risk / phases)
