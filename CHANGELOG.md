@@ -1,5 +1,32 @@
 # CHANGELOG.md
 
+## 2026-06-28
+
+### `install.sh`: auto-migrate flat layout + gitignore the activity log
+
+Made `install.sh` a true upgrader, not just a first-time installer, so re-running it on an older or
+drifted target converges to the canonical state instead of leaving duplicates and noise.
+
+- **Auto-migration of pre-`utils/pdda/` (flat) installs.** Older targets kept the runtime flat under
+  `utils/` (`utils/pdda.sh`, `utils/pdda-lib.sh`, …). A plain re-install used to *add* the new
+  `utils/pdda/` subfolder beside the flat files, leaving two copies and an ambiguous source of truth.
+  `install.sh` now detects the flat entry point and migrates: removes the duplicate PDDA-owned flat
+  files (+ legacy `utils/pdda-phase-out/`, root `PDDA-INSTALL.md`) and repoints old-path references
+  (`utils/pdda.sh` → `utils/pdda/pdda.sh`, etc.) in tracked docs. Never touches the target's own
+  `utils/` files or the dated CHANGELOG; idempotent; `--no-migrate` opts out.
+- **Activity log is gitignored.** `PROJECT/PDDA-ACTIVITY.jsonl` is churning runtime state, so a fresh
+  install now adds it to the target's `.gitignore`, and an upgrade of a repo that already committed it
+  appends the entry *and* `git rm --cached`s it. Idempotent (no duplicate lines; clean append even when
+  the existing `.gitignore` lacks a trailing newline).
+- **Portable in-place edits.** The doc-repointing writes its temp file beside the target (no `$TMPDIR`
+  dependency, same-filesystem atomic `mv`) — fixing a `set -e` abort when the system temp dir is
+  unwritable. `utils/pdda/PDDA-INSTALL.md` updated in lockstep (migration spec + gitignore step).
+
+Verification: `bash -n install.sh` clean; migration tested against a throwaway flat-layout repo
+(flat files removed, repo's own `utils/` file kept, `ROUTER.md` repointed, already-correct paths and
+`CHANGELOG.md` untouched, idempotent on re-run); gitignore tested across fresh / already-tracked /
+no-trailing-newline / re-run cases.
+
 ## 2026-06-27
 
 ### Runtime relocated to `utils/pdda/` subfolder

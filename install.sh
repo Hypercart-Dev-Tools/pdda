@@ -11,12 +11,17 @@ set -euo pipefail
 # ROADMAP/CHANGELOG/activity content, so the target starts empty but immediately valid. Existing
 # target files are never clobbered unless you pass --force.
 #
+# Re-running it upgrades in place. If the target predates the utils/pdda/ subfolder (runtime kept
+# FLAT under utils/), it auto-migrates to the canonical layout: removes the duplicate PDDA-owned flat
+# files and repoints old-path references. Disable with --no-migrate.
+#
 # This is the executable form of utils/pdda/PDDA-INSTALL.md; keep the two in lockstep.
 
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 FORCE=0
 WITH_STARTUP_DOCS=0
+MIGRATE=1
 MODE="observe"
 TARGET=""
 
@@ -33,6 +38,9 @@ Options:
                          refreshed. Never touches your real PROJECT/** docs.
   --with-startup-docs    Also install adapted ROUTER.md + AGENTS.md + the /pdda re-orient skill
                          (operator read-order scaffold).
+  --no-migrate           Skip auto-migration of a pre-utils/pdda/ (flat) layout. By default, when the
+                         target keeps the runtime flat under utils/, install removes the duplicate
+                         PDDA-owned flat files and repoints old-path references to utils/pdda/.
   --mode <m>             Initial .pdda-mode: observe (default) | light | full.
   -h, --help             This message.
 
@@ -41,6 +49,7 @@ What gets installed (zero state):
   PROJECT/PDDA.md                                            (the contract, refreshed)
   PROJECT/{1-INBOX,2-WORKING,3-COMPLETED,4-MISC}/blank.md    (lifecycle buckets)
   ROADMAP.md CHANGELOG.md PROJECT/PDDA-ACTIVITY.jsonl .pdda-mode   (blank seeds, create-only)
+  .gitignore += PROJECT/PDDA-ACTIVITY.jsonl                        (the churning log is runtime state)
 
 After install it runs `utils/pdda/pdda.sh run` in the target so you see it working immediately.
 USAGE
@@ -50,6 +59,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --force) FORCE=1; shift ;;
     --with-startup-docs) WITH_STARTUP_DOCS=1; shift ;;
+    --no-migrate) MIGRATE=0; shift ;;
     --mode) MODE="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     -*) printf 'install.sh: unknown option %q\n\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -92,6 +102,58 @@ copy_runtime() {  # <relpath>
   say "  runtime   $rel"
 }
 
+# Portable in-place edit (BSD/GNU `sed -i` differ; avoid both via temp + mv). The temp lives BESIDE
+# the target — no $TMPDIR dependency and the mv stays on one filesystem (atomic, no cross-device copy).
+sed_inplace() {  # <file> <sed-args...>
+  local f="$1"; shift
+  local tmp="$f.pdda-mig.$$"
+  sed "$@" "$f" > "$tmp" && mv "$tmp" "$f"
+}
+
+# Collapse a pre-utils/pdda/ FLAT install into the canonical subfolder layout. The runtime is already
+# refreshed under utils/pdda/ by the time this runs, so here we (1) delete the now-duplicate PDDA-owned
+# flat files and (2) repoint old flat-path references — never touching the repo's own utils/ files,
+# the dated CHANGELOG, or the activity log. Idempotent: a no-op once there is no flat utils/pdda.sh.
+migrate_flat_layout() {
+  [ "$MIGRATE" -eq 1 ] || return 0
+  [ -f "$TARGET/utils/pdda.sh" ] || return 0   # no flat entry point => nothing to migrate
+
+  say ""
+  say "Migrating pre-utils/pdda/ flat layout:"
+
+  local f
+  for f in utils/pdda.sh utils/pdda-lib.sh utils/pdda-doc-ready.sh utils/pdda-catchup.sh \
+           utils/PDDA-INSTALL.md PDDA-INSTALL.md; do
+    if [ -f "$TARGET/$f" ]; then
+      rm -f "$TARGET/$f"
+      say "  remove    $f (now in utils/pdda/)"
+    fi
+  done
+  if [ -d "$TARGET/utils/pdda-phase-out" ]; then
+    rm -rf "$TARGET/utils/pdda-phase-out"
+    say "  remove    utils/pdda-phase-out/ (legacy)"
+  fi
+
+  local rel repointed=0
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    sed_inplace "$TARGET/$rel" \
+      -e 's|utils/pdda\.sh|utils/pdda/pdda.sh|g' \
+      -e 's|utils/pdda-lib\.sh|utils/pdda/pdda-lib.sh|g' \
+      -e 's|utils/pdda-doc-ready\.sh|utils/pdda/pdda-doc-ready.sh|g' \
+      -e 's|utils/pdda-catchup\.sh|utils/pdda/pdda-catchup.sh|g' \
+      -e 's|utils/PDDA-INSTALL\.md|utils/pdda/PDDA-INSTALL.md|g'
+    say "  repoint   $rel"
+    repointed=$((repointed + 1))
+  done < <(
+    cd "$TARGET" && grep -rIl --exclude-dir=.git --exclude=CHANGELOG.md --exclude='*.jsonl' \
+      -e 'utils/pdda\.sh' -e 'utils/pdda-lib\.sh' -e 'utils/pdda-doc-ready\.sh' \
+      -e 'utils/pdda-catchup\.sh' -e 'utils/PDDA-INSTALL\.md' . 2>/dev/null | sed 's|^\./||'
+  )
+  [ "$repointed" -eq 0 ] && say "  (no old-path references found)"
+  say "  migration done — review with: git -C \"$TARGET\" diff"
+}
+
 # Create a seed file only if absent (or when --force). Reads content from stdin.
 seed_file() {  # <relpath>  (content on stdin)
   local rel="$1" dst="$TARGET/$1"
@@ -103,6 +165,26 @@ seed_file() {  # <relpath>  (content on stdin)
   fi
   cat > "$dst"
   say "  seed      $rel"
+}
+
+# Ensure the churning activity log is gitignored in the target (it is runtime state, not source —
+# tracking it makes every `pdda.sh run` a dirty diff). Idempotent, so installs AND upgrades converge:
+# adds the entry if missing, and untracks the file if a pre-gitignore install already committed it.
+ensure_activity_ignored() {
+  local entry="PROJECT/PDDA-ACTIVITY.jsonl" gi="$TARGET/.gitignore"
+  if [ -f "$gi" ] && grep -qxF "$entry" "$gi"; then
+    say "  keep      .gitignore ($entry already ignored)"
+  else
+    # Guarantee a trailing newline before appending so we never glue onto the prior last line.
+    if [ -f "$gi" ] && [ -n "$(tail -c1 "$gi" 2>/dev/null)" ]; then printf '\n' >> "$gi"; fi
+    printf '%s\n' "$entry" >> "$gi"
+    say "  ignore    .gitignore += $entry"
+  fi
+  if [ -d "$TARGET/.git" ] && git -C "$TARGET" ls-files --error-unmatch "$entry" >/dev/null 2>&1; then
+    if git -C "$TARGET" rm --cached --quiet "$entry" >/dev/null 2>&1; then
+      say "  untrack   $entry (was tracked; git rm --cached)"
+    fi
+  fi
 }
 
 say "Installing PDDA into: $TARGET"
@@ -120,6 +202,8 @@ if [ "$WITH_STARTUP_DOCS" -eq 1 ]; then
   copy_runtime "AGENTS.md"
   copy_runtime ".claude/skills/pdda/SKILL.md"
 fi
+
+migrate_flat_layout
 
 say ""
 say "Lifecycle buckets:"
@@ -194,6 +278,7 @@ CHANGELOG
 
 # Empty activity log (never copy the source repo's log).
 seed_file "PROJECT/PDDA-ACTIVITY.jsonl" </dev/null
+ensure_activity_ignored
 
 seed_file ".pdda-mode" <<MODE
 $MODE

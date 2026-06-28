@@ -19,6 +19,29 @@ The rest of this document is the canonical spec `install.sh` implements — read
 install by hand, adapt to a non-standard layout, or keep the script honest. Keep the two in lockstep:
 a change to the install surface updates both.
 
+## Upgrading an existing install
+
+Re-run `install.sh` (no flags) against the target — `copy_runtime` overwrites the runtime + contract
+unconditionally, while seed/state files (`ROADMAP.md`, `CHANGELOG.md`, `.pdda-mode`, `PROJECT/**`,
+the activity log) are create-only and stay untouched. Do **not** pass `--force` (it overwrites seeds)
+or `--with-startup-docs` (it overwrites any repo-adapted `ROUTER.md`/`AGENTS.md`).
+
+### Migrating a repo that predates the `utils/pdda/` layout
+
+Older installs put the runtime **flat** under `utils/` (`utils/pdda.sh`, `utils/pdda-lib.sh`,
+`utils/pdda-doc-ready.sh`, sometimes `utils/pdda-catchup.sh`, plus `utils/PDDA-INSTALL.md` and a
+legacy `utils/pdda-phase-out/`). The runtime is relocatable (it sources via `HERE="$(dirname "$0")"`),
+so both layouts *run* — but a plain re-install **adds** the new `utils/pdda/` subfolder beside the old
+flat files, leaving **two copies** and an ambiguous source of truth.
+
+`install.sh` detects the flat layout and **migrates it automatically** (one canonical `utils/pdda/`):
+it removes the now-duplicate PDDA-owned flat files (`utils/pdda.sh`, `utils/pdda-lib.sh`,
+`utils/pdda-doc-ready.sh`, `utils/pdda-catchup.sh`, `utils/PDDA-INSTALL.md`, the legacy
+`utils/pdda-phase-out/`), repoints old-path references (`utils/pdda.sh` → `utils/pdda/pdda.sh`, etc.)
+in tracked docs, and prints a summary of what moved. The target repo's own non-PDDA `utils/` files are
+never touched, and historical CHANGELOG paths are left as the dated record they are. Migration runs as
+part of the upgrade so the maintainer's whole job is "run the script, review the diff, commit."
+
 ## Purpose
 
 PDDA installs two things:
@@ -95,6 +118,7 @@ Create a fresh empty file instead.
 2. Copy the canonical install-set files verbatim to the same relative paths in the target repo. -> expect `PROJECT/PDDA.md` and all shipped `utils/pdda-*.sh` files to exist.
 3. Create baseline `ROADMAP.md` and `CHANGELOG.md` files if the target repo does not already have them. -> expect the roadmap contract to have a file to guard and the changelog check to warn less.
 4. Create an empty `PROJECT/PDDA-ACTIVITY.jsonl` if it does not exist. -> expect a zero- or low-byte log file, not this repo's historical log.
+4a. Add `PROJECT/PDDA-ACTIVITY.jsonl` to the target's `.gitignore` (and `git rm --cached` it if already tracked). -> expect the churning runtime log to stop dirtying `git status` on every run.
 5. Make the shell scripts executable. -> expect `chmod +x utils/pdda/pdda.sh utils/pdda/pdda-doc-ready.sh utils/pdda/pdda-lib.sh utils/pdda/pdda-catchup.sh` to succeed.
 6. Optionally create a repo-root `.pdda-mode` file with `observe` for first install. -> expect a non-destructive first run.
 7. If the target repo uses a different doc layout, set environment overrides instead of editing the scripts first. -> expect the checks to honor the env vars below.
