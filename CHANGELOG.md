@@ -2,6 +2,25 @@
 
 ## 2026-06-27
 
+### `pdda.sh catchup` — LLM repo triage with ROUTER.md recommendations
+
+New opt-in subcommand that reviews recent repo activity against `ROUTER.md` and proposes concrete
+MOVE / DELETE / ADD edits to the routing guide.
+
+- **`pdda-catchup.sh`** mirrors the existing `pdda-doc-ready.sh` pattern: sources `pdda-lib.sh`,
+  skips gracefully (emits an `info` finding, exits 0) when `PDDA_LLM_BIN` is unset, and stays fully
+  read-only/advisory. Gathers `ROUTER.md`, the top of `CHANGELOG.md`, recent commits, and inbox issue
+  titles, then hands them to the configured model CLI.
+- **Wired into `pdda.sh`** as `catchup) exec pdda-catchup.sh` plus a usage line — the thin-router
+  convention (LLM subcommands live in their own `pdda-*.sh` script).
+- **Fails loudly, not silently.** The model CLI's stderr flows to the terminal and a non-zero exit
+  records a `warn` finding (was previously swallowed by `2>/dev/null || true`). The prompt is fed on
+  stdin (portable across CLIs, immune to `ARG_MAX`), inbox context includes each issue's first
+  heading, and recommendations are persisted to `PROJECT/4-MISC/pdda-catchup-<date>.md`.
+
+Verification: `bash -n utils/pdda-catchup.sh` clean; skip, failure (`PDDA_LLM_BIN=false`), and success
+(stub CLI) paths all exercised — failure surfaces a WARN, success writes the dated recommendations file.
+
 ### Agent startup: imperative AGENTS.md trigger + `/pdda` re-orient skill
 
 Closed the gap between the auto-loaded `AGENTS.md` and the `ROUTER.md` startup sequence, and added a

@@ -538,6 +538,7 @@ Commands:
   changelog          end-of-iteration changelog nudge (warn-only)
   stale              flag stale working docs (flag-only; never moves)
   doc-ready          LLM readiness review (delegates to pdda-doc-ready.sh; opt-in via PDDA_LLM_BIN)
+  catchup            LLM repo triage and ROUTER.md recommendations (delegates to pdda-catchup.sh)
   help               this message
 
 Mode/format/path overrides come from the environment (PDDA_MODE, PDDA_FORMAT, PDDA_WORKING_DIR,
@@ -557,6 +558,7 @@ case "$cmd" in
   changelog)        check_changelog; exit "$?" ;;
   stale)            check_stale; exit "$?" ;;
   doc-ready)        exec "$HERE/pdda-doc-ready.sh" "$@" ;;
+  catchup)          exec "$HERE/pdda-catchup.sh" "$@" ;;
   help|-h|--help)   pdda_usage; exit 0 ;;
   *)                printf 'pdda.sh: unknown command %q\n\n' "$cmd" >&2; pdda_usage >&2; exit 2 ;;
 esac
