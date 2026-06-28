@@ -29,15 +29,15 @@ never to this source repo.
 
 ## Scope
 
-- `install.sh` (repo root) — executable form of `utils/PDDA-INSTALL.md`.
-  - Copies runtime: `utils/pdda.sh`, `utils/pdda-lib.sh`, `utils/pdda-doc-ready.sh`, `PROJECT/PDDA.md`.
+- `install.sh` (repo root) — executable form of `utils/pdda/PDDA-INSTALL.md`.
+  - Copies runtime: `utils/pdda/pdda.sh`, `utils/pdda/pdda-lib.sh`, `utils/pdda/pdda-doc-ready.sh`, `utils/pdda/pdda-catchup.sh`, `PROJECT/PDDA.md`.
   - Creates `PROJECT/{1-INBOX,2-WORKING,3-COMPLETED,4-MISC}` with `blank.md`.
   - Synthesizes blank seeds (never copied from here): `ROADMAP.md`, `CHANGELOG.md`,
     `PROJECT/PDDA-ACTIVITY.jsonl`, `.pdda-mode`.
   - Idempotent (create-only seeds; `--force` to overwrite); `--with-startup-docs`; `--mode`.
   - Runs `pdda.sh run` in the target as a post-install smoke test.
 - `README.md` — operator-first onboarding (install path, day-to-day commands, modes).
-- Lockstep doc updates: `utils/PDDA-INSTALL.md`, `ROUTER.md`.
+- Lockstep doc updates: `utils/pdda/PDDA-INSTALL.md`, `ROUTER.md`.
 
 ## Phase 1 — install.sh + onboarding
 

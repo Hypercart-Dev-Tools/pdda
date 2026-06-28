@@ -49,10 +49,10 @@ docs are kept unless you pass `--force`.
 After install, everything runs through one dispatcher:
 
 ```bash
-./utils/pdda.sh run                # all deterministic checks, then the LLM readiness review
-./utils/pdda.sh frontmatter        # one check on its own
-./utils/pdda.sh roadmap-coverage
-./utils/pdda.sh help               # list every command
+./utils/pdda/pdda.sh run                # all deterministic checks, then the LLM readiness review
+./utils/pdda/pdda.sh frontmatter        # one check on its own
+./utils/pdda/pdda.sh roadmap-coverage
+./utils/pdda/pdda.sh help               # list every command
 ```
 
 The workflow PDDA expects:
@@ -77,7 +77,7 @@ The workflow PDDA expects:
 
 Set it in `.pdda-mode` (or the `PDDA_MODE` env var). No mode ever mutates your tree.
 
-Wire `./utils/pdda.sh run` into a pre-commit hook, CI, or an hourly cron once you're ready.
+Wire `./utils/pdda/pdda.sh run` into a pre-commit hook, CI, or an hourly cron once you're ready.
 
 ---
 
@@ -87,12 +87,12 @@ This repo's job is to keep the PDDA contract and the shipped surface in lockstep
 
 - `GUIDING-PRINCIPLES.md` — the north star the goals and design tradeoffs answer to
 - `PROJECT/PDDA.md` — the document contract and enforcement model (the source of truth)
-- `utils/pdda.sh` — unified entry point: dispatcher for every deterministic check + `pdda.sh run`
-  (shared helpers in `utils/pdda-lib.sh`)
-- `utils/pdda-doc-ready.sh` — the opt-in, model-dependent LLM readiness review (a separate layer)
-- `install.sh` — the executable installer (keep in lockstep with `utils/PDDA-INSTALL.md`)
-- `utils/PDDA-INSTALL.md` — the extraction/install manifest for target repos
+- `utils/pdda/pdda.sh` — unified entry point: dispatcher for every deterministic check + `pdda.sh run`
+  (shared helpers in `utils/pdda/pdda-lib.sh`)
+- `utils/pdda/pdda-doc-ready.sh` — the opt-in, model-dependent LLM readiness review (a separate layer)
+- `install.sh` — the executable installer (keep in lockstep with `utils/pdda/PDDA-INSTALL.md`)
+- `utils/pdda/PDDA-INSTALL.md` — the extraction/install manifest for target repos
 
 Read `ROUTER.md` first for the startup order, then `GUIDING-PRINCIPLES.md` for the north star, then
-`AGENTS.md` for the operating principles. Verify any change with `./utils/pdda.sh run` before
+`AGENTS.md` for the operating principles. Verify any change with `./utils/pdda/pdda.sh run` before
 reporting it done.

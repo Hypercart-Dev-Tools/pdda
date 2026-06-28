@@ -26,9 +26,11 @@ PDDA installs two things:
 - the canonical document contract in `PROJECT/PDDA.md`
 - the runnable shell checks in `utils/pdda-*.sh`
 
-This standalone repo also carries repo-local startup docs (`ROUTER.md`, `AGENTS.md`, `README.md`) so
-the installer source stays self-consistent, but those files are not part of the target-repo install
-surface unless the target explicitly wants them.
+This standalone repo also carries repo-local startup docs (`ROUTER.md`, `AGENTS.md`, `README.md`) and
+the `/pdda` re-orient skill (`.claude/skills/pdda/SKILL.md`) so the installer source stays
+self-consistent, but those files are not part of the target-repo install surface unless the target
+explicitly wants them. `install.sh --with-startup-docs` ships `ROUTER.md`, `AGENTS.md`, and the
+`/pdda` skill together as the agent read-order scaffold.
 
 Do not install deprecated PDDA companion docs from `PROJECT/4-MISC/`.
 
@@ -44,14 +46,18 @@ Extract these files verbatim from this repo into the target repo at the same rel
 
 ```text
 PROJECT/PDDA.md
-utils/pdda-lib.sh
-utils/pdda.sh
-utils/pdda-doc-ready.sh
+utils/pdda/pdda-lib.sh
+utils/pdda/pdda.sh
+utils/pdda/pdda-doc-ready.sh
+utils/pdda/pdda-catchup.sh
 ```
 
-`utils/pdda.sh` is the unified entry point — it carries every deterministic check plus the aggregate
-`run` as subcommands (`pdda.sh run`, `pdda.sh frontmatter`, `pdda.sh roadmap`, ...). `utils/pdda-lib.sh`
-holds the shared helpers it sources; `utils/pdda-doc-ready.sh` is the opt-in LLM readiness layer.
+The shipped runtime lives in its own `utils/pdda/` subfolder so it never mixes with a target repo's
+existing `utils/` files. `utils/pdda/pdda.sh` is the unified entry point — it carries every
+deterministic check plus the aggregate `run` as subcommands (`pdda.sh run`, `pdda.sh frontmatter`,
+`pdda.sh roadmap`, ...). `utils/pdda/pdda-lib.sh` holds the shared helpers it sources;
+`utils/pdda/pdda-doc-ready.sh` is the opt-in LLM readiness layer and `utils/pdda/pdda-catchup.sh` is
+the opt-in ROUTER.md triage layer.
 
 ## Files to create in the target repo
 
@@ -63,7 +69,7 @@ PROJECT/1-INBOX/
 PROJECT/2-WORKING/
 PROJECT/3-COMPLETED/
 PROJECT/4-MISC/
-utils/
+utils/pdda/
 ROADMAP.md
 CHANGELOG.md
 PROJECT/PDDA-ACTIVITY.jsonl
@@ -89,10 +95,10 @@ Create a fresh empty file instead.
 2. Copy the canonical install-set files verbatim to the same relative paths in the target repo. -> expect `PROJECT/PDDA.md` and all shipped `utils/pdda-*.sh` files to exist.
 3. Create baseline `ROADMAP.md` and `CHANGELOG.md` files if the target repo does not already have them. -> expect the roadmap contract to have a file to guard and the changelog check to warn less.
 4. Create an empty `PROJECT/PDDA-ACTIVITY.jsonl` if it does not exist. -> expect a zero- or low-byte log file, not this repo's historical log.
-5. Make the shell scripts executable. -> expect `chmod +x utils/pdda.sh utils/pdda-doc-ready.sh utils/pdda-lib.sh` to succeed.
+5. Make the shell scripts executable. -> expect `chmod +x utils/pdda/pdda.sh utils/pdda/pdda-doc-ready.sh utils/pdda/pdda-lib.sh utils/pdda/pdda-catchup.sh` to succeed.
 6. Optionally create a repo-root `.pdda-mode` file with `observe` for first install. -> expect a non-destructive first run.
 7. If the target repo uses a different doc layout, set environment overrides instead of editing the scripts first. -> expect the checks to honor the env vars below.
-8. Run `utils/pdda.sh run` in the target repo. -> expect report-only behavior in `observe` mode and an append to `PROJECT/PDDA-ACTIVITY.jsonl`.
+8. Run `utils/pdda/pdda.sh run` in the target repo. -> expect report-only behavior in `observe` mode and an append to `PROJECT/PDDA-ACTIVITY.jsonl`.
 
 ## Environment overrides
 
@@ -151,9 +157,9 @@ If you are an install agent extracting PDDA into another repo, follow this exact
 Run these commands in the target repo:
 
 ```bash
-chmod +x utils/pdda.sh utils/pdda-doc-ready.sh utils/pdda-lib.sh
+chmod +x utils/pdda/pdda.sh utils/pdda/pdda-doc-ready.sh utils/pdda/pdda-lib.sh utils/pdda/pdda-catchup.sh
 printf 'observe\n' > .pdda-mode
-utils/pdda.sh run
+utils/pdda/pdda.sh run
 ```
 
 Expected result:

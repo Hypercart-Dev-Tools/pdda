@@ -1,5 +1,79 @@
 # CHANGELOG.md
 
+## 2026-06-27
+
+### Runtime relocated to `utils/pdda/` subfolder
+
+Moved the shipped runtime (`pdda.sh`, `pdda-lib.sh`, `pdda-doc-ready.sh`, `pdda-catchup.sh`) and the
+install manifest into a dedicated `utils/pdda/` subfolder so it never mixes with a target repo's own
+`utils/` files on install.
+
+- **One real code fix: repo-root resolution.** `pdda-lib.sh` derived `PDDA_REPO_ROOT` as
+  `$PDDA_LIB_DIR/..`, which assumed the runtime sat directly under `utils/`. With the scripts now one
+  level deeper, that resolved the root to `utils/` — so every check scanned an empty `utils/PROJECT/**`
+  and *vacuously passed*, and the activity log was written to `utils/PROJECT/`. Fixed to `../..`. This
+  was the load-bearing change; without it the relocation silently breaks every install.
+- **Inter-script sourcing needed no change** — it already resolves via `$(dirname "$0")`/`BASH_SOURCE`,
+  so co-locating the files keeps `run`/`doc-ready`/`catchup` wiring intact. `shellcheck source=` hints
+  were repathed.
+- **All path-prefixed references repathed in lockstep** — `install.sh` (copy + chmod + messages),
+  `utils/pdda/PDDA-INSTALL.md` (canonical set, create paths, chmod, verification), `ROUTER.md`,
+  `AGENTS.md`, `README.md`, `PROJECT/PDDA.md`, `ROADMAP.md` banner, the active install-script working
+  doc, and the `/pdda` skill (repo-local + global). Bare subcommand mentions (`pdda.sh frontmatter`)
+  were left as-is — they name commands, not file paths.
+- **Fixed a pre-existing lockstep gap:** `install.sh` and `PDDA-INSTALL.md` did not ship
+  `pdda-catchup.sh`, so the `catchup` subcommand would have failed in target repos. It's now part of
+  the copied runtime + chmod set.
+- Historical CHANGELOG entries keep their original `utils/pdda.sh` paths — they are a dated record of
+  what was true at the time, not live references.
+
+Verification: `bash -n` clean on `install.sh` + all four scripts; `./utils/pdda/pdda.sh run` from the
+repo root correctly re-detects `PROJECT/2-WORKING` (the dogfood `BLANK.md` findings reappeared,
+confirming root resolution) and writes to the real `PROJECT/PDDA-ACTIVITY.jsonl`, with no stray
+`utils/PROJECT/`. End-to-end `install.sh [--with-startup-docs]` into throwaway repos confirmed the
+runtime lands in `utils/pdda/`, the `/pdda` skill ships, the target root resolves correctly (activity
+log at target `PROJECT/`, no `utils/PROJECT/`), and both `pdda.sh run` and `pdda.sh catchup` work.
+
+### `pdda.sh catchup` — LLM repo triage with ROUTER.md recommendations
+
+New opt-in subcommand that reviews recent repo activity against `ROUTER.md` and proposes concrete
+MOVE / DELETE / ADD edits to the routing guide.
+
+- **`pdda-catchup.sh`** mirrors the existing `pdda-doc-ready.sh` pattern: sources `pdda-lib.sh`,
+  skips gracefully (emits an `info` finding, exits 0) when `PDDA_LLM_BIN` is unset, and stays fully
+  read-only/advisory. Gathers `ROUTER.md`, the top of `CHANGELOG.md`, recent commits, and inbox issue
+  titles, then hands them to the configured model CLI.
+- **Wired into `pdda.sh`** as `catchup) exec pdda-catchup.sh` plus a usage line — the thin-router
+  convention (LLM subcommands live in their own `pdda-*.sh` script).
+- **Fails loudly, not silently.** The model CLI's stderr flows to the terminal and a non-zero exit
+  records a `warn` finding (was previously swallowed by `2>/dev/null || true`). The prompt is fed on
+  stdin (portable across CLIs, immune to `ARG_MAX`), inbox context includes each issue's first
+  heading, and recommendations are persisted to `PROJECT/4-MISC/pdda-catchup-<date>.md`.
+
+Verification: `bash -n utils/pdda-catchup.sh` clean; skip, failure (`PDDA_LLM_BIN=false`), and success
+(stub CLI) paths all exercised — failure surfaces a WARN, success writes the dated recommendations file.
+
+### Agent startup: imperative AGENTS.md trigger + `/pdda` re-orient skill
+
+Closed the gap between the auto-loaded `AGENTS.md` and the `ROUTER.md` startup sequence, and added a
+thin re-orientation lever for mid-session inflection points.
+
+- **Imperative startup directive.** `AGENTS.md` (which agent harnesses auto-load) now *instructs* the
+  agent to follow the `ROUTER.md` startup sequence on first action, rather than only pointing at it.
+  This makes the read-order self-executing without the user typing "read ROUTER.md", and needs no new
+  surface — the harness already loads the file.
+- **`/pdda` skill (`.claude/skills/pdda/SKILL.md`).** A deliberately dumb read-and-report pass for the
+  one case the auto-load can't cover: explicit re-orientation on task switch, resume, post-compact, or
+  context drift. It walks `ROUTER.md`, names the next canonical file, and runs `pdda.sh run` for state.
+  It re-specifies no contract — points at where each fact lives.
+- **Ships via `--with-startup-docs`.** Bundled with `ROUTER.md`/`AGENTS.md` (it's only useful when
+  those exist in the target), so no new installer flag. `install.sh`, `utils/PDDA-INSTALL.md`, and the
+  `ROUTER.md` routing hints updated in lockstep.
+
+Verification: `bash -n install.sh` clean; `./utils/pdda.sh run` green (pre-existing BLANK.md dogfood
+findings only, non-blocking in observe); end-to-end `install.sh --with-startup-docs` into a temp repo
+confirmed `ROUTER.md`, `AGENTS.md`, and `.claude/skills/pdda/SKILL.md` all land in the target.
+
 ## 2026-06-26
 
 ### Triage ratings for medium-large work (effort / complexity / risk / phases)

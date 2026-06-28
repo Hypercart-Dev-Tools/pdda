@@ -1,6 +1,7 @@
 # AGENTS.md
 
-See `ROUTER.md` for repo startup order and canonical files.
+**On your first action in this repo, follow the startup sequence in `ROUTER.md` before recommending or editing anything.** It names the canonical files and the order to read them. Re-run it (or `/pdda`) when you switch tasks, resume a long session, or feel context has drifted.
+
 See `GUIDING-PRINCIPLES.md` for the repo's north star — the goals and tradeoff lens these rules serve.
 
 ## Operating principles
@@ -21,14 +22,14 @@ Every consequential change gets a read on the shared scale: `Easy / Costly / One
 
 ### 4. Verify instead of implying
 
-Do not report a win you did not verify. In this repo, `utils/pdda.sh run` is the main rail unless a narrower single check (`utils/pdda.sh <check>`) is more appropriate.
+Do not report a win you did not verify. In this repo, `utils/pdda/pdda.sh run` is the main rail unless a narrower single check (`utils/pdda/pdda.sh <check>`) is more appropriate.
 
 ### 5. Keep the installer surface in lockstep
 
 If a PDDA script is added, removed, or behaviorally changed, update the matching contract docs in the same change:
 
 - `PROJECT/PDDA.md`
-- `utils/PDDA-INSTALL.md`
+- `utils/pdda/PDDA-INSTALL.md`
 - any repo-facing startup docs that describe the shipped surface
 
 ### 6. Keep this repo about PDDA
@@ -42,7 +43,7 @@ Update `CHANGELOG.md` at the end of a substantive iteration. `PROJECT/PDDA.md` o
 ## Working in this repository
 
 - The canonical PDDA contract lives in `PROJECT/PDDA.md`.
-- The runnable install surface lives in `utils/pdda.sh` (checks + runner), `utils/pdda-doc-ready.sh` (LLM layer), and `utils/pdda-lib.sh` (shared helpers).
-- The extraction contract lives in `utils/PDDA-INSTALL.md`.
+- The runnable install surface lives in `utils/pdda/pdda.sh` (checks + runner), `utils/pdda/pdda-doc-ready.sh` (LLM layer), and `utils/pdda/pdda-lib.sh` (shared helpers).
+- The extraction contract lives in `utils/pdda/PDDA-INSTALL.md`.
 - `ROADMAP.md` is this repo's pointer ledger, not a second plan body.
 - `PROJECT/PDDA-ACTIVITY.jsonl` is runtime output, not install history to copy into target repos.
