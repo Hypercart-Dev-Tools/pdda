@@ -2,7 +2,7 @@
 set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=utils/pdda-lib.sh
+# shellcheck source=utils/pdda/pdda-lib.sh
 . "$HERE/pdda-lib.sh"
 
 CHECK_NAME="pdda-doc-ready"

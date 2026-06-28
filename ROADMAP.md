@@ -15,7 +15,7 @@ goal: >
      NOT allowed: phase checklists, build steps, deep execution notes — put those in the project doc.
      Carve-out: a SHORT exception note is OK only when omitting it would hide an operationally critical fact.
      Coverage rule: every PROJECT/2-WORKING doc must be reflected here by a pointer (or opt out with roadmap_exempt: true).
-     Enforced by `pdda.sh roadmap` + `pdda.sh roadmap-coverage` (deterministic) + utils/pdda-doc-ready.sh ROADMAP rubric (LLM). -->
+     Enforced by `pdda.sh roadmap` + `pdda.sh roadmap-coverage` (deterministic) + utils/pdda/pdda-doc-ready.sh ROADMAP rubric (LLM). -->
 
 # PDDA Standalone Roadmap
 

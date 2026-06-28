@@ -11,7 +11,7 @@ set -euo pipefail
 # ROADMAP/CHANGELOG/activity content, so the target starts empty but immediately valid. Existing
 # target files are never clobbered unless you pass --force.
 #
-# This is the executable form of utils/PDDA-INSTALL.md; keep the two in lockstep.
+# This is the executable form of utils/pdda/PDDA-INSTALL.md; keep the two in lockstep.
 
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -37,12 +37,12 @@ Options:
   -h, --help             This message.
 
 What gets installed (zero state):
-  utils/pdda.sh utils/pdda-lib.sh utils/pdda-doc-ready.sh   (runtime, refreshed)
+  utils/pdda/{pdda.sh,pdda-lib.sh,pdda-doc-ready.sh,pdda-catchup.sh}   (runtime, refreshed)
   PROJECT/PDDA.md                                            (the contract, refreshed)
   PROJECT/{1-INBOX,2-WORKING,3-COMPLETED,4-MISC}/blank.md    (lifecycle buckets)
   ROADMAP.md CHANGELOG.md PROJECT/PDDA-ACTIVITY.jsonl .pdda-mode   (blank seeds, create-only)
 
-After install it runs `utils/pdda.sh run` in the target so you see it working immediately.
+After install it runs `utils/pdda/pdda.sh run` in the target so you see it working immediately.
 USAGE
 }
 
@@ -108,11 +108,12 @@ seed_file() {  # <relpath>  (content on stdin)
 say "Installing PDDA into: $TARGET"
 say ""
 say "Runtime + contract:"
-copy_runtime "utils/pdda.sh"
-copy_runtime "utils/pdda-lib.sh"
-copy_runtime "utils/pdda-doc-ready.sh"
+copy_runtime "utils/pdda/pdda.sh"
+copy_runtime "utils/pdda/pdda-lib.sh"
+copy_runtime "utils/pdda/pdda-doc-ready.sh"
+copy_runtime "utils/pdda/pdda-catchup.sh"
 copy_runtime "PROJECT/PDDA.md"
-chmod +x "$TARGET/utils/pdda.sh" "$TARGET/utils/pdda-lib.sh" "$TARGET/utils/pdda-doc-ready.sh"
+chmod +x "$TARGET/utils/pdda/pdda.sh" "$TARGET/utils/pdda/pdda-lib.sh" "$TARGET/utils/pdda/pdda-doc-ready.sh" "$TARGET/utils/pdda/pdda-catchup.sh"
 
 if [ "$WITH_STARTUP_DOCS" -eq 1 ]; then
   copy_runtime "ROUTER.md"
@@ -138,7 +139,7 @@ seed_file "ROADMAP.md" <<ROADMAP
      NOT allowed: phase checklists, build steps, deep execution notes — put those in the project doc.
      Carve-out: a SHORT exception note is OK only when omitting it would hide an operationally critical fact.
      Coverage rule: every PROJECT/2-WORKING doc must be reflected here by a pointer (or opt out with roadmap_exempt: true).
-     Enforced by \`pdda.sh roadmap\` + \`pdda.sh roadmap-coverage\` (deterministic) + utils/pdda-doc-ready.sh ROADMAP rubric (LLM). -->
+     Enforced by \`pdda.sh roadmap\` + \`pdda.sh roadmap-coverage\` (deterministic) + utils/pdda/pdda-doc-ready.sh ROADMAP rubric (LLM). -->
 
 # Roadmap
 
@@ -184,11 +185,11 @@ why, and the verification. See \`PROJECT/PDDA.md\` for the full contract.
 
 ### PDDA installed
 
-- Installed the PDDA document-automation surface (\`utils/pdda.sh\` + helpers, \`PROJECT/PDDA.md\`)
+- Installed the PDDA document-automation surface (\`utils/pdda/pdda.sh\` + helpers, \`PROJECT/PDDA.md\`)
   and the \`PROJECT/**\` lifecycle tree in \`observe\` mode.
 - Next: replace this entry as real iterations land.
 
-Verification: \`./utils/pdda.sh run\`
+Verification: \`./utils/pdda/pdda.sh run\`
 CHANGELOG
 
 # Empty activity log (never copy the source repo's log).
@@ -199,19 +200,19 @@ $MODE
 MODE
 
 say ""
-say "Verifying install (utils/pdda.sh run):"
+say "Verifying install (utils/pdda/pdda.sh run):"
 say ""
 case "$MODE" in
   observe) MODE_BLURB="report-only; graduate to light → full as you clear doc debt" ;;
   light)   MODE_BLURB="reports findings but never blocks; graduate to full when ready" ;;
   full)    MODE_BLURB="on rails — errors block with a non-zero exit" ;;
 esac
-if ( cd "$TARGET" && PDDA_MODE="$MODE" ./utils/pdda.sh run ); then
+if ( cd "$TARGET" && PDDA_MODE="$MODE" ./utils/pdda/pdda.sh run ); then
   say ""
   say "PDDA installed. Mode: $MODE ($MODE_BLURB)."
   say "Next: read PROJECT/PDDA.md, then start a doc in PROJECT/2-WORKING and point ROADMAP.md at it."
 else
   say ""
   say "PDDA installed, but the first run reported findings or failed — see output above."
-  say "In observe mode this never blocks; review the findings and re-run ./utils/pdda.sh run."
+  say "In observe mode this never blocks; review the findings and re-run ./utils/pdda/pdda.sh run."
 fi

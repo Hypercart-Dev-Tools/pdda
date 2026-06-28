@@ -252,8 +252,8 @@ PDDA should have two classes of automation:
 
 Implementation note:
 
-- the automation ships as a single dispatcher, `utils/pdda.sh`, which sources shared helpers from
-  `utils/pdda-lib.sh`
+- the automation ships as a single dispatcher, `utils/pdda/pdda.sh`, which sources shared helpers from
+  `utils/pdda/pdda-lib.sh`
 - every deterministic check is a subcommand: `pdda.sh frontmatter`, `pdda.sh status-table`,
   `pdda.sh hardcoded-paths`, `pdda.sh roadmap`, `pdda.sh roadmap-coverage`, `pdda.sh changelog`,
   `pdda.sh stale`
@@ -474,7 +474,7 @@ How this is enforced (so it cannot quietly rot in either direction):
 - **deterministic (no gap missing)** — `pdda.sh roadmap-coverage` errors when either an
   active `PROJECT/2-WORKING` doc has no pointer here, or a captured `PROJECT/1-INBOX/GH-*.md` doc is
   not parked here as a queue entry (honors `roadmap_exempt: true`)
-- **LLM** — `utils/pdda-doc-ready.sh` reviews `ROADMAP.md` against the full pointer contract for the
+- **LLM** — `utils/pdda/pdda-doc-ready.sh` reviews `ROADMAP.md` against the full pointer contract for the
   fuzzier "this paragraph is really execution detail" cases (honors the carve-out)
 - the file itself carries a top banner restating the contract, so a human editing it sees the rule
 

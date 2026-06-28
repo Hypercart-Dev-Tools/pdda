@@ -2,6 +2,38 @@
 
 ## 2026-06-27
 
+### Runtime relocated to `utils/pdda/` subfolder
+
+Moved the shipped runtime (`pdda.sh`, `pdda-lib.sh`, `pdda-doc-ready.sh`, `pdda-catchup.sh`) and the
+install manifest into a dedicated `utils/pdda/` subfolder so it never mixes with a target repo's own
+`utils/` files on install.
+
+- **One real code fix: repo-root resolution.** `pdda-lib.sh` derived `PDDA_REPO_ROOT` as
+  `$PDDA_LIB_DIR/..`, which assumed the runtime sat directly under `utils/`. With the scripts now one
+  level deeper, that resolved the root to `utils/` — so every check scanned an empty `utils/PROJECT/**`
+  and *vacuously passed*, and the activity log was written to `utils/PROJECT/`. Fixed to `../..`. This
+  was the load-bearing change; without it the relocation silently breaks every install.
+- **Inter-script sourcing needed no change** — it already resolves via `$(dirname "$0")`/`BASH_SOURCE`,
+  so co-locating the files keeps `run`/`doc-ready`/`catchup` wiring intact. `shellcheck source=` hints
+  were repathed.
+- **All path-prefixed references repathed in lockstep** — `install.sh` (copy + chmod + messages),
+  `utils/pdda/PDDA-INSTALL.md` (canonical set, create paths, chmod, verification), `ROUTER.md`,
+  `AGENTS.md`, `README.md`, `PROJECT/PDDA.md`, `ROADMAP.md` banner, the active install-script working
+  doc, and the `/pdda` skill (repo-local + global). Bare subcommand mentions (`pdda.sh frontmatter`)
+  were left as-is — they name commands, not file paths.
+- **Fixed a pre-existing lockstep gap:** `install.sh` and `PDDA-INSTALL.md` did not ship
+  `pdda-catchup.sh`, so the `catchup` subcommand would have failed in target repos. It's now part of
+  the copied runtime + chmod set.
+- Historical CHANGELOG entries keep their original `utils/pdda.sh` paths — they are a dated record of
+  what was true at the time, not live references.
+
+Verification: `bash -n` clean on `install.sh` + all four scripts; `./utils/pdda/pdda.sh run` from the
+repo root correctly re-detects `PROJECT/2-WORKING` (the dogfood `BLANK.md` findings reappeared,
+confirming root resolution) and writes to the real `PROJECT/PDDA-ACTIVITY.jsonl`, with no stray
+`utils/PROJECT/`. End-to-end `install.sh [--with-startup-docs]` into throwaway repos confirmed the
+runtime lands in `utils/pdda/`, the `/pdda` skill ships, the target root resolves correctly (activity
+log at target `PROJECT/`, no `utils/PROJECT/`), and both `pdda.sh run` and `pdda.sh catchup` work.
+
 ### `pdda.sh catchup` — LLM repo triage with ROUTER.md recommendations
 
 New opt-in subcommand that reviews recent repo activity against `ROUTER.md` and proposes concrete

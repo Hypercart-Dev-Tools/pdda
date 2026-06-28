@@ -14,14 +14,14 @@ A thin re-orientation pass. It does not re-specify any contract; it points at th
 3. **Report current PDDA state** by running the deterministic surface:
 
    ```bash
-   utils/pdda.sh run
+   utils/pdda/pdda.sh run
    ```
 
-   If the user only wants a quick state read, a narrower check is fine (`utils/pdda.sh status-table`, `utils/pdda.sh roadmap-coverage`). Report deterministic findings first; do not override them with prose.
+   If the user only wants a quick state read, a narrower check is fine (`utils/pdda/pdda.sh status-table`, `utils/pdda/pdda.sh roadmap-coverage`). Report deterministic findings first; do not override them with prose.
 4. **Give the operator a short orientation**: current enforcement mode (`.pdda-mode`), what active work `PROJECT/2-WORKING` holds, and any findings worth attention — then the recommended next action.
 
 ## Keep it dumb
 
 - Do not paste the contract, the roadmap rules, or the changelog rules — link to where they live.
 - Do not edit anything. This is a read + report pass.
-- If `utils/pdda.sh` is absent, PDDA isn't installed here; say so and stop.
+- If `utils/pdda/pdda.sh` is absent, PDDA isn't installed here; say so and stop.

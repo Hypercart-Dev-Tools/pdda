@@ -2,7 +2,7 @@
 set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=utils/pdda-lib.sh
+# shellcheck source=utils/pdda/pdda-lib.sh
 . "$HERE/pdda-lib.sh"
 
 CHECK_NAME="pdda-catchup"
@@ -23,7 +23,7 @@ read -ra _llm_args <<<"$PDDA_LLM_ARGS"
 
 read -r -d '' RUBRIC <<'RUBRIC_EOF' || true
 You are an expert repository manager and technical lead. 
-Your task is to review recent activity in this repository (CHANGELOG entries, recent Git commits, and recently added Inbox issues) and compare it against the current contents of ROUTER.md.
+Your task is to review recent activity in this repository (CHANGELOG entries, recent Git commits, recently added Inbox issues, and active working docs) and compare it against the current contents of ROUTER.md.
 ROUTER.md serves as the canonical startup file and routing guide for this repository.
 
 Based on the recent activity, please provide specific, actionable recommendations on what to:
@@ -66,6 +66,19 @@ if [ -d "$PDDA_INBOX_DIR" ]; then
   )"
 fi
 
+# 5. Active Working Docs (filename + title + status)
+WORKING_CONTENT=""
+if [ -d "$PDDA_WORKING_DIR" ]; then
+  WORKING_CONTENT="$(
+    pdda_list_working_docs |
+      while IFS= read -r f; do
+        title="$(pdda_frontmatter_value "$f" "title" 2>/dev/null || grep -m1 '^#[[:space:]]' "$f" 2>/dev/null | sed -E 's/^#+[[:space:]]*//')"
+        status="$(pdda_frontmatter_value "$f" "status" 2>/dev/null || echo "unknown")"
+        printf '%s — %s (Status: %s)\n' "$(basename "$f")" "${title:-(no title)}" "$status"
+      done
+  )"
+fi
+
 # Assemble the full prompt once, then feed it on stdin (portable across model CLIs and immune to
 # ARG_MAX limits when ROUTER.md is large).
 PROMPT="$RUBRIC
@@ -81,6 +94,9 @@ $COMMITS_CONTENT
 
 === RECENT INBOX ISSUES (TOP 10) ===
 $INBOX_CONTENT
+
+=== ACTIVE WORKING DOCS ===
+$WORKING_CONTENT
 "
 
 # Run LLM. Let stderr flow to the terminal (so auth/rate-limit/arg errors are visible, not swallowed)
