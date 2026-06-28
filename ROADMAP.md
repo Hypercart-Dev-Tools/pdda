@@ -39,6 +39,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 ### In progress
 
 - **Root `install.sh` + operator onboarding** (2026-06-25) - installer that provisions a foreign repo to a clean zero state; README rewritten for onboarding. Tracking issue pending `gh` re-auth. -> [PROJECT/2-WORKING/INSTALL-SCRIPT-AND-ONBOARDING.md](PROJECT/2-WORKING/INSTALL-SCRIPT-AND-ONBOARDING.md)
+- **Sync the PDDA runtime to other repos** (2026-06-27) - register repos for the `utils/pdda/` runtime, then a launchd job every 30 min content-hash-syncs changes (backup-then-overwrite); registry lives in gitignored `temp/`. Plan/decisions captured; impl pending approval. -> [PROJECT/2-WORKING/PDDA-SYNC-TO-OTHER-REPOS.md](PROJECT/2-WORKING/PDDA-SYNC-TO-OTHER-REPOS.md)
 
 ### Completed
 
