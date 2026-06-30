@@ -134,10 +134,13 @@ Use these when the target repo does not exactly match this repo's layout:
 ```text
 PDDA_MODE
 PDDA_WORKING_DIR
+PDDA_COMPLETED_DIR
 PDDA_MISC_DIR
 PDDA_ACTIVITY_LOG
+PDDA_GH_STATE_CACHE
 PDDA_ROADMAP
 PDDA_STALE_DAYS
+PDDA_ISSUE_SYNC_SOURCE
 PDDA_DRY_RUN
 PDDA_FORMAT
 PDDA_ACTIVITY_MAX_LINES
@@ -147,6 +150,11 @@ PDDA_LLM_BIN
 PDDA_LLM_ARGS
 PDDA_LLM_MODEL
 ```
+
+`issue-doc-sync` adds three of these: `PDDA_COMPLETED_DIR` (the `3-COMPLETED` move target named in the
+flag), `PDDA_GH_STATE_CACHE` (the cached GitHub issue-state file used when `gh` is offline; written by
+`pdda-gh-refresh.sh`), and `PDDA_ISSUE_SYNC_SOURCE` = `auto` (default: live `gh`, else cache) | `gh` |
+`cache` (the Stop doc-health hook forces `cache` to stay fast and offline-tolerant).
 
 ## Minimal target-repo expectations
 

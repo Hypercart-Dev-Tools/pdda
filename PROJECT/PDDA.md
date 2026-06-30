@@ -256,7 +256,7 @@ Implementation note:
   `utils/pdda/pdda-lib.sh`
 - every deterministic check is a subcommand: `pdda.sh frontmatter`, `pdda.sh status-table`,
   `pdda.sh hardcoded-paths`, `pdda.sh roadmap`, `pdda.sh roadmap-coverage`, `pdda.sh changelog`,
-  `pdda.sh stale`
+  `pdda.sh stale`, `pdda.sh issue-doc-sync`
 - the aggregate runner is `pdda.sh run` (it runs the deterministic checks in order, then the LLM
   review)
 - each finding still carries a stable `check` id (e.g. `pdda-check-frontmatter`) in stdout and the
@@ -376,6 +376,33 @@ Expected exceptions:
 - a working doc that should not appear in the ledger opts out with `roadmap_exempt: true` in its
   frontmatter (mirrors the `pdda_hold` escape hatch in `pdda.sh stale`); the check then
   emits `info` (skip) for that doc
+
+#### H. `pdda.sh issue-doc-sync`
+
+Purpose:
+- catch a `PROJECT/2-WORKING/GH-*.md` doc whose recorded state has drifted from its **GitHub issue**,
+  in either direction — the gap a 2026-06-29 manual reconciliation pass had to cross-reference by hand
+
+Minimum behavior:
+- for each working doc, resolve its issue number from the `gh_issue` frontmatter key (preferred) or the
+  `GH-<number>-` filename; silently skip docs that carry neither (they are not issue-tracked)
+- resolve each issue's state from the best available source (see gh-degrade below), then flag two drifts:
+  - **(a)** issue **CLOSED** but the doc is still in `2-WORKING` -> `warn`, recommending the exact
+    `git mv` to `PROJECT/3-COMPLETED` (flag-only; a human runs the one reversible move)
+  - **(b)** issue **OPEN** but the doc's `status:` lead word declares it done (`complete`, `done`,
+    `shipped`, `fixed`, `closed`, `merged`, `resolved`, `landed`) -> `warn` to reconcile (close the
+    issue or correct the status). Anchoring on the status **lead word** means a mid-status mention like
+    `Active — Phase 0 complete` never false-flags.
+- `warn` (never `error` — does not block, even in `full`, mirroring `pdda.sh changelog`); **flag-only**,
+  never moves a file
+- gh-degrade: with `PDDA_ISSUE_SYNC_SOURCE=auto` (default) it uses live `gh` when that succeeds, else a
+  cached state file (`PDDA_GH_STATE_CACHE`, written by `pdda-gh-refresh.sh`); when neither is available
+  it emits `info` (skip) for the affected doc and evaluates nothing. `gh`/`cache` force one source.
+
+Why warn-only + flag-only:
+- every drift class here is mechanical, so the check carries zero false-judgment risk; a false flag is
+  one ignorable warn line and a missed flag just leaves today's manual reconciliation — both cheap, so
+  warn-only never-blocks is the right calibration (same stance as `pdda.sh stale` and `pdda.sh changelog`)
 
 ### 2. LLM-assisted doc readiness review
 
@@ -540,10 +567,11 @@ Run the deterministic checks every hour in this order:
 5. `pdda.sh roadmap-coverage`
 6. `pdda.sh changelog`
 7. `pdda.sh stale`
+8. `pdda.sh issue-doc-sync`
 
 Then run:
 
-8. `pdda.sh doc-ready`
+9. `pdda.sh doc-ready`
 
 (`pdda.sh run` runs exactly this sequence and applies the active `PDDA_MODE` gate. Scheduling the
 single aggregate command is the recommended hourly cron entry.)
@@ -551,6 +579,8 @@ single aggregate command is the recommended hourly cron entry.)
 Reason for the order:
 
 - deterministic failures should surface first
+- the network-dependent `issue-doc-sync` runs last among the deterministic checks, so every local
+  check still completes when `gh` is offline (it then degrades to the cache or an `info` skip)
 - the LLM review should spend time only on docs that passed basic structural hygiene
 
 ## Suggested output contract
