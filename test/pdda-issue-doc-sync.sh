@@ -109,6 +109,14 @@ printf '105\tCLOSED\n' > "$SBOX/.pdda-gh-state.tsv"
 out="$(run_check cache)"
 assert_contains "$out" "issue #105 is CLOSED" "(fallback) resolves issue number from GH-<n>- filename"
 
+# (filename fallback, bare) GH-<n>.md with NO description and NO gh_issue key must still resolve
+# (regression for the agy QA-review nit: '.md' must be stripped before the dash split).
+new_sandbox
+write_doc "$SBOX/PROJECT/2-WORKING/GH-106.md" - "Active"
+printf '106\tCLOSED\n' > "$SBOX/.pdda-gh-state.tsv"
+out="$(run_check cache)"
+assert_contains "$out" "issue #106 is CLOSED" "(fallback-bare) resolves bare GH-<n>.md filename (no description)"
+
 # (non-GH doc) a working doc with neither gh_issue nor GH- name is silently skipped
 new_sandbox
 write_doc "$SBOX/PROJECT/2-WORKING/PLAIN-DOC.md" - "Active"

@@ -484,7 +484,7 @@ _pdda_doc_issue_number() {
   if printf '%s' "$num" | grep -Eq '^[0-9]+$'; then printf '%s' "$num"; return; fi
   base="$(basename "$file")"
   case "$base" in
-    GH-[0-9]*) num="${base#GH-}"; num="${num%%-*}"
+    GH-[0-9]*) num="${base#GH-}"; num="${num%.md}"; num="${num%%-*}"   # strip .md first so a bare GH-<n>.md (no description) still resolves
       if printf '%s' "$num" | grep -Eq '^[0-9]+$'; then printf '%s' "$num"; fi ;;
   esac
 }
