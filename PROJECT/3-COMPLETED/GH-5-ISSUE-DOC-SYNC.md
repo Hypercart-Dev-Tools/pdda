@@ -1,6 +1,6 @@
 ---
 title: Deterministic issue↔doc sync check + two-tier doc-health hooks
-status: Active — Phases 1–4 built, tested, and committed; finalize (CHANGELOG/ROADMAP/move/close #5) pending
+status: Complete — all 4 build phases shipped, tested, committed + pushed; issue #5 closed, doc archived to 3-COMPLETED
 created: 2026-06-29
 updated: 2026-06-29
 owner: noel
@@ -35,7 +35,7 @@ phases: 5
 
 | What was just completed | What's next |
 |---|---|
-| Phases 1–4 all built, tested, and committed (`53ab555`, `4d49764`, `561f38c`, `e110fa1`): the `issue-doc-sync` check (warn-only, gh-degrade, 13 tests), the `gh-refresh` cache producer, and the two-tier PostToolUse + Stop doc-health hooks (18 tests). `pdda.sh run` green; live tree reports no drift. | Finalize (deferred while a concurrent GH-6 edit holds `ROADMAP.md`/`CHANGELOG.md` uncommitted): add the CHANGELOG entry, move this doc's `ROADMAP.md` pointer to **Completed**, `git mv` this doc to `PROJECT/3-COMPLETED/`, then close issue #5 once you've verified it. |
+| **Complete.** All 4 build phases shipped, tested, committed + pushed (`53ab555`, `4d49764`, `561f38c`, `e110fa1`): the `issue-doc-sync` check (warn-only, gh-degrade, 13 tests), the `gh-refresh` cache producer, and the two-tier PostToolUse + Stop doc-health hooks (18 tests). Issue #5 closed; doc archived here, ROADMAP pointer moved to Completed. | Done. (One repo-level follow-up outside GH-5: a concurrent GH-6 edit left `CHANGELOG.md` mid-flight — deleting ~156 lines of history — for the operator to reconcile; the GH-5 changelog entry rides with that fix.) |
 
 ## Table of contents
 
