@@ -40,6 +40,14 @@ TARGET=""
 # path with PDDA_REGISTRY; skip writing it with --no-register.
 PDDA_REGISTRY="${PDDA_REGISTRY:-${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv}"
 
+# Optional multi-device rollup: if git-pulse (a separate, GitHub-backed activity-sync tool) is present, the
+# installer also drops a PATH-NORMALIZED projection of the registry (repo name + date + source commit +
+# mode; never absolute paths) into git-pulse's repo under pdda/, and git-pulse's own sync carries it across
+# devices — no new sync infrastructure. Best-effort and fail-open: absent git-pulse → silently skipped, the
+# install is unaffected. The LOCAL registry above stays the source of truth. Override the location with
+# PDDA_GITPULSE_DIR; disable by pointing it at a nonexistent path, or with --no-register (same gate).
+PDDA_GITPULSE_DIR="${PDDA_GITPULSE_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/git-pulse/repo}"
+
 usage() {
   cat <<'USAGE'
 PDDA installer — install Project-Driven Doc Automation into a target repo.
@@ -59,6 +67,7 @@ Options:
   --no-register          Skip recording this install in the per-user registry
                          (default: $XDG_CONFIG_HOME/pdda/registry.tsv or ~/.config/pdda/registry.tsv;
                          override with PDDA_REGISTRY). The registry is machine-local and never committed.
+                         Also skips the multi-device git-pulse projection (see below).
   --mode <m>             Initial .pdda-mode: observe (default) | light | full.
   -h, --help             This message.
 
@@ -69,8 +78,14 @@ What gets installed (zero state):
   ROADMAP.md CHANGELOG.md PROJECT/PDDA-ACTIVITY.jsonl .pdda-mode   (blank seeds, create-only)
   .gitignore += PROJECT/PDDA-ACTIVITY.jsonl .pdda-gh-state.tsv     (churning runtime state)
 
-It also records the install in a per-user, machine-local registry (~/.config/pdda/registry.tsv) so a
-future sync layer knows where every copy lives. The registry is never committed. --no-register skips it.
+It also records the install in a per-user, machine-local registry (~/.config/pdda/registry.tsv) so
+pdda-sync.sh knows where every copy lives. The registry is never committed. --no-register skips it.
+
+If git-pulse (a GitHub-backed activity-sync tool) is present, the installer additionally drops a
+path-normalized projection of the registry (repo name + date + source commit + mode; never absolute
+paths) into git-pulse's repo under pdda/, and git-pulse's own sync carries that status across your
+devices. Best-effort and fail-open — absent git-pulse it is silently skipped. Override the location with
+PDDA_GITPULSE_DIR; the local registry remains the source of truth.
 
 After install it runs `utils/pdda/pdda.sh run` in the target so you see it working immediately.
 USAGE
@@ -228,10 +243,44 @@ ensure_runtime_ignored() {
   done
 }
 
+# Publish a path-normalized projection of the registry into git-pulse's sync repo when git-pulse is present,
+# so PDDA install status rolls up across devices with NO new sync infrastructure (git-pulse's own sync
+# carries the file). Normalized = col 1 absolute path -> bare repo name; the projection never contains a
+# filesystem path. Best-effort / fail-open (GUIDING-PRINCIPLES #6: never break an install); the local
+# registry stays the source of truth (#4) and keeps absolute paths because pdda-sync.sh cd's into them.
+# Rewritten in full every run, so the projection can't drift from the registry. A maintainer-LLM on another
+# machine locates a repo by name (the file header carries the exact find command), not by a path we ship.
+publish_registry_projection() {
+  local gp="$PDDA_GITPULSE_DIR" dev cfg out
+  [ -d "$gp/.git" ] || return 0   # no git-pulse checkout here -> nothing to roll up
+  cfg="${XDG_CONFIG_HOME:-$HOME/.config}/git-pulse/config.sh"
+  # Reuse git-pulse's own device id so PDDA and pulse files key on the same device; else fall back to host.
+  dev="$( ( . "$cfg" 2>/dev/null; printf '%s' "${device_id:-}" ) )"
+  [ -n "$dev" ] || dev="$(hostname -s 2>/dev/null || printf 'unknown-device')"
+  mkdir -p "$gp/pdda" 2>/dev/null || { say "  (git-pulse pdda/ not writable — publish skipped)"; return 0; }
+  out="$gp/pdda/registry-$dev.tsv"
+  # ponytail: registry paths are pwd-normalized (no trailing slash), so basename-via-split is safe.
+  if {
+       printf '# PDDA install status (normalized to repo name; absolute paths intentionally omitted).\n'
+       printf '# Maintainer LLM on another machine: a clone usually keeps the origin repo name as its folder,\n'
+       printf '# so locate it by exact name first:\n'
+       printf '#   find ~ -type d -name "<repo>" -exec test -d "{}/.git" \\; -print 2>/dev/null\n'
+       printf '# If that returns nothing (repo cloned into a renamed folder), fall back to a fuzzy search:\n'
+       printf '#   find ~ -type d -iname "*<repo>*" -exec test -d "{}/.git" \\; -print 2>/dev/null\n'
+       printf '# repo\tlast_install_utc\tmode\tsource_commit\tstartup_docs\n'
+       awk -F'\t' 'BEGIN{OFS="\t"} /^#/{next} NF==0{next} {n=split($1,a,"/"); $1=a[n]; print}' "$PDDA_REGISTRY"
+     } > "$out" 2>/dev/null; then
+    say "  publish   pdda/registry-$dev.tsv (normalized; git-pulse carries it)"
+  else
+    say "  (git-pulse publish failed — skipped)"
+  fi
+  return 0
+}
+
 # Record this install in the per-user, per-device registry (one row per target, latest wins). This is
-# the data a future sync layer reads to find copies that are behind — recording source_commit now means
-# that layer needs no schema change. Machine-local; never committed. Best-effort: a failure here never
-# fails the install.
+# the data pdda-sync.sh reads to find copies that are behind — recording source_commit means that layer
+# needs no schema change. Machine-local; never committed. Best-effort: a failure here never fails the
+# install. On success it also publishes the multi-device projection (publish_registry_projection).
 register_install() {
   [ "$REGISTER" -eq 1 ] || return 0
   local reg="$PDDA_REGISTRY" dir
@@ -255,7 +304,10 @@ register_install() {
   row="$(printf '%s\t%s\t%s\t%s\t%s' "$TARGET" "$ts" "$MODE" "$src_commit" "$sdocs")"
   tmp="$reg.tmp.$$"
   if awk -F'\t' -v t="$TARGET" '$1 != t' "$reg" > "$tmp" 2>/dev/null; then
-    printf '%s\n' "$row" >> "$tmp" && mv "$tmp" "$reg" && say "  register  $TARGET -> $reg"
+    if printf '%s\n' "$row" >> "$tmp" && mv "$tmp" "$reg"; then
+      say "  register  $TARGET -> $reg"
+      publish_registry_projection   # best-effort multi-device rollup; never fails the install
+    fi
   else
     rm -f "$tmp"
     say "  (registry write failed — skipped)"

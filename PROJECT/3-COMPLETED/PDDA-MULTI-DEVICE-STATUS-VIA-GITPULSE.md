@@ -1,6 +1,6 @@
 ---
 title: Multi-device PDDA install status — piggyback git-pulse's sync repo (new folder)
-status: Active (sketch — design only, not yet built)
+status: Completed (2026-06-30 — Iteration 1 wired into install.sh; 10/10 publish test green; today's ledger backfilled)
 created: 2026-06-30
 updated: 2026-06-30
 owner: noel
@@ -19,7 +19,7 @@ gh_issue: pending (gh auth re-login required; rename this doc to GH-<n>-… once
 
 | What was just completed | What's next |
 |---|---|
-| Sketched, **ponytail-trimmed**, then refined to a **path-normalized projection**. Open questions resolved: (1) reuse `rebalance-git-pulse` with an isolated `pdda/` folder; (2) repo is **private** — confirmed; (3) cadence — **git-pulse's existing launchd sync carries any file written into its repo** (its own snapshot: "the existing pulse sync carries the file"); (4) projection carries repo name + date + build hash + mode, **never the folder path**. So PDDA needs **no git logic and no new command**. | Build **Iteration 1**: ~6 best-effort lines in the existing `register_install()` that write a normalized `pdda/registry-<device>.tsv`. Open: bare repo name vs git remote slug as the key (defaulting to bare name). |
+| **Iteration 1 built and shipped.** `publish_registry_projection()` added to `install.sh` and called from `register_install()` on every successful install/upgrade: when git-pulse is present it writes a path-normalized `pdda/registry-<device>.tsv` (bare repo name + date + source commit + mode; no absolute paths), carried by git-pulse's own sync. Best-effort/fail-open. Key = bare repo name with an exact-then-fuzzy maintainer `find` note. Backfilled today's ledger by hand earlier; this makes it automatic going forward. | Nothing committed remaining. Deferred (YAGNI, reopen if needed): a `roster` aggregation read and folding the projection into `pdda-sync.sh status`. |
 
 ## Design (post-ponytail)
 
