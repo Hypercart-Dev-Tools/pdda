@@ -102,5 +102,34 @@ run_edit_hook "$SBOX/ROADMAP.md"
 assert_rc0 "ROADMAP edit: exits 0"
 assert_has "pdda-check-roadmap" "ROADMAP edit: routed to the roadmap check"
 
+printf '\n== tier 2: Stop full-scan hook ==\n'
+
+run_stop_hook() {
+  HOOK_OUT="$(printf '%s' '{"stop_hook_active":false}' | env $(sbox_env) bash "$STOP_HOOK" 2>&1)"
+  RC=$?
+}
+
+# clean working set -> single consolidated report, "all clear", exit 0
+new_sandbox
+good_doc "$SBOX/PROJECT/2-WORKING/GH-1-ok.md"
+printf -- '- [GH-1](PROJECT/2-WORKING/GH-1-ok.md)\n' >> "$SBOX/ROADMAP.md"
+printf '# Changelog\n\n## 2026-06-29\n\n- seeded\n' > "$SBOX/CHANGELOG.md"
+printf '1\tOPEN\n' > "$SBOX/.pdda-gh-state.tsv"
+run_stop_hook
+assert_rc0 "stop/clean: exits 0"
+assert_has "PDDA doc-health (stop scan)" "stop/clean: emits ONE consolidated report header"
+assert_has "all clear" "stop/clean: reports all clear"
+
+# closed-issue drift -> consolidated report includes issue-doc-sync (from cache), still exit 0
+new_sandbox
+good_doc "$SBOX/PROJECT/2-WORKING/GH-2-done.md"
+printf -- '- [GH-2](PROJECT/2-WORKING/GH-2-done.md)\n' >> "$SBOX/ROADMAP.md"
+printf '# Changelog\n\n## 2026-06-29\n\n- seeded\n' > "$SBOX/CHANGELOG.md"
+printf '2\tCLOSED\n' > "$SBOX/.pdda-gh-state.tsv"
+run_stop_hook
+assert_rc0 "stop/drift: exits 0 even with findings (never blocks)"
+assert_has "issue #2 is CLOSED" "stop/drift: report includes issue-doc-sync against the cached gh-state"
+assert_has "warn(s)" "stop/drift: consolidated counts shown"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

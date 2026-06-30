@@ -75,6 +75,7 @@ utils/pdda/pdda-doc-ready.sh
 utils/pdda/pdda-catchup.sh
 utils/pdda/pdda-gh-refresh.sh
 utils/pdda/pdda-edit-doc-hook.sh
+utils/pdda/pdda-stop-doc-health.sh
 ```
 
 The shipped runtime lives in its own `utils/pdda/` subfolder so it never mixes with a target repo's
@@ -84,10 +85,11 @@ deterministic check plus the aggregate `run` as subcommands (`pdda.sh run`, `pdd
 `utils/pdda/pdda-doc-ready.sh` is the opt-in LLM readiness layer and `utils/pdda/pdda-catchup.sh` is
 the opt-in ROUTER.md triage layer. `utils/pdda/pdda-gh-refresh.sh` (`pdda.sh gh-refresh`) refreshes the
 cached GitHub issue-state file that `pdda.sh issue-doc-sync` reads when `gh` is offline.
-`utils/pdda/pdda-edit-doc-hook.sh` is tier 1 of the optional doc-health hooks (a `PostToolUse`
-single-file lint) — installs receive the script but **opt in by wiring it in their own
-`.claude/settings.json`** (see PROJECT/PDDA.md → "Doc-health hooks"); it ships nothing into the target's
-hook config automatically.
+`utils/pdda/pdda-edit-doc-hook.sh` (tier 1, a `PostToolUse` single-file lint) and
+`utils/pdda/pdda-stop-doc-health.sh` (tier 2, a `Stop` consolidated full-scan) are the optional
+doc-health hooks — installs receive the scripts but **opt in by wiring them in their own
+`.claude/settings.json`** (see PROJECT/PDDA.md → "Doc-health hooks"); nothing is written into the
+target's hook config automatically.
 
 ## Files to create in the target repo
 
@@ -127,7 +129,7 @@ Create a fresh empty file instead.
 4. Create an empty `PROJECT/PDDA-ACTIVITY.jsonl` if it does not exist. -> expect a zero- or low-byte log file, not this repo's historical log.
 4a. Add `PROJECT/PDDA-ACTIVITY.jsonl` to the target's `.gitignore` (and `git rm --cached` it if already tracked). -> expect the churning runtime log to stop dirtying `git status` on every run.
 4b. Record the install in the per-user, machine-local registry `${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv` (one tab-delimited row per target: `target · last_install_utc · mode · source_commit · startup_docs`; latest install wins). -> expect a future sync layer to read this to find copies that are behind. Machine-local, never committed; `--no-register` or `PDDA_REGISTRY` adjust it.
-5. Make the shell scripts executable. -> expect `chmod +x utils/pdda/pdda.sh utils/pdda/pdda-doc-ready.sh utils/pdda/pdda-lib.sh utils/pdda/pdda-catchup.sh utils/pdda/pdda-gh-refresh.sh utils/pdda/pdda-edit-doc-hook.sh` to succeed.
+5. Make the shell scripts executable. -> expect `chmod +x utils/pdda/pdda.sh utils/pdda/pdda-doc-ready.sh utils/pdda/pdda-lib.sh utils/pdda/pdda-catchup.sh utils/pdda/pdda-gh-refresh.sh utils/pdda/pdda-edit-doc-hook.sh utils/pdda/pdda-stop-doc-health.sh` to succeed.
 6. Optionally create a repo-root `.pdda-mode` file with `observe` for first install. -> expect a non-destructive first run.
 7. If the target repo uses a different doc layout, set environment overrides instead of editing the scripts first. -> expect the checks to honor the env vars below.
 8. Run `utils/pdda/pdda.sh run` in the target repo. -> expect report-only behavior in `observe` mode and an append to `PROJECT/PDDA-ACTIVITY.jsonl`.

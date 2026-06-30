@@ -455,6 +455,21 @@ principle, same as `pdda.sh changelog`).
 default everywhere else). Wiring is repo-local in `.claude/settings.json`; installs receive the hook
 scripts via the manifest and opt in by adding the hook entries.
 
+#### Suggested Stop doc-health scan
+
+Tier 2's `pdda-stop-doc-health.sh` runs **one** system-wide scan per turn and prints a **single
+consolidated report**:
+
+- it runs the deterministic suite with `PDDA_ISSUE_SYNC_SOURCE=cache`, so `issue-doc-sync` reads the
+  cached gh-state file (written by `pdda.sh gh-refresh`) and the scan makes **no network call**;
+- it runs in `observe` mode with the LLM layer disabled — purely deterministic, fast, offline;
+- it aggregates the run into one report: a header with the error/warn totals, then the warn/error
+  finding lines (an `all clear` line when there are none);
+- it **always exits `0`** (proven by `test/pdda-doc-health-hooks.sh`), so it can never block a stop.
+
+Wire it as a `Stop` hook in `.claude/settings.json` (no matcher). Because it reads the cache rather
+than calling `gh`, keep `pdda.sh gh-refresh` on the hourly cadence so the Stop report stays current.
+
 ## Enforcement modes
 
 PDDA runs in one of three modes. The mode is resolved in this order: **the `PDDA_MODE` env var wins if
