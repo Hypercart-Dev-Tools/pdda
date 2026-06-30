@@ -2,6 +2,55 @@
 
 ## 2026-06-29
 
+### Deterministic issue↔doc sync check + two-tier doc-health hooks (GH-5)
+
+New `pdda.sh issue-doc-sync` flags `PROJECT/2-WORKING/GH-*.md` docs drifted from their GitHub issue
+state, both directions: (a) issue CLOSED but the doc still sits in `2-WORKING` → `warn` + a `git mv`
+recommendation to `3-COMPLETED`; (b) issue OPEN but the doc's status lead word declares it done →
+`warn` to reconcile. Warn-only + flag-only (mirrors `pdda.sh changelog`; never blocks, even in `full`).
+gh-degrades: live `gh` → cached `.pdda-gh-state.tsv` (written by the new `pdda.sh gh-refresh`) → an
+`info` skip. Anchors (b) on the status lead word so `Active — Phase 0 complete` never false-flags.
+
+Plus a two-tier, warn-only / fail-open doc-health hook system (both always exit `0`, can never block):
+
+- **tier 1 — `pdda-edit-doc-hook.sh` (`PostToolUse`):** fast LOCAL single-file lint of an edited doc
+  (`frontmatter`/`status-table`/`hardcoded-paths`/`roadmap-coverage`; `roadmap` for `ROADMAP.md`),
+  scoped via the new `PDDA_ONLY_FILE` seam — no network, no `gh`, no LLM.
+- **tier 2 — `pdda-stop-doc-health.sh` (`Stop`):** one consolidated system-wide scan per turn (the
+  deterministic suite incl. `issue-doc-sync` read from the cached gh-state, so no network call).
+
+Lockstep: `PROJECT/PDDA.md` (check H + Doc-health hooks layer + Stop scan + hourly refresh cadence),
+`utils/pdda/PDDA-INSTALL.md` (install set, env vars, chmod), `ROUTER.md` (command rails), `install.sh`
+(gitignores `.pdda-gh-state.tsv` in targets). Establishes the repo's first `test/` dir.
+
+- Bet: every drift class is mechanical, so a deterministic warn-only check carries zero false-judgment
+  risk; a false flag is one ignorable line, a missed flag leaves today's manual reconciliation — both
+  cheap, which is why warn-only/fail-open is the right calibration. Reversibility: **Easy** — additive
+  subcommand + hooks + a new test dir + a new `.claude/settings.json`; revert = delete the additions.
+
+Verification: `test/pdda-issue-doc-sync.sh` 13/13 (both directions, gh-absent degrade, never-blocks,
+filename fallback); `test/pdda-doc-health-hooks.sh` 18/18 (no-op, warn-but-exit-0, fail-open,
+no-network, consolidated report); `pdda.sh run` green; live tree reports no drift; both hooks proven to
+always exit `0`. Built in 4 phases, every QA gate green, committed + pushed. Issue #5 (closed).
+
+### `/pdda-eod` skill scaffold
+
+Added the first `SKILL.md` scaffold for the planned `/pdda-eod` end-of-day wrap, at the user-requested
+path `SKILLS/PDDA-EOD/SKILL.md`.
+
+- Encodes the GH-6 runtime order as an operator workflow: gather read-only state, reconcile project
+  docs, reconcile `ROADMAP.md` and `CHANGELOG.md`, write the dated EOD summary before the final
+  commit, then push and optionally close user-verified issues.
+- Keeps the skill intentionally thin: guardrails, command rails, confirmation model, and degradation
+  behavior when `gh` is unavailable. The detailed design remains in
+  `PROJECT/2-WORKING/GH-6-PDDA-EOD.md` rather than being duplicated into the skill.
+- Bet: a lean skill file is enough to make `/pdda-eod` usable without creating a second source of
+  truth. Reversibility: **Easy** — one new skill file and a changelog entry.
+
+Verification: reviewed against `PROJECT/2-WORKING/GH-6-PDDA-EOD.md`, `ROUTER.md`, and the existing
+`.claude/skills/pdda/SKILL.md` pattern; `utils/pdda/pdda.sh changelog` reports clean for this
+doc-only iteration.
+
 ### PDDA sync/push system (HQ → registered targets)
 
 Built the steady-state distribution layer the registry foundation was for: `utils/pdda/pdda-sync.sh`
