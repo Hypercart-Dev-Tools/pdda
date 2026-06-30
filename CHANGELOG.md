@@ -2,6 +2,27 @@
 
 ## 2026-06-30
 
+### install.sh auto-detects the git-pulse repo path for the projection (GH-7)
+
+The multi-device projection silently skipped on any device where git-pulse's sync repo isn't at the
+hardcoded default `~/.config/git-pulse/repo` — `publish_registry_projection()` gated on
+`[ -d "$PDDA_GITPULSE_DIR/.git" ]` and fail-opened. Observed on `noels-mac-studio`, where git-pulse
+keeps its checkout at `~/git-pulse-sync`: every install registered locally but never rolled up.
+
+`publish_registry_projection()` now resolves the git-pulse checkout in priority order: explicit
+`PDDA_GITPULSE_DIR` override → `sync_repo_dir` sourced from git-pulse's own `config.sh` (the same file
+already sourced for `device_id`) → first existing of `~/.config/git-pulse/repo` or `~/git-pulse-sync`.
+The final `[ -d "$gp/.git" ]` gate is unchanged, so it stays best-effort / fail-open, and setting
+`PDDA_GITPULSE_DIR` to a nonexistent path still disables it. The top-level default is now empty
+(`""` = "auto-detect"); resolution lives in the function's existing config-sourcing subshell.
+
+Verification: `test/pdda-publish-projection.sh` extended with Case 4 (autodetect via `sync_repo_dir`
+when no override is given) → 17/17; `bash -n` clean; real-world proof on `noels-mac-studio` — deleting
+the projection and running a plain `./install.sh` (no env override) re-published
+`~/git-pulse-sync/pdda/registry-noels-mac-studio.tsv`; `pdda.sh run` green for this change. Issue
+[#7](https://github.com/Hypercart-Dev-Tools/pdda/issues/7). Lockstep: `install.sh` comment/usage +
+`utils/pdda/PDDA-INSTALL.md` step 4c. -> `PROJECT/1-INBOX/GH-7-GITPULSE-PATH-AUTODETECT.md`
+
 ### install.sh auto-publishes multi-device PDDA status via git-pulse
 
 Wired Iteration 1 of the multi-device rollup: `install.sh` now has `publish_registry_projection()`, called

@@ -2,7 +2,7 @@
 title: PDDA Standalone Roadmap
 status: Active
 created: 2026-06-24
-updated: 2026-06-24
+updated: 2026-06-30
 branch: main
 goal: >
   Canonical pointer ledger for the standalone PDDA installer repo. This file tracks the repo's
@@ -34,7 +34,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Queue / parked intake
 
-- No parked intake docs.
+- **GH-7 — auto-detect git-pulse repo path for the registry projection** (2026-06-30) - the install's multi-device projection silently skipped when git-pulse's sync repo isn't at the hardcoded default `~/.config/git-pulse/repo`; fix resolves the path via `PDDA_GITPULSE_DIR` → git-pulse `config.sh` `sync_repo_dir` → candidate list. Issue [#7](https://github.com/Hypercart-Dev-Tools/pdda/issues/7). -> [PROJECT/1-INBOX/GH-7-GITPULSE-PATH-AUTODETECT.md](PROJECT/1-INBOX/GH-7-GITPULSE-PATH-AUTODETECT.md)
 
 ### In progress
 

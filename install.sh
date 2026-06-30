@@ -44,9 +44,11 @@ PDDA_REGISTRY="${PDDA_REGISTRY:-${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.
 # installer also drops a PATH-NORMALIZED projection of the registry (repo name + date + source commit +
 # mode; never absolute paths) into git-pulse's repo under pdda/, and git-pulse's own sync carries it across
 # devices — no new sync infrastructure. Best-effort and fail-open: absent git-pulse → silently skipped, the
-# install is unaffected. The LOCAL registry above stays the source of truth. Override the location with
-# PDDA_GITPULSE_DIR; disable by pointing it at a nonexistent path, or with --no-register (same gate).
-PDDA_GITPULSE_DIR="${PDDA_GITPULSE_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/git-pulse/repo}"
+# install is unaffected. The LOCAL registry above stays the source of truth. The git-pulse checkout is
+# auto-detected (see publish_registry_projection): explicit PDDA_GITPULSE_DIR wins, else git-pulse's own
+# config.sh `sync_repo_dir`, else a small candidate list. Set PDDA_GITPULSE_DIR to a nonexistent path to
+# disable, or use --no-register (same gate). Empty default = "auto-detect" (resolution lives in the fn).
+PDDA_GITPULSE_DIR="${PDDA_GITPULSE_DIR:-}"
 
 usage() {
   cat <<'USAGE'
@@ -84,8 +86,9 @@ pdda-sync.sh knows where every copy lives. The registry is never committed. --no
 If git-pulse (a GitHub-backed activity-sync tool) is present, the installer additionally drops a
 path-normalized projection of the registry (repo name + date + source commit + mode; never absolute
 paths) into git-pulse's repo under pdda/, and git-pulse's own sync carries that status across your
-devices. Best-effort and fail-open — absent git-pulse it is silently skipped. Override the location with
-PDDA_GITPULSE_DIR; the local registry remains the source of truth.
+devices. Best-effort and fail-open — absent git-pulse it is silently skipped. The git-pulse checkout is
+auto-detected (git-pulse's config.sh sync_repo_dir, then common locations); set PDDA_GITPULSE_DIR to
+override or to a nonexistent path to disable. The local registry remains the source of truth.
 
 After install it runs `utils/pdda/pdda.sh run` in the target so you see it working immediately.
 USAGE
@@ -251,9 +254,20 @@ ensure_runtime_ignored() {
 # Rewritten in full every run, so the projection can't drift from the registry. A maintainer-LLM on another
 # machine locates a repo by name (the file header carries the exact find command), not by a path we ship.
 publish_registry_projection() {
-  local gp="$PDDA_GITPULSE_DIR" dev cfg out tmp
-  [ -d "$gp/.git" ] || return 0   # no git-pulse checkout here -> nothing to roll up
+  local gp="$PDDA_GITPULSE_DIR" dev cfg out tmp cand
   cfg="${XDG_CONFIG_HOME:-$HOME/.config}/git-pulse/config.sh"
+  # Resolve the git-pulse checkout when no explicit override was given: ask git-pulse's own config where
+  # its sync repo lives (sync_repo_dir), then fall back to a small candidate list. Keeps PDDA in step with
+  # git-pulse's actual layout instead of assuming the old hardcoded ~/.config/git-pulse/repo default.
+  if [ -z "$gp" ]; then
+    gp="$( ( . "$cfg" 2>/dev/null; printf '%s' "${sync_repo_dir:-}" ) )"
+    if [ -z "$gp" ] || [ ! -d "$gp/.git" ]; then
+      for cand in "${XDG_CONFIG_HOME:-$HOME/.config}/git-pulse/repo" "$HOME/git-pulse-sync"; do
+        [ -d "$cand/.git" ] && { gp="$cand"; break; }
+      done
+    fi
+  fi
+  [ -d "$gp/.git" ] || return 0   # no git-pulse checkout found -> nothing to roll up
   # Reuse git-pulse's own device id so PDDA and pulse files key on the same device; else fall back to host.
   dev="$( ( . "$cfg" 2>/dev/null; printf '%s' "${device_id:-}" ) )"
   [ -n "$dev" ] || dev="$(hostname -s 2>/dev/null || printf 'unknown-device')"

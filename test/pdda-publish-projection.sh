@@ -76,5 +76,23 @@ assert_contains "$(cat "$SENTINEL")" "PRIOR-GOOD-PROJECTION" "prior projection s
 [ -z "$(ls "$GP3"/pdda/*.tmp.* 2>/dev/null)" ] && pass "no leftover .tmp file after a failed write" || fail "stray .tmp file remained"
 assert_contains "$(cat "$REG3")" "$TARGET3" "local registry still written despite publish failure"
 
+# --- Case 4: autodetect — no PDDA_GITPULSE_DIR override; resolve git-pulse from config.sh sync_repo_dir --
+# GH-7: when the git-pulse checkout isn't at the hardcoded default, install must still find it via
+# git-pulse's own config (sync_repo_dir) instead of silently skipping the projection.
+TARGET4="$SBOX/fourth-repo"; mkdir -p "$TARGET4"; git_init "$TARGET4"
+GP4="$SBOX/gitpulse4-elsewhere"; mkdir -p "$GP4"; git_init "$GP4"   # NOT at the default ~/.config/git-pulse/repo
+REG4="$SBOX/registry4.tsv"
+XDG4="$SBOX/xdg4"; mkdir -p "$XDG4/git-pulse"
+printf 'device_id="test-device"\nsync_repo_dir="%s"\n' "$GP4" > "$XDG4/git-pulse/config.sh"
+
+# PDDA_GITPULSE_DIR intentionally UNSET (env -u) -> exercises the autodetection path, not the override.
+env -u PDDA_GITPULSE_DIR XDG_CONFIG_HOME="$XDG4" PDDA_REGISTRY="$REG4" \
+  bash "$INSTALL" --mode observe "$TARGET4" >/dev/null 2>&1
+rc=$?
+[ "$rc" -eq 0 ] && pass "install exits 0 with autodetected git-pulse path" || fail "install exit $rc (autodetect)"
+PROJ4="$GP4/pdda/registry-test-device.tsv"
+[ -f "$PROJ4" ] && pass "projection auto-published to sync_repo_dir from git-pulse config" || fail "autodetected projection missing ($PROJ4)"
+assert_contains "$(cat "$PROJ4" 2>/dev/null)" "fourth-repo" "autodetected projection lists the installed repo"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
