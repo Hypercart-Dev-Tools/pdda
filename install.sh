@@ -251,7 +251,7 @@ ensure_runtime_ignored() {
 # Rewritten in full every run, so the projection can't drift from the registry. A maintainer-LLM on another
 # machine locates a repo by name (the file header carries the exact find command), not by a path we ship.
 publish_registry_projection() {
-  local gp="$PDDA_GITPULSE_DIR" dev cfg out
+  local gp="$PDDA_GITPULSE_DIR" dev cfg out tmp
   [ -d "$gp/.git" ] || return 0   # no git-pulse checkout here -> nothing to roll up
   cfg="${XDG_CONFIG_HOME:-$HOME/.config}/git-pulse/config.sh"
   # Reuse git-pulse's own device id so PDDA and pulse files key on the same device; else fall back to host.
@@ -259,7 +259,11 @@ publish_registry_projection() {
   [ -n "$dev" ] || dev="$(hostname -s 2>/dev/null || printf 'unknown-device')"
   mkdir -p "$gp/pdda" 2>/dev/null || { say "  (git-pulse pdda/ not writable — publish skipped)"; return 0; }
   out="$gp/pdda/registry-$dev.tsv"
+  tmp="$out.tmp.$$"
   # ponytail: registry paths are pwd-normalized (no trailing slash), so basename-via-split is safe.
+  # Write to a temp file in the SAME dir, then atomic mv — git-pulse's concurrent sync must never catch a
+  # half-written projection and publish a truncated snapshot to other devices (mirrors the local registry
+  # write above; GUIDING-PRINCIPLES #6). On a failed generation the prior good projection survives untouched.
   if {
        printf '# PDDA install status (normalized to repo name; absolute paths intentionally omitted).\n'
        printf '# Maintainer LLM on another machine: a clone usually keeps the origin repo name as its folder,\n'
@@ -269,10 +273,11 @@ publish_registry_projection() {
        printf '#   find ~ -type d -iname "*<repo>*" -exec test -d "{}/.git" \\; -print 2>/dev/null\n'
        printf '# repo\tlast_install_utc\tmode\tsource_commit\tstartup_docs\n'
        awk -F'\t' 'BEGIN{OFS="\t"} /^#/{next} NF==0{next} {n=split($1,a,"/"); $1=a[n]; print}' "$PDDA_REGISTRY"
-     } > "$out" 2>/dev/null; then
+     } > "$tmp" 2>/dev/null && mv "$tmp" "$out"; then
     say "  publish   pdda/registry-$dev.tsv (normalized; git-pulse carries it)"
   else
-    say "  (git-pulse publish failed — skipped)"
+    rm -f "$tmp" 2>/dev/null
+    say "  (git-pulse publish failed — projection unchanged)"
   fi
   return 0
 }

@@ -17,7 +17,7 @@ assert_contains() { case "$1" in *"$2"*) pass "$3" ;; *) fail "$3 (missing: $2)"
 assert_absent()   { case "$1" in *"$2"*) fail "$3 (unexpected: $2)"; printf '----\n%s\n----\n' "$1" ;; *) pass "$3" ;; esac; }
 
 SBOX="$(mktemp -d "${TMPDIR:-/tmp}/pdda-publish.XXXXXX")"
-cleanup() { [ -n "$SBOX" ] && rm -rf "$SBOX"; }
+cleanup() { [ -n "$SBOX" ] && { chmod -R u+w "$SBOX" 2>/dev/null; rm -rf "$SBOX"; }; }
 trap cleanup EXIT
 
 git_init() { ( cd "$1" && git init -q && git config user.name t && git config user.email t@e ); }
@@ -56,6 +56,25 @@ rc=$?
 [ "$rc" -eq 0 ] && pass "install exits 0 with git-pulse absent (fail-open)" || fail "install exit $rc with git-pulse absent"
 assert_contains "$(cat "$REG2")" "$TARGET2" "local registry written even when git-pulse absent"
 [ ! -e "$MISSING" ] && pass "no stray projection dir created when git-pulse absent" || fail "publish wrote into a non-git-pulse path"
+
+# --- Case 3: atomic write — a failed generation leaves the prior projection intact (Codex review) -------
+# git-pulse's concurrent sync must never see a half-written file; publish writes temp-then-mv. Force the
+# write to fail (read-only projection dir) and prove the previous good file survives and install stays 0.
+TARGET3="$SBOX/third-repo"; mkdir -p "$TARGET3"; git_init "$TARGET3"
+GP3="$SBOX/gitpulse3"; mkdir -p "$GP3/pdda"; git_init "$GP3"
+REG3="$SBOX/registry3.tsv"
+SENTINEL="$GP3/pdda/registry-test-device.tsv"
+printf 'PRIOR-GOOD-PROJECTION\n' > "$SENTINEL"
+chmod 0555 "$GP3/pdda"   # read-only dir -> the temp write (and thus the mv) cannot occur
+
+XDG_CONFIG_HOME="$XDG" PDDA_REGISTRY="$REG3" PDDA_GITPULSE_DIR="$GP3" \
+  bash "$INSTALL" --mode observe "$TARGET3" >/dev/null 2>&1
+rc=$?
+chmod 0755 "$GP3/pdda" 2>/dev/null
+[ "$rc" -eq 0 ] && pass "install exits 0 when projection dir is unwritable (fail-open)" || fail "install exit $rc on unwritable projection dir"
+assert_contains "$(cat "$SENTINEL")" "PRIOR-GOOD-PROJECTION" "prior projection survives a failed atomic write"
+[ -z "$(ls "$GP3"/pdda/*.tmp.* 2>/dev/null)" ] && pass "no leftover .tmp file after a failed write" || fail "stray .tmp file remained"
+assert_contains "$(cat "$REG3")" "$TARGET3" "local registry still written despite publish failure"
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

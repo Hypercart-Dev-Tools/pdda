@@ -13,12 +13,15 @@ git-pulse's own sync carries the file across devices, so PDDA adds no git logic 
 
 Best-effort and fail-open (GUIDING-PRINCIPLES #6): absent git-pulse it silently skips and the install is
 unaffected. The local `~/.config/pdda/registry.tsv` stays the source of truth and keeps absolute paths
-(#4) — the projection is one-way, rewritten in full each run, so it can't drift. Location overridable with
-`PDDA_GITPULSE_DIR`; `--no-register` skips it too. Lockstep: `install.sh` usage + `utils/pdda/PDDA-INSTALL.md`
-step 4c.
+(#4) — the projection is one-way, rewritten in full each run, so it can't drift. The projection is written
+**temp-then-`mv` (atomic)** so git-pulse's concurrent sync can never publish a half-truncated snapshot, and
+a failed generation leaves the prior good projection untouched (mirrors the local registry write; found in a
+headless Codex relay review). Location overridable with `PDDA_GITPULSE_DIR`; `--no-register` skips it too.
+Lockstep: `install.sh` usage + `utils/pdda/PDDA-INSTALL.md` step 4c.
 
-Verification: new `test/pdda-publish-projection.sh` 10/10 (publish present, normalized/no-path-leak,
-local registry intact, fail-open when git-pulse absent, no stray dir); `bash -n` clean; `pdda.sh run` green.
+Verification: new `test/pdda-publish-projection.sh` 14/14 (publish present, normalized/no-path-leak,
+local registry intact, fail-open when git-pulse absent, no stray dir, atomic-write preserves prior
+projection on failure); `bash -n` clean; `pdda.sh run` green; reviewed end-to-end by Codex via relay-xyz.
 -> `PROJECT/3-COMPLETED/PDDA-MULTI-DEVICE-STATUS-VIA-GITPULSE.md`
 
 ### `pdda.sh changelog` now accepts semver-style dated headings
