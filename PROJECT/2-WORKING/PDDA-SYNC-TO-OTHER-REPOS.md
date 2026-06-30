@@ -1,22 +1,25 @@
 ---
-title: Sync the PDDA runtime to other repos (initial copy + 30-min auto-update)
+title: Sync the PDDA runtime to other repos (HQ → registered targets, push-based)
 status: Active
 created: 2026-06-27
-updated: 2026-06-27
+updated: 2026-06-29
 owner: noel
 goal: >
-  Let one canonical PDDA source repo push its utils/pdda/ runtime into other registered repos —
-  an initial install/update on registration, then a launchd job every 30 minutes that re-copies
-  only files whose content has actually changed, backing up the target's version first. The set of
-  synced repos lives in a machine-local registry at ~/.config/pdda/registry.tsv (written by install.sh).
+  Let one canonical PDDA source repo ("HQ") distribute its utils/pdda/ runtime into other registered
+  repos — an initial install/update on registration, then an on-demand `push` from HQ that re-copies
+  only files whose content has actually changed (backing up the target's version first) and mirrors
+  HQ-side deletions (also backed up first). The synced file set is an auto-regenerated manifest derived
+  from declared source roots, so adding a runtime file or folder propagates without editing a list. The
+  set of target repos lives in a machine-local registry at ${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv (written by
+  install.sh). A launchd schedule is an OPTIONAL wrapper over the same `push` engine, not the headline.
 branch: pdda-sync-to-other-repos
 gh_issue: pending (open once scope is approved; rename this doc to GH-<n>-… then)
 non_goals: >
   Not a two-way sync, not a git submodule/subtree, not a package manager, not a remote/cross-machine
-  service. Source of truth is always this local clone's utils/pdda/.
+  service. Source of truth is always this local clone's HQ working tree (dirty-guarded).
 effort: 3
 complexity: 3
-risk: 2
+risk: 3
 phases: 5
 ---
 
@@ -24,48 +27,73 @@ phases: 5
 
 | What was just completed | What's next |
 |---|---|
-| Planned + QA-reviewed (Codex). **Shipped the registry foundation early:** `install.sh` now writes a machine-local `~/.config/pdda/registry.tsv` (sync-ready schema) on every install/upgrade — the data the future sync consumes. No sync built yet, by request. | Defer the sync build until requested; when it starts, the registry is already populated. Open question still pending: GH issue intake. |
+| Planned + QA-reviewed (Codex). **Shipped the registry foundation early:** `install.sh` writes `${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv` (sync-ready schema) on every install/upgrade. **Realigned 2026-06-29** to an HQ→targets *push* model: manual `push` primary, launchd optional; auto-regenerated manifest; **mirror HQ-side deletes (backup-first)**. Three prior "Resolved decisions" were deliberately reopened (trigger, deletions, manifest) — see [Realignment](#realignment-2026-06-29). | Codex relay review of this realignment, then defer the build until requested; the registry is already populated. |
+
+## Realignment (2026-06-29)
+
+This doc was reconciled with a generic "HQ distribution system" design so PDDA stays the single
+canonical owner of this feature (Principle #4 — one canonical place per fact). Three earlier locked
+decisions were intentionally reversed; the rest stand:
+
+| Aspect | Was | Now | Why |
+|---|---|---|---|
+| **Trigger** | launchd 30-min *pull* job (headline) | **manual `push` from HQ** is primary; launchd is an optional wrapper over the same engine | Operator wants distribution on demand from HQ, not a background daemon. The engine stays daemon-ready, so scheduling is a thin add (Phase 4). |
+| **Deletions** | additive only (backup-then-overwrite) | **mirror HQ-side deletes**, backup-first, dry-run-visible, manifest-diff-gated | A file dropped from the runtime should leave targets; a stale file in a target is drift. Safety preserved via backup + only removing paths HQ previously shipped. |
+| **Manifest** | hand-maintained static list | **auto-regenerated** from declared source roots via `git ls-files` | New runtime files/folders propagate without editing a list; still DRY and dirty-guardable. |
+
+Unchanged: content-hash change detection, atomic writes, backup-then-overwrite, the state-stamp
+decision model, the dirty-source guard, `register` confirms by default, `PROJECT/PDDA.md` in the
+synced set, bounded backup retention.
 
 ## Table of contents
 
-- [Phase 1 — Registry, manifest & state model](#phase-1--registry-manifest--state-model)
-- [Phase 2 — Sync engine (`pdda-sync.sh run`)](#phase-2--sync-engine-pdda-syncsh-run)
+- [Phase 1 — Registry, manifest expander & state model](#phase-1--registry-manifest-expander--state-model)
+- [Phase 2 — Push engine (`pdda-sync.sh push`)](#phase-2--push-engine-pdda-syncsh-push)
 - [Phase 3 — `register` / initial sync (reuse `install.sh`) + `list` / `remove` / `prune`](#phase-3--register--initial-sync-reuse-installsh--list--remove--prune)
-- [Phase 4 — launchd scheduler (30-minute job)](#phase-4--launchd-scheduler-30-minute-job)
+- [Phase 4 — Optional launchd scheduler (wraps `push`)](#phase-4--optional-launchd-scheduler-wraps-push)
 - [Phase 5 — Docs + dogfood verification](#phase-5--docs--dogfood-verification)
 
 ## Context
 
-`install.sh` already copies the `utils/pdda/` runtime into a target repo's `utils/pdda/`. So the
-"initial sync (new copy or update)" is **not new code** — it is `install.sh` plus *registering* the
-target. What is new is the **steady-state** layer: a registry of repos that opted in, and a scheduled
-job that keeps each one current as the source runtime evolves.
+`install.sh` already copies the `utils/pdda/` runtime into a target repo and records the install in a
+machine-local registry. So the "initial sync (new copy or update)" is **not new code** — it is
+`install.sh` plus *registering* the target. What is new is the **steady-state** layer: an on-demand
+`push` from HQ that keeps each registered target current as the source runtime evolves — including
+when files or whole folders are added to, or removed from, the runtime.
 
-The four locked decisions:
+**Vocabulary:** *HQ* = this canonical local clone, the only writer and source of truth. *Targets* =
+other local repos that opted in via `register`. `push` distributes HQ's current runtime to one or all
+targets.
 
-- **Scheduler:** macOS `launchd` LaunchAgent (native, survives reboot/login; one job iterates the whole
-  registry).
-- **Drift policy:** backup-then-overwrite — the source is canonical, but the target's current file is
-  saved before it is replaced, so nothing is ever destroyed irrecoverably.
+The locked decisions (post-realignment):
+
+- **Trigger:** **manual `pdda-sync.sh push [<target>]` from HQ.** No daemon required. A launchd
+  LaunchAgent that runs the same `push` on a schedule is an *optional* Phase-4 add for operators who
+  want hands-off propagation.
+- **Drift policy:** backup-then-overwrite, **and backup-then-delete** for HQ-side removals — HQ is
+  canonical, but the target's current file is always saved before it is replaced *or* removed, so
+  nothing is ever destroyed irrecoverably.
 - **Change detection:** content hash (`shasum`), not mtime. `git` checkouts reset mtimes, so a
   date-based rule misfires; hashing is just as cheap and actually correct.
-- **Scope:** the `utils/pdda/` runtime **plus the contract `PROJECT/PDDA.md`** (resolved Q3 — a stale
-  contract in a target is a real footgun, and `install.sh` already treats it as runtime). Per-repo
-  *adapted* startup docs (`ROUTER.md`, `AGENTS.md`) are left alone so the job never clobbers
+- **Scope:** the `utils/pdda/` runtime **plus the contract `PROJECT/PDDA.md`**, expressed as an
+  **auto-regenerated manifest** — HQ declares *source roots* (the `utils/pdda/` subtree + named files)
+  and the expander walks them (`git ls-files`-backed) into a concrete file set at run time. Per-repo
+  *adapted* startup docs (`ROUTER.md`, `AGENTS.md`) are left alone so `push` never clobbers
   customization.
 
 ### Operating principles this must respect
 
-- **Non-destructive by default** (PDDA's `observe` ethos): a `--dry-run` preview, recoverable backups,
-  and a guard against syncing a dirty source.
-- **One canonical place per fact:** the synced file list is derived from one manifest, shared with
-  `install.sh`, not duplicated.
+- **Non-destructive by default** (PDDA's `observe` ethos): a `--dry-run` preview (showing planned
+  copies *and* deletions), recoverable backups for every overwrite and delete, and a guard against
+  pushing from a dirty HQ.
+- **One canonical place per fact:** the synced file set is derived from one manifest declaration,
+  shared with `install.sh`, not duplicated.
 
 ## Design
 
 ### Files & layout
 
-**The registry (SHIPPED — see below) is machine-local, in `$HOME`, NOT in the repo:**
+**The registry (SHIPPED) is machine-local, in `$HOME`, NOT in the repo:**
 
 ```text
 ${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv   # one row per target:
@@ -73,157 +101,242 @@ ${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv   # one row per target:
 ```
 
 Per-user, per-device, never committed (the repo will be public). Written by `install.sh` on every
-install/upgrade (latest-wins dedup on the target path); `source_commit` is what lets sync later tell
-which targets are behind. Lives in `$HOME` rather than the source clone so it survives the
-temp-clone upgrade flow and can't leak into the public repo.
+install/upgrade (latest-wins dedup on the target path); `source_commit` is what lets `push` later tell
+which targets are behind. Lives in `$HOME` rather than the source clone so it survives the temp-clone
+upgrade flow and can't leak into the public repo.
 
-Sync-only runtime (built later, source-side under gitignored `temp/`):
+Push-only runtime (built later, HQ-side under gitignored `temp/`):
 
 ```text
-temp/pdda-sync-state/<slug>.tsv  # per-target: <relpath>\t<last-synced-source-hash>
-temp/pdda-sync-backups/<slug>/<utc-timestamp>/<relpath>   # pre-overwrite backups
-temp/pdda-sync.log               # append-only run log (also launchd stdout/stderr sink)
-temp/pdda-sync.lock              # mkdir-based lock; prevents overlapping runs
+temp/pdda-sync-state/<slug>.tsv     # per-target: <relpath>\t<last-synced-source-hash>
+temp/pdda-sync-manifest/<slug>.tsv  # per-target: the expanded relpath set from the LAST push
+                                    #   (diffed against the current set to detect HQ-side deletions)
+temp/pdda-sync-backups/<slug>/<utc-timestamp>/<relpath>   # pre-overwrite AND pre-delete backups
+temp/pdda-sync.log                  # append-only run log (also launchd stdout/stderr sink)
+temp/pdda-sync.lock                 # mkdir-based lock; prevents overlapping runs
 ```
 
 `<slug>` = the target root path sanitized to a filename.
 
-### The canonical manifest (shared with `install.sh`)
+### The auto-regenerated manifest (shared with `install.sh`)
 
 The synced set is the `utils/pdda/` runtime — `pdda.sh`, `pdda-lib.sh`, `pdda-doc-ready.sh`,
-`pdda-catchup.sh`, `PDDA-INSTALL.md` — **plus `PROJECT/PDDA.md`** (the contract). To stay DRY, this
-list is factored into one place both `install.sh` and `pdda-sync.sh` read, so adding a synced file
-never requires editing two copies. The per-target state and backup paths key off each file's
-repo-relative path, so a file outside `utils/pdda/` (like `PROJECT/PDDA.md`) needs no special-casing.
+`pdda-catchup.sh`, `PDDA-INSTALL.md` — **plus `PROJECT/PDDA.md`** (the contract). Rather than a
+hand-maintained list, HQ declares **source roots** in one place both `install.sh` and `pdda-sync.sh`
+read:
 
-### Per-file sync decision (the state-stamp model)
+```text
+# the declaration (one canonical place):
+dir   utils/pdda/        # whole subtree, recursively — new files/folders auto-included
+file  PROJECT/PDDA.md    # single file
+# optional exclude globs, e.g.:  exclude  utils/pdda/*.local
+```
+
+At run time the expander turns `dir` entries into a concrete relpath set with a bounded walk —
+**prefer `git ls-files` over the source root** so untracked junk / `node_modules` never ship (mirrors
+the migration scan in `install.sh`). Benefits:
+
+- **DRY** — one declaration feeds initial install (`install.sh`) and steady-state `push`.
+- **New files/folders propagate** — a `dir` entry means any file or subfolder added under it is copied
+  (and its folder created) in targets on the next `push`, with no list edit.
+- **Dirty-source guard covers new files for free** — the guard reads the *expanded* set, so a
+  half-finished new runtime file can't slip past it. The per-target state and backup paths key off each
+  file's repo-relative path, so a file outside `utils/pdda/` (like `PROJECT/PDDA.md`) needs no
+  special-casing.
+
+### Per-file push decision (the state-stamp model)
 
 For each manifest file, against each target, compute `src_hash` and the target's `tgt_hash`, and read
-`last_hash` from the per-target state file:
+`last_hash` from the per-target state file. HQ-side deletions are found by diffing the *previous*
+expanded manifest (persisted per target) against the *current* one:
 
 | Situation | Action |
 |---|---|
 | target file missing | copy → record `last_hash = src_hash` (`new`) |
-| `src_hash == last_hash` (source unchanged since last sync) | **leave target alone** — respects local edits between source releases (`skip`) |
-| source advanced **and** target unchanged from `last_hash` | atomic copy → update state (`updated`) |
-| source advanced **and** target also diverged | **back up target**, then atomic copy → update state (`updated+backup`) |
+| `src_hash == last_hash` (HQ unchanged since last push) | **leave target alone** — respects local edits between source releases (`skip`) |
+| HQ advanced **and** target unchanged from `last_hash` | atomic copy → update state (`updated`) |
+| HQ advanced **and** target also diverged | **back up target**, then atomic copy → update state (`updated+backup`) |
+| **was in last manifest, gone from HQ now** | **back up target's copy, then delete it**, drop the state row (`deleted+backup`) |
 
-The state stamp is what stops two failure modes a naive "source-wins hash diff" has: (a) **backup
-spam** — re-backing-up a persistently-customized target on every run; and (b) **stomping local edits**
-the operator made deliberately while the source had not changed. Source only ever overwrites when it
-has genuinely advanced.
+The state stamp stops two failure modes a naive "source-wins hash diff" has: (a) **backup spam** —
+re-backing-up a persistently-customized target on every run; and (b) **stomping local edits** the
+operator made deliberately while the source had not changed. Source only ever overwrites when it has
+genuinely advanced. Deletions only fire for paths HQ *previously shipped and has now removed* — a file
+the target created itself (never in any HQ manifest) is never touched.
 
 ### Safety / ops invariants
 
 - **Atomic writes:** copy to `<file>.pdda-tmp` then `mv` into place (no half-written runtime).
+- **Atomic deletes:** back up first, then `rm`; if the backup fails, the delete is skipped + logged
+  (never delete without a recoverable copy).
 - **Lock:** `mkdir temp/pdda-sync.lock` guard; stale-lock age-out so a crashed run self-heals.
 - **Missing targets:** skip + log; `prune` subcommand removes dead entries (never auto-deletes silently).
-- **Dirty-source guard:** refuse to sync if this repo has uncommitted changes to **any file in the
-  shared manifest** (`--allow-dirty` to override) — prevents pushing half-finished edits to many repos
-  at once. The check is driven off the same manifest used for copying, *not* a hardcoded `utils/pdda/`
-  subtree, so a file outside that folder (notably the contract `PROJECT/PDDA.md`) can't slip past the
-  guard half-edited. (QA: Codex review 2026-06-27.)
+- **Dirty-source guard:** refuse to push if HQ has uncommitted changes to **any file in the expanded
+  manifest** (`--allow-dirty` to override) — prevents pushing half-finished edits to many repos at
+  once. Driven off the same expander used for copying, *not* a hardcoded `utils/pdda/` subtree, so a
+  file outside that folder (notably the contract `PROJECT/PDDA.md`) can't slip past the guard
+  half-edited. (QA: Codex review 2026-06-27.)
 - **chmod:** restore the executable bit on copied `*.sh` (mirrors `install.sh`).
-- **Recoverability:** every overwrite leaves a timestamped backup under `temp/pdda-sync-backups/`.
+- **Recoverability:** every overwrite *and every delete* leaves a timestamped backup under
+  `temp/pdda-sync-backups/`.
 - **Backup retention:** prune to the last `N` backups per target (default `N=5`, `PDDA_SYNC_BACKUPS`
-  override) so the backup tree stays bounded under a 30-min cadence — same spirit as the activity-log
-  rotation in `pdda-lib.sh`.
+  override) so the backup tree stays bounded — same spirit as the activity-log rotation in
+  `pdda-lib.sh`.
+- **Delete safety net (manifest-poisoning guard).** A delete is only as safe as the manifest diff that
+  drives it, so before removing anything in **any** target the push **aborts the entire delete phase,
+  touching no target**, when the expanded manifest looks truncated or poisoned — specifically when:
+  - **(a) zero-root:** any declared source root resolves to **zero** tracked files (a mis-declared path
+    or an over-broad `exclude`);
+  - **(b) empty-after-nonempty:** the current expanded manifest is **empty** while the
+    previously-persisted per-target snapshot was non-empty;
+  - **(c) shrink-threshold:** the manifest **shrank** by more than a threshold fraction of the prior
+    snapshot (default 25%, `PDDA_SYNC_MAX_SHRINK` override).
+
+  Each abort logs the offending root and the prior/current counts, and requires an explicit
+  `--force-delete` (a deliberate operator ack that HQ really did drop that much) to proceed. `--no-delete`
+  skips all removals unconditionally. **Copies are never gated by this** — a poisoned manifest blocks
+  only the destructive delete phase, so a normal run still safely propagates additions/updates.
 
 ---
 
-## Phase 1 — Registry, manifest & state model
+## Phase 1 — Registry, manifest expander & state model
 
 Establish the data layer before any copying.
 
 > **Partially SHIPPED (2026-06-29):** the registry itself is done — `install.sh` writes
-> `~/.config/pdda/registry.tsv` (machine-local, sync-ready schema incl. `source_commit`) on every
-> install/upgrade, latest-wins per target, `--no-register`/`PDDA_REGISTRY` knobs. No sync built yet.
-> Remaining Phase 1 work below is for when the sync project starts.
+> `${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv` (machine-local, sync-ready schema incl. `source_commit`) on every
+> install/upgrade, latest-wins per target, `--no-register`/`PDDA_REGISTRY` knobs. No push built yet.
+> Remaining Phase 1 work below is for when the push project starts.
 
 - Create the `temp/` layout above (lazily, on first use — no tracked files).
 - Add `utils/pdda-sync.sh` skeleton with subcommand dispatch mirroring `pdda.sh`'s thin-router style:
-  `register`, `run`, `list`, `remove`, `prune`, `install-agent`, `uninstall-agent`, `help`.
-- Factor the runtime manifest into one shared list consumed by both `install.sh` and `pdda-sync.sh`.
+  `register`, `push`, `list`, `status`, `remove`, `prune`, `install-agent`, `uninstall-agent`, `help`.
+- **Manifest expander:** factor the source-root declaration into one place consumed by both
+  `install.sh` and `pdda-sync.sh`; expand `dir` roots via `git ls-files` (fallback pruned `find`) into
+  a concrete relpath set; apply exclude globs.
 - Registry read/append helpers (dedupe on absolute, normalized path; tolerate spaces; ignore `#`/blank).
 
 **QA gate:** `bash -n utils/pdda-sync.sh` clean; `pdda-sync.sh list` on an empty registry prints
-nothing and exits 0; registering the same path twice does not duplicate it; the shared manifest yields
-the identical file set `install.sh` copies (diff the two lists).
+nothing and exits 0; registering the same path twice does not duplicate it; the expanded manifest
+yields the identical file set `install.sh` copies (diff the two lists); adding a new file — **and a new
+nested subfolder + file** — under a declared `dir` root makes both appear in the expanded set with no
+code edit.
 
-## Phase 2 — Sync engine (`pdda-sync.sh run`)
+## Phase 2 — Push engine (`pdda-sync.sh push`)
 
-The steady-state copier — the heart of the feature.
+The steady-state distributor — the heart of the feature.
 
-- Implement the state-stamp decision table per file, per target.
-- `shasum`-based comparison; atomic temp-then-`mv`; backup-then-overwrite; chmod; per-file logging.
-- `--dry-run` (report planned actions, write nothing) and `--target <path>` (one repo) flags.
-- Lock acquisition + stale-lock age-out; dirty-source guard (`--allow-dirty`).
+- Implement the state-stamp decision table per file, per target, **including the `deleted+backup` row**
+  (diff the persisted previous manifest against the current expanded set).
+- `shasum`-based comparison; atomic temp-then-`mv`; backup-then-overwrite; backup-then-delete; chmod;
+  per-file logging.
+- `--dry-run` (report planned copies **and deletions**, write nothing); `--target <path>` (one repo);
+  positional `<target>` (one repo) with no arg = every registered target; `--allow-dirty`;
+  `--no-delete`; and the manifest-poisoning guard — abort the delete phase before touching any target
+  on zero-root / empty-after-nonempty / shrink-over-threshold, overridable only with `--force-delete`.
+- Lock acquisition + stale-lock age-out; dirty-source guard on the expanded manifest.
 - Backup retention: after writing a backup, prune that target's backups to the last `N` (default 5).
+- Persist the current expanded manifest per target after a successful push (input for next run's
+  delete-diff).
 
 **QA gate:** against two throwaway target repos — unchanged source ⇒ all `skip`; bump a source file ⇒
-exactly that file `updated` in both targets, backup written, state stamp advanced; locally edit a
-target file with source unchanged ⇒ `skip` (local edit preserved); locally edit a target *and* advance
-source ⇒ `updated+backup` with the old target content recoverable from the backup dir; `--dry-run`
-writes nothing; second consecutive `run` is a clean all-`skip` no-op.
+exactly that file `updated` in both targets, backup written, state stamp advanced; add a NEW file under
+a declared root ⇒ it copies as `new` in both; **add a NEW nested subfolder + file (e.g.
+`utils/pdda/sub/new.sh`) ⇒ the subfolder is created AND the file copies as `new` in both targets, with
+no manifest/code edit** (folder propagation, not just file); **delete a file from HQ ⇒ it is backed up
+then removed in both targets (`deleted+backup`), recoverable from the backup dir**; locally edit a target file with
+source unchanged ⇒ `skip` (local edit preserved); locally edit a target *and* advance source ⇒
+`updated+backup`; `--dry-run` writes nothing but lists the pending delete; `--no-delete` copies but
+skips removals; **point a declared root at a non-existent/empty path (or empty the whole manifest) ⇒
+the delete phase aborts before touching any target, copies still apply, exit is non-zero with the
+zero-root/empty/shrink reason logged, and `--force-delete` is required to proceed**; second consecutive
+`push` is a clean all-`skip` no-op.
 
 ## Phase 3 — `register` / initial sync (reuse `install.sh`) + `list` / `remove` / `prune`
 
 Onboarding and registry management.
 
 - `register <target-repo-dir>`: validate it's a git repo; **confirm interactively before first write,
-  with `--yes` to bypass for unattended onboarding** (resolved Q2 — friction only at the rare,
-  consequential enrollment step; the recurring `run` never prompts); run
-  `./install.sh [--with-startup-docs] [--mode <m>] <target>` for the initial copy; append to the
-  registry; seed the per-target state stamps from the just-installed hashes.
+  with `--yes` to bypass for unattended onboarding** (the recurring `push` never prompts); run
+  `./install.sh [--with-startup-docs] [--mode <m>] <target>` for the initial copy. **`install.sh` is the
+  single registry writer** — it already records the target in `${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv` (latest-wins)
+  as part of that run, so `register` does **not** write the registry itself (no second writer — Principle
+  #4). After the install returns, `register` only seeds the per-target sync **state stamps and manifest
+  snapshot** under `temp/` from the just-installed hashes. (If `--no-register` is ever passed through to
+  `install.sh`, `register` is a no-op on the registry by definition.)
 - `remove <target>` (de-register, keep files), `prune` (drop registry entries whose dir is gone),
-  `list` (show registered targets + last-sync summary from the log).
+  `list` (show registered targets + last-push summary from the log), `status [<target>]` (per-target
+  behind/current/diverged counts — a read-only dry-run-style report).
 
 **QA gate:** `register` on a fresh repo installs the runtime (target `pdda.sh run` works), adds exactly
-one registry line, and seeds state so the very next `run` is all-`skip`; `remove` then `list` shows it
-gone but leaves files intact; `prune` drops a moved/deleted target.
+one registry line, and seeds state + manifest snapshot so the very next `push` is all-`skip`; `remove`
+then `list` shows it gone but leaves files intact; `prune` drops a moved/deleted target.
 
-## Phase 4 — launchd scheduler (30-minute job)
+## Phase 4 — Optional launchd scheduler (wraps `push`)
 
-Wrap `run` in a native macOS job.
+Wrap the on-demand `push` in a native macOS job — **opt-in**, for operators who want hands-off
+propagation. The manual `push` is the primary interface; this just schedules it.
 
 - `install-agent`: write `~/Library/LaunchAgents/com.hiqs.rebalance.pdda-sync.plist` with
-  `ProgramArguments` → `pdda-sync.sh run` (absolute path to this clone), `StartInterval` 1800,
+  `ProgramArguments` → `pdda-sync.sh push` (absolute path to this clone), `StartInterval` 1800,
   `RunAtLoad`, and `StandardOutPath`/`StandardErrorPath` → `temp/pdda-sync.log`; then
   `launchctl bootstrap`/`enable`.
 - `uninstall-agent`: `launchctl bootout` + remove the plist.
-- Job is a single agent that iterates the whole registry (not one-per-repo).
+- Job is a single agent that iterates the whole registry (not one-per-repo) by calling the same
+  `push` engine — no scheduler-specific copy logic.
 
-**QA gate:** after `install-agent`, `launchctl list` shows the label; a forced kickstart performs a real
-sync and appends to `temp/pdda-sync.log`; the interval is 1800s and `RunAtLoad` fires once; the job
-survives a logout/login (or documented if it needs `RunAtLoad` only); `uninstall-agent` fully removes it
-(`launchctl list` no longer shows the label, plist gone).
+**QA gate (single pass/fail MVP contract — no escape hatch):** after `install-agent`, `launchctl list`
+shows the label; the plist sets `StartInterval` 1800 and `RunAtLoad` true, verified by reading it back;
+a forced `launchctl kickstart` performs a real push and appends to `temp/pdda-sync.log`; `RunAtLoad`
+fires exactly once at load. **MVP scope is explicitly limited to RunAtLoad + the 1800s interval within
+the active login session** — logout/login persistence is *not* a gated guarantee (a
+`~/Library/LaunchAgents/` agent reloads at next login by construction; the MVP does not test that path,
+and the gate does not depend on it). `uninstall-agent` fully removes it (`launchctl list` no longer
+shows the label, plist gone); with NO agent installed, manual `push` is fully functional on its own.
 
 ## Phase 5 — Docs + dogfood verification
 
 Make it discoverable and prove it end-to-end.
 
-- Document the sync system in `utils/pdda/PDDA-INSTALL.md` (or a dedicated section), add a `.gitignore`
-  note that `temp/` holds the registry/state/backups, and add routing hints in `ROUTER.md`.
-- Add a CHANGELOG entry. Update `install.sh` header comment if the manifest was refactored.
-- Full dogfood: register 2–3 real secondary repos, run the agent for one interval, confirm a genuine
-  source bump propagates within 30 minutes with backups intact and no clobbered local edits.
+- Document the push system in `utils/pdda/PDDA-INSTALL.md` (or a dedicated section), add a `.gitignore`
+  note that `temp/` holds the sync **state, expanded-manifest snapshots, backups, run log, and lockfile**
+  — the **registry itself stays machine-local under `${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv`, never in `temp/`** —
+  and add routing hints in `ROUTER.md`.
+- Add a CHANGELOG entry. Update `install.sh` header comment now that the manifest is a shared
+  declaration.
+- Full dogfood: register 2–3 real secondary repos, run `push` manually, confirm a genuine source bump
+  AND a source-side delete both propagate with backups intact and no clobbered local edits. If a
+  launchd agent is installed, confirm the scheduled `push` produces the same result within one interval.
 
 **QA gate:** `./utils/pdda/pdda.sh run` green; a clean-clone walk shows the docs explain register →
-auto-sync → uninstall; CHANGELOG updated; one real propagation observed end-to-end via launchd.
+push (→ optional auto-schedule) → uninstall; CHANGELOG updated; one real propagation (copy + delete)
+observed end-to-end.
 
 ## Resolved decisions
 
-All five settled 2026-06-27:
+Realigned 2026-06-29 (see [Realignment](#realignment-2026-06-29)). Current state:
 
-1. **Source of truth = working tree, dirty-guarded.** Sync the on-disk synced set, but refuse when the
-   source repo is git-dirty on **any manifest file** (the guard reads the shared manifest, not a
-   hardcoded `utils/pdda/` subtree, so `PROJECT/PDDA.md` is covered); `--allow-dirty` overrides.
-2. **`register` confirms by default, `--yes` to bypass.** Friction only at the rare, consequential
-   enrollment step; the recurring `run` never prompts (its safety is backups + state-stamp). Aligns
-   with GUIDING-PRINCIPLES #6 (low-friction/portable) without surrendering the non-destructive ethos.
-3. **`PROJECT/PDDA.md` is in the synced set.** The contract ships with the runtime; a stale contract in
+1. **Source of truth = HQ working tree, dirty-guarded.** Push the on-disk synced set, but refuse when
+   HQ is git-dirty on **any expanded manifest file** (the guard reads the expander output, not a
+   hardcoded `utils/pdda/` subtree, so `PROJECT/PDDA.md` and any new runtime file are covered);
+   `--allow-dirty` overrides.
+2. **Trigger = manual `push` from HQ; launchd optional.** *(Reversed 2026-06-29 — was launchd-primary.)*
+   On-demand distribution is the default interface; the scheduler is a thin opt-in wrapper over the
+   same engine (Phase 4). Aligns with GUIDING-PRINCIPLES #6 (low-friction/portable).
+3. **Deletions = mirror HQ-side removals, backup-first.** *(Reversed 2026-06-29 — was additive-only.)*
+   A file dropped from the runtime is removed from targets, but only after a recoverable backup and
+   only for paths HQ previously shipped (manifest-diff-gated). The blast radius is contained by the
+   **manifest-poisoning guard** — the delete phase aborts before touching any target on **zero-root**,
+   **empty-after-nonempty**, or **shrink-beyond-threshold** (`PDDA_SYNC_MAX_SHRINK`, default 25%),
+   overridable only with an explicit `--force-delete` ack — plus `--no-delete` to skip removals entirely.
+4. **Manifest = auto-regenerated from declared source roots.** *(Reversed 2026-06-29 — was a static
+   list.)* New runtime files/folders propagate without a list edit; still DRY and dirty-guardable via
+   the `git ls-files`-backed expander.
+5. **`register` confirms by default, `--yes` to bypass.** Friction only at the rare, consequential
+   enrollment step; the recurring `push` never prompts (its safety is backups + state-stamp).
+6. **`PROJECT/PDDA.md` is in the synced set.** The contract ships with the runtime; a stale contract in
    a target is a real drift footgun.
-4. **Backups prune to the last `N` per target** (default 5, `PDDA_SYNC_BACKUPS` override) — bounded
+7. **Backups prune to the last `N` per target** (default 5, `PDDA_SYNC_BACKUPS` override) — bounded
    like the activity-log rotation.
-5. **launchd label `com.hiqs.rebalance.pdda-sync`**, per-user LaunchAgent under
-   `~/Library/LaunchAgents/`.
+8. **launchd label `com.hiqs.rebalance.pdda-sync`**, per-user LaunchAgent under
+   `~/Library/LaunchAgents/` (only when the optional agent is installed).
