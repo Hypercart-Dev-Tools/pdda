@@ -87,7 +87,11 @@ if [ "$TARGET" = "$SOURCE_DIR" ]; then
   exit 1
 fi
 
-if [ ! -d "$TARGET/.git" ]; then
+# True if TARGET is inside a git work tree. Uses `git rev-parse`, not a literal `.git` directory test,
+# so it also handles worktrees and submodules (where `.git` is a FILE) and an external GIT_DIR.
+is_git_repo() { git -C "$TARGET" rev-parse --is-inside-work-tree >/dev/null 2>&1; }
+
+if ! is_git_repo; then
   printf 'install.sh: note — %q is not a git repo. PDDA works best under version control (changelog\n' "$TARGET" >&2
   printf '            freshness uses git history). Consider `git init` there.\n' >&2
 fi
@@ -134,9 +138,18 @@ migrate_flat_layout() {
     say "  remove    utils/pdda-phase-out/ (legacy)"
   fi
 
+  # Repoint old flat-path references. Candidate files come from `git ls-files` (tracked only — skips
+  # node_modules/.venv and other untracked trees, and keeps the scan bounded); a non-git target falls
+  # back to a pruned `find`. Either way we skip the target's own utils/ tree (never our files to edit),
+  # the dated CHANGELOG, and machine logs — and only rewrite a file that actually contains an old path.
   local rel repointed=0
-  while IFS= read -r rel; do
-    [ -n "$rel" ] || continue
+  while IFS= read -r -d '' rel; do
+    rel="${rel#./}"
+    case "$rel" in
+      utils/*|node_modules/*|.venv/*|vendor/*|CHANGELOG.md|*.jsonl) continue ;;
+    esac
+    grep -Iq -e 'utils/pdda\.sh' -e 'utils/pdda-lib\.sh' -e 'utils/pdda-doc-ready\.sh' \
+      -e 'utils/pdda-catchup\.sh' -e 'utils/PDDA-INSTALL\.md' "$TARGET/$rel" 2>/dev/null || continue
     sed_inplace "$TARGET/$rel" \
       -e 's|utils/pdda\.sh|utils/pdda/pdda.sh|g' \
       -e 's|utils/pdda-lib\.sh|utils/pdda/pdda-lib.sh|g' \
@@ -146,9 +159,12 @@ migrate_flat_layout() {
     say "  repoint   $rel"
     repointed=$((repointed + 1))
   done < <(
-    cd "$TARGET" && grep -rIl --exclude-dir=.git --exclude=CHANGELOG.md --exclude='*.jsonl' \
-      -e 'utils/pdda\.sh' -e 'utils/pdda-lib\.sh' -e 'utils/pdda-doc-ready\.sh' \
-      -e 'utils/pdda-catchup\.sh' -e 'utils/PDDA-INSTALL\.md' . 2>/dev/null | sed 's|^\./||'
+    if is_git_repo; then
+      git -C "$TARGET" ls-files -z
+    else
+      ( cd "$TARGET" && find . \( -name .git -o -name node_modules -o -name .venv -o -path './utils' \) -prune \
+          -o -type f -print0 )
+    fi
   )
   [ "$repointed" -eq 0 ] && say "  (no old-path references found)"
   say "  migration done — review with: git -C \"$TARGET\" diff"
@@ -180,7 +196,7 @@ ensure_activity_ignored() {
     printf '%s\n' "$entry" >> "$gi"
     say "  ignore    .gitignore += $entry"
   fi
-  if [ -d "$TARGET/.git" ] && git -C "$TARGET" ls-files --error-unmatch "$entry" >/dev/null 2>&1; then
+  if is_git_repo && git -C "$TARGET" ls-files --error-unmatch "$entry" >/dev/null 2>&1; then
     if git -C "$TARGET" rm --cached --quiet "$entry" >/dev/null 2>&1; then
       say "  untrack   $entry (was tracked; git rm --cached)"
     fi
@@ -299,5 +315,8 @@ if ( cd "$TARGET" && PDDA_MODE="$MODE" ./utils/pdda/pdda.sh run ); then
 else
   say ""
   say "PDDA installed, but the first run reported findings or failed — see output above."
-  say "In observe mode this never blocks; review the findings and re-run ./utils/pdda/pdda.sh run."
+  case "$MODE" in
+    observe|light) say "In $MODE mode this never blocks; review the findings and re-run ./utils/pdda/pdda.sh run." ;;
+    full)          say "In full mode errors block (non-zero exit); review the findings and re-run ./utils/pdda/pdda.sh run." ;;
+  esac
 fi

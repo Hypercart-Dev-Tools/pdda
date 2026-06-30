@@ -1,5 +1,26 @@
 # CHANGELOG.md
 
+## 2026-06-29
+
+### `install.sh`: hardening from an Agy review relay
+
+Drove `install.sh` through a headless Agy review relay; landed all three findings (2 blockers + 1 nit),
+each re-tested.
+
+- **Git detection handles worktrees/submodules.** `is_git_repo()` now uses
+  `git rev-parse --is-inside-work-tree` instead of testing for a literal `.git` *directory* — in a
+  worktree/submodule `.git` is a FILE, so the old check silently skipped untracking
+  `PROJECT/PDDA-ACTIVITY.jsonl`. Verified in a real `git worktree`.
+- **Migration repointing is scoped and bounded.** Candidate files come from `git ls-files` (tracked
+  only — no scanning untracked `node_modules`/`.venv`), with a pruned `find` fallback for non-git
+  targets; `utils/ node_modules/ .venv/ vendor/ CHANGELOG.md *.jsonl` are skipped by path so even a
+  *tracked* dependency dir is never rewritten, and only files that actually contain an old path are
+  edited.
+- **Verify-failure message is mode-aware** (was hardcoded to "observe mode"; now reflects light/full).
+
+Verification: `bash -n` clean; re-tested flat-layout migration (real refs repointed, tracked
+`node_modules` untouched, target's own `utils/` intact) and the git-worktree untrack path.
+
 ## 2026-06-28
 
 ### `install.sh`: auto-migrate flat layout + gitignore the activity log
