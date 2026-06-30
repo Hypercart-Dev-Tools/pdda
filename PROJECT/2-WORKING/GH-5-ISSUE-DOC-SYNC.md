@@ -1,6 +1,6 @@
 ---
 title: Deterministic issue↔doc sync check + two-tier doc-health hooks
-status: Active — Phase 0 complete (issue + doc + park), Phase 1 next
+status: Active — Phases 1–4 built, tested, and committed; finalize (CHANGELOG/ROADMAP/move/close #5) pending
 created: 2026-06-29
 updated: 2026-06-29
 owner: noel
@@ -35,7 +35,7 @@ phases: 5
 
 | What was just completed | What's next |
 |---|---|
-| Phase 0 — filed issue #5, wrote this doc, parked it in `ROADMAP.md`, and recorded the Swarm Preflight Contract below. | Phase 1 — build `check_issue_doc_sync()` in [utils/pdda/pdda.sh](../../utils/pdda/pdda.sh), wire it into `cmd_run()`, add `test/pdda-issue-doc-sync.sh`, update lockstep docs. |
+| Phases 1–4 all built, tested, and committed (`53ab555`, `4d49764`, `561f38c`, `e110fa1`): the `issue-doc-sync` check (warn-only, gh-degrade, 13 tests), the `gh-refresh` cache producer, and the two-tier PostToolUse + Stop doc-health hooks (18 tests). `pdda.sh run` green; live tree reports no drift. | Finalize (deferred while a concurrent GH-6 edit holds `ROADMAP.md`/`CHANGELOG.md` uncommitted): add the CHANGELOG entry, move this doc's `ROADMAP.md` pointer to **Completed**, `git mv` this doc to `PROJECT/3-COMPLETED/`, then close issue #5 once you've verified it. |
 
 ## Table of contents
 
