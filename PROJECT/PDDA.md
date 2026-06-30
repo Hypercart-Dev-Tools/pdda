@@ -347,7 +347,8 @@ Purpose:
 - nudge that `CHANGELOG.md` (the first-class end-of-iteration record) was updated this iteration
 
 Minimum behavior:
-- read `CHANGELOG.md` (override via `PDDA_CHANGELOG`); find the newest `## YYYY-MM-DD` entry
+- read `CHANGELOG.md` (override via `PDDA_CHANGELOG`); find the newest dated heading, accepting both
+  `## YYYY-MM-DD` and `## [x.y.z] - YYYY-MM-DD`
 - `warn` (never `error` — does not block, even in `full`) when that entry predates the latest git
   commit by more than `PDDA_CHANGELOG_STALE_DAYS` days (default `0`)
 - `warn` if `CHANGELOG.md` is missing or has no dated entry; emit `info` (skip the compare) when there
@@ -550,7 +551,7 @@ findings, and durable Costly / one-way-door bets still earn a `decisions/` recor
 
 It should contain:
 
-- newest-first, dated `## YYYY-MM-DD` sections
+- newest-first, dated sections headed either `## YYYY-MM-DD` or `## [x.y.z] - YYYY-MM-DD`
 - one entry per substantive iteration: what changed, why, and the verification (test / suite result)
 - the bet behind a consequential change when one applies (the call, the expected signal, reversibility)
 

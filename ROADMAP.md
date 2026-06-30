@@ -39,6 +39,8 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 ### In progress
 
 - **Root `install.sh` + operator onboarding** (2026-06-25) - installer that provisions a foreign repo to a clean zero state; README rewritten for onboarding. Tracking issue pending `gh` re-auth. -> [PROJECT/2-WORKING/INSTALL-SCRIPT-AND-ONBOARDING.md](PROJECT/2-WORKING/INSTALL-SCRIPT-AND-ONBOARDING.md)
+- **Reconcile pdda-sync `list` vs `status` wording** (2026-06-30) - a just-installed-but-unpushed target read as `not-yet-pushed` in `list` while `status` reported it current; `list` is now content-aware (`current`/`out-of-sync` + `(unpushed)` marker). Iteration 1 shipped. -> [PROJECT/2-WORKING/SYNC-LIST-STATUS-RECONCILE.md](PROJECT/2-WORKING/SYNC-LIST-STATUS-RECONCILE.md)
+- **Multi-device PDDA status via git-pulse piggyback** (2026-06-30) - sketch (ponytail-trimmed): a per-device, **path-normalized** registry projection (repo name + date + build hash + mode, no folder path) dropped into a new `pdda/` folder of git-pulse's sync repo, carried by git-pulse's existing sync — ~6 best-effort lines in `register_install()`, no new command or git logic. Ready to build. -> [PROJECT/2-WORKING/PDDA-MULTI-DEVICE-STATUS-VIA-GITPULSE.md](PROJECT/2-WORKING/PDDA-MULTI-DEVICE-STATUS-VIA-GITPULSE.md)
 
 ### Completed
 

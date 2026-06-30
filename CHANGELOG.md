@@ -1,5 +1,39 @@
 # CHANGELOG.md
 
+## 2026-06-30
+
+### `pdda.sh changelog` now accepts semver-style dated headings
+
+`check_changelog` only matched bare `## YYYY-MM-DD` headings, so repos using the common
+Keep-a-Changelog style `## [x.y.z] - YYYY-MM-DD` could false-flag as stale by falling through to an
+older legacy bare-date heading lower in the file. Fixed the matcher to accept both heading forms while
+keeping the existing "first matching heading wins" newest-first assumption, and updated the fallback
+warning + contract text to reflect the dual-format behavior.
+
+Added `test/pdda-changelog.sh` to lock the regression down across three cases: semver-only headings,
+bare-date-only headings, and a mixed file where the top semver heading must beat a lower legacy bare
+date.
+
+Verification: `bash -n utils/pdda/pdda.sh test/pdda-changelog.sh`; `bash test/pdda-changelog.sh`
+(7/7); `utils/pdda/pdda.sh changelog` -> `errors=0 warns=0 info=0`.
+
+### pdda-sync `list` now content-aware (reconciles with `status`)
+
+`pdda-sync.sh list` decided its currency column purely on sync-state-file existence, so a target that
+`install.sh` had just provisioned (content identical to HQ, but `push` never run) printed `not-yet-pushed`
+— implying staleness — while `pdda-sync.sh status` simultaneously hashed the files and reported it
+`current=9 behind=0 diverged=0`. The two read-only surfaces contradicted each other for every
+just-installed target.
+
+Fix: added a `target_is_current()` helper (hashes each manifest file in the target against HQ; collapses
+status's current/behind/diverged to one boolean) and rewrote `cmd_list` to print `current` / `out-of-sync`
+with an `(unpushed)` marker when no sync-state file exists yet. A just-installed target now reads
+`current (unpushed)` — consistent with `status`, honest that `push` has not adopted it. `status` is
+unchanged (it was already authoritative); blast radius is the `list` column only.
+
+Verification: `pdda-sync.sh list` now agrees with `pdda-sync.sh status` for both registered targets
+(rebalance-OS, xyz-3-agents-swarm); `pdda.sh run` all checks passed. -> `PROJECT/2-WORKING/SYNC-LIST-STATUS-RECONCILE.md`
+
 ## 2026-06-29
 
 ### Deterministic issue↔doc sync check + two-tier doc-health hooks (GH-5)

@@ -330,15 +330,40 @@ EOF
   return 0
 }
 
-# list — registered targets with mode, source commit, and sync state.
+# Content-currency check used by `list`: returns 0 iff every manifest file exists in the target and its
+# content matches HQ (i.e. `status` would report behind=0 diverged=0), else 1. Collapses status's
+# current/behind/diverged distinction to a single boolean — status stays the authoritative per-file report;
+# this just keeps `list` from implying staleness it never verified. Reads the manifest from $1 to avoid
+# re-expanding per target.
+target_is_current() {  # <target> <manifest-text>
+  local tgt="$1" rel tgt_f
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    tgt_f="$tgt/$rel"
+    [ -e "$tgt_f" ] || return 1
+    [ "$(hash_file "$tgt_f")" = "$(hash_file "$SOURCE_DIR/$rel")" ] || return 1
+  done <<EOF
+$2
+EOF
+  return 0
+}
+
+# list — registered targets with mode, source commit, and content currency. The currency column is
+# content-aware (consistent with `status`): a target install.sh provisioned but `push` never stamped reads
+# `current (unpushed)`, NOT a staleness-implying `not-yet-pushed`. `(unpushed)` marks the missing sync-state
+# file (provenance), not drift.
 cmd_list() {
-  local t mode src slug synced
+  local CUR; CUR="$(pdda_manifest_expand "$SOURCE_DIR")"
+  local t mode src slug synced unpushed
   while IFS= read -r t; do
     [ -n "$t" ] || continue
     mode="$(registry_field "$t" 3)"; src="$(registry_field "$t" 4)"; slug="$(slug_for "$t")"
-    if [ ! -d "$t" ]; then synced="MISSING"
-    elif [ -f "$STATE_DIR/$slug.tsv" ]; then synced="synced"
-    else synced="not-yet-pushed"; fi
+    if [ ! -d "$t" ]; then
+      synced="MISSING"
+    else
+      unpushed=""; [ -f "$STATE_DIR/$slug.tsv" ] || unpushed=" (unpushed)"
+      if target_is_current "$t" "$CUR"; then synced="current$unpushed"; else synced="out-of-sync$unpushed"; fi
+    fi
     printf '%s\tmode=%s\tsrc=%s\t%s\n' "$t" "${mode:-?}" "${src:-?}" "$synced"
   done < <(registry_targets)
   return 0
