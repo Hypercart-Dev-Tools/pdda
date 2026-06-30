@@ -576,6 +576,12 @@ Then run:
 (`pdda.sh run` runs exactly this sequence and applies the active `PDDA_MODE` gate. Scheduling the
 single aggregate command is the recommended hourly cron entry.)
 
+The cached GitHub issue-state refresh is a separate, network-only step. Run `pdda.sh gh-refresh`
+(the standalone `utils/pdda/pdda-gh-refresh.sh`) on the same hourly cron/launchd cadence, **before**
+the suite, so `issue-doc-sync` and the Stop doc-health scan read fresh state. It is the only step that
+needs `gh`/the network; it writes `PDDA_GH_STATE_CACHE` atomically and leaves the existing cache
+untouched on any `gh` failure, so the suite itself stays offline-tolerant by reading the cache.
+
 Reason for the order:
 
 - deterministic failures should surface first

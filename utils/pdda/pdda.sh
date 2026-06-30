@@ -448,31 +448,8 @@ check_stale() {
 # ------------------------------------------------------------------------------------------------
 # H. issue-doc-sync (warn-only, flag-only; gh-degrades to a cached state file, never blocks)
 # ------------------------------------------------------------------------------------------------
-# Derive owner/repo from the origin remote so `gh` works regardless of the caller's CWD. Empty on
-# failure (gh then auto-detects from CWD, or we fall through to the cache).
-_pdda_gh_repo_slug() {
-  local url
-  url="$(git -C "$PDDA_REPO_ROOT" remote get-url origin 2>/dev/null)" || return 0
-  url="${url%.git}"
-  case "$url" in
-    *github.com[:/]*) printf '%s' "${url##*github.com}" | sed -E 's#^[:/]+##' ;;
-    *) : ;;
-  esac
-}
-
-# Live issue-state table from gh, as "<number>\t<STATE>" lines. Non-zero (and empty) when gh fails
-# (absent, unauthenticated, or offline) — the caller then degrades to the cache.
-_pdda_gh_state_table() {
-  local slug
-  slug="$(_pdda_gh_repo_slug)"
-  if [ -n "$slug" ]; then
-    gh issue list -R "$slug" --state all --limit 1000 --json number,state \
-      --jq '.[] | [.number, .state] | @tsv' 2>/dev/null
-  else
-    gh issue list --state all --limit 1000 --json number,state \
-      --jq '.[] | [.number, .state] | @tsv' 2>/dev/null
-  fi
-}
+# The gh-fetch primitives (_pdda_gh_repo_slug, _pdda_gh_state_table) live in pdda-lib.sh so the
+# cache producer (pdda-gh-refresh.sh) and this consumer share ONE definition of the cache format.
 
 # Cached issue-state table ('#'-comment lines stripped). Empty when no cache file exists.
 _pdda_cache_state_table() {
@@ -661,6 +638,7 @@ Commands:
   changelog          end-of-iteration changelog nudge (warn-only)
   stale              flag stale working docs (flag-only; never moves)
   issue-doc-sync     flag 2-WORKING/GH-*.md docs drifted from their GitHub issue state (warn-only)
+  gh-refresh         refresh the cached GitHub issue-state file issue-doc-sync reads offline (needs gh)
   doc-ready          LLM readiness review (delegates to pdda-doc-ready.sh; opt-in via PDDA_LLM_BIN)
   catchup            LLM repo triage and ROUTER.md recommendations (delegates to pdda-catchup.sh)
   help               this message
@@ -682,6 +660,7 @@ case "$cmd" in
   changelog)        check_changelog; exit "$?" ;;
   stale)            check_stale; exit "$?" ;;
   issue-doc-sync)   check_issue_doc_sync; exit "$?" ;;
+  gh-refresh)       exec "$HERE/pdda-gh-refresh.sh" "$@" ;;
   doc-ready)        exec "$HERE/pdda-doc-ready.sh" "$@" ;;
   catchup)          exec "$HERE/pdda-catchup.sh" "$@" ;;
   help|-h|--help)   pdda_usage; exit 0 ;;

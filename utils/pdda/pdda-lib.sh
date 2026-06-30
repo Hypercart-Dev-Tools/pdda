@@ -262,3 +262,33 @@ pdda_is_real_date() {
   fi
   [ "$out" = "$d" ]
 }
+
+# --- GitHub issue-state fetch (shared by `pdda.sh issue-doc-sync` and pdda-gh-refresh.sh) ---------
+# One definition of the live-state query + cache row format ("<number>\t<STATE>"), so the cache
+# producer and consumer can never disagree on shape.
+
+# Derive owner/repo from the origin remote so `gh` works regardless of the caller's CWD. Empty on
+# failure (gh then auto-detects from CWD, or callers fall through to the cache).
+_pdda_gh_repo_slug() {
+  local url
+  url="$(git -C "$PDDA_REPO_ROOT" remote get-url origin 2>/dev/null)" || return 0
+  url="${url%.git}"
+  case "$url" in
+    *github.com[:/]*) printf '%s' "${url##*github.com}" | sed -E 's#^[:/]+##' ;;
+    *) : ;;
+  esac
+}
+
+# Live issue-state table from gh, as "<number>\t<STATE>" lines. Non-zero (and empty) when gh fails
+# (absent, unauthenticated, or offline) — callers then degrade to the cached state file.
+_pdda_gh_state_table() {
+  local slug
+  slug="$(_pdda_gh_repo_slug)"
+  if [ -n "$slug" ]; then
+    gh issue list -R "$slug" --state all --limit 1000 --json number,state \
+      --jq '.[] | [.number, .state] | @tsv' 2>/dev/null
+  else
+    gh issue list --state all --limit 1000 --json number,state \
+      --jq '.[] | [.number, .state] | @tsv' 2>/dev/null
+  fi
+}

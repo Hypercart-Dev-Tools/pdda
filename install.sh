@@ -63,11 +63,11 @@ Options:
   -h, --help             This message.
 
 What gets installed (zero state):
-  utils/pdda/{pdda.sh,pdda-lib.sh,pdda-doc-ready.sh,pdda-catchup.sh}   (runtime, refreshed)
+  utils/pdda/{pdda.sh,pdda-lib.sh,pdda-doc-ready.sh,pdda-catchup.sh,pdda-gh-refresh.sh}   (runtime, refreshed)
   PROJECT/PDDA.md                                            (the contract, refreshed)
   PROJECT/{1-INBOX,2-WORKING,3-COMPLETED,4-MISC}/blank.md    (lifecycle buckets)
   ROADMAP.md CHANGELOG.md PROJECT/PDDA-ACTIVITY.jsonl .pdda-mode   (blank seeds, create-only)
-  .gitignore += PROJECT/PDDA-ACTIVITY.jsonl                        (the churning log is runtime state)
+  .gitignore += PROJECT/PDDA-ACTIVITY.jsonl .pdda-gh-state.tsv     (churning runtime state)
 
 It also records the install in a per-user, machine-local registry (~/.config/pdda/registry.tsv) so a
 future sync layer knows where every copy lives. The registry is never committed. --no-register skips it.
@@ -205,24 +205,27 @@ seed_file() {  # <relpath>  (content on stdin)
   say "  seed      $rel"
 }
 
-# Ensure the churning activity log is gitignored in the target (it is runtime state, not source —
-# tracking it makes every `pdda.sh run` a dirty diff). Idempotent, so installs AND upgrades converge:
-# adds the entry if missing, and untracks the file if a pre-gitignore install already committed it.
-ensure_activity_ignored() {
-  local entry="PROJECT/PDDA-ACTIVITY.jsonl" gi="$TARGET/.gitignore"
-  if [ -f "$gi" ] && grep -qxF "$entry" "$gi"; then
-    say "  keep      .gitignore ($entry already ignored)"
-  else
-    # Guarantee a trailing newline before appending so we never glue onto the prior last line.
-    if [ -f "$gi" ] && [ -n "$(tail -c1 "$gi" 2>/dev/null)" ]; then printf '\n' >> "$gi"; fi
-    printf '%s\n' "$entry" >> "$gi"
-    say "  ignore    .gitignore += $entry"
-  fi
-  if is_git_repo && git -C "$TARGET" ls-files --error-unmatch "$entry" >/dev/null 2>&1; then
-    if git -C "$TARGET" rm --cached --quiet "$entry" >/dev/null 2>&1; then
-      say "  untrack   $entry (was tracked; git rm --cached)"
+# Ensure PDDA's churning runtime state is gitignored in the target (the activity log and the gh-issue
+# -state cache are regenerated output, not source — tracking them makes every run a dirty diff).
+# Idempotent, so installs AND upgrades converge: adds each entry if missing, and untracks any that a
+# pre-gitignore install already committed (a no-op for entries that were never tracked).
+ensure_runtime_ignored() {
+  local gi="$TARGET/.gitignore" entry
+  for entry in "PROJECT/PDDA-ACTIVITY.jsonl" ".pdda-gh-state.tsv"; do
+    if [ -f "$gi" ] && grep -qxF "$entry" "$gi"; then
+      say "  keep      .gitignore ($entry already ignored)"
+    else
+      # Guarantee a trailing newline before appending so we never glue onto the prior last line.
+      if [ -f "$gi" ] && [ -n "$(tail -c1 "$gi" 2>/dev/null)" ]; then printf '\n' >> "$gi"; fi
+      printf '%s\n' "$entry" >> "$gi"
+      say "  ignore    .gitignore += $entry"
     fi
-  fi
+    if is_git_repo && git -C "$TARGET" ls-files --error-unmatch "$entry" >/dev/null 2>&1; then
+      if git -C "$TARGET" rm --cached --quiet "$entry" >/dev/null 2>&1; then
+        say "  untrack   $entry (was tracked; git rm --cached)"
+      fi
+    fi
+  done
 }
 
 # Record this install in the per-user, per-device registry (one row per target, latest wins). This is
@@ -350,7 +353,8 @@ CHANGELOG
 
 # Empty activity log (never copy the source repo's log).
 seed_file "PROJECT/PDDA-ACTIVITY.jsonl" </dev/null
-ensure_activity_ignored
+
+ensure_runtime_ignored
 
 seed_file ".pdda-mode" <<MODE
 $MODE
