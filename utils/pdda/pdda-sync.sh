@@ -31,6 +31,11 @@ BACKUP_DIR="$SYNC_TMP/pdda-sync-backups"
 LOG_FILE="$SYNC_TMP/pdda-sync.log"
 LOCK_DIR="$SYNC_TMP/pdda-sync.lock"
 
+# Optional launchd scheduler (Phase 4). All overridable for testing; the live agent is opt-in.
+LAUNCH_LABEL="${PDDA_SYNC_LABEL:-com.hiqs.rebalance.pdda-sync}"
+LAUNCH_INTERVAL="${PDDA_SYNC_INTERVAL:-1800}"
+LAUNCH_PLIST="${PDDA_SYNC_PLIST:-$HOME/Library/LaunchAgents/$LAUNCH_LABEL.plist}"
+
 say() { printf '%s\n' "$*"; }
 warn() { printf '%s\n' "$*" >&2; }
 
@@ -440,10 +445,68 @@ EOF
   return 0
 }
 
-# Stubs filled in by later phases — fail loudly rather than silently no-op.
-not_yet() { warn "pdda-sync.sh: '$1' is not implemented yet (planned: $2)"; return 3; }
-cmd_install_agent()   { not_yet install-agent "Phase 4"; }
-cmd_uninstall_agent() { not_yet uninstall-agent "Phase 4"; }
+# Write the LaunchAgent plist (one agent that runs `push` over the whole registry on an interval).
+write_agent_plist() {
+  ensure_tmp
+  mkdir -p "$(dirname "$LAUNCH_PLIST")"
+  cat > "$LAUNCH_PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$LAUNCH_LABEL</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>$HERE/pdda-sync.sh</string>
+		<string>push</string>
+	</array>
+	<key>StartInterval</key>
+	<integer>$LAUNCH_INTERVAL</integer>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>WorkingDirectory</key>
+	<string>$SOURCE_DIR</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>$LOG_FILE</string>
+	<key>StandardErrorPath</key>
+	<string>$LOG_FILE</string>
+</dict>
+</plist>
+PLIST
+}
+
+# install-agent [--no-load] — write the plist and (by default) load it into the per-user gui domain.
+cmd_install_agent() {
+  local LOAD=1
+  [ "${1:-}" = "--no-load" ] && LOAD=0
+  write_agent_plist
+  say "install-agent: wrote $LAUNCH_PLIST (interval ${LAUNCH_INTERVAL}s, push over the whole registry)"
+  if [ "$LOAD" -eq 0 ]; then say "install-agent: --no-load — not loaded into launchd"; return 0; fi
+  local domain="gui/$(id -u)"
+  launchctl bootout "$domain" "$LAUNCH_PLIST" >/dev/null 2>&1 || true   # idempotent: clear any prior load
+  if launchctl bootstrap "$domain" "$LAUNCH_PLIST" >/dev/null 2>&1; then
+    launchctl enable "$domain/$LAUNCH_LABEL" >/dev/null 2>&1 || true
+    say "install-agent: loaded $LAUNCH_LABEL into $domain"
+  else
+    warn "install-agent: plist written but launchctl bootstrap failed — load manually:"
+    warn "  launchctl bootstrap $domain \"$LAUNCH_PLIST\""
+    return 1
+  fi
+}
+
+# uninstall-agent — unload from launchd and remove the plist.
+cmd_uninstall_agent() {
+  local domain="gui/$(id -u)"
+  launchctl bootout "$domain" "$LAUNCH_PLIST" >/dev/null 2>&1 || launchctl bootout "$domain/$LAUNCH_LABEL" >/dev/null 2>&1 || true
+  rm -f "$LAUNCH_PLIST"
+  say "uninstall-agent: unloaded $LAUNCH_LABEL and removed $LAUNCH_PLIST"
+}
 
 usage() {
   cat <<'USAGE'

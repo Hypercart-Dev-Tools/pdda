@@ -27,7 +27,7 @@ phases: 5
 
 | What was just completed | What's next |
 |---|---|
-| **Phase 3 SHIPPED (2026-06-29) — onboarding & registry mgmt.** `register` (validates git repo, confirms unless `--yes`/no-TTY-refuses, delegates the copy + registry write to `install.sh`, then seeds state + snapshot so the next push is all-skip), `list` (mode / source-commit / sync state), `status` (current / behind / diverged / missing / to-delete, read-only), `remove` (de-register, keep files), `prune` (drop targets whose dir is gone). **Phase 3 QA gate GREEN (17/17).** Phases 1–2 (manifest expander + push engine) shipped prior. | **Phase 4 — optional launchd wrapper** (`install-agent` / `uninstall-agent` scheduling the same `push`; manual push stays primary). |
+| **Phase 4 SHIPPED (2026-06-29) — optional launchd wrapper.** `install-agent` writes `~/Library/LaunchAgents/com.hiqs.rebalance.pdda-sync.plist` (`ProgramArguments`=`pdda-sync.sh push`, `StartInterval` 1800, `RunAtLoad`, logs → `temp/pdda-sync.log`) then `launchctl bootstrap`+`enable`; `--no-load` writes the plist only; `uninstall-agent` does `bootout`+`rm`. Label/interval/plist-path overridable. **Phase 4 QA gate GREEN (11/11)**, including a live `launchctl` bootstrap/print/bootout round-trip with a throwaway harmless agent — the **real recurring daemon is opt-in, not auto-installed**. Manual `push` stays primary. Phases 1–3 prior. | **Phase 5 — docs + dogfood:** document push in `PDDA-INSTALL.md`, `ROUTER.md` hints, CHANGELOG, `.gitignore` note; one real propagation (copy + delete) end-to-end. |
 
 ## Realignment (2026-06-29)
 
@@ -299,6 +299,15 @@ one registry line, and seeds state + manifest snapshot so the very next `push` i
 then `list` shows it gone but leaves files intact; `prune` drops a moved/deleted target.
 
 ## Phase 4 — Optional launchd scheduler (wraps `push`)
+
+> **SHIPPED (2026-06-29) — QA gate GREEN (11/11).** `write_agent_plist` + `cmd_install_agent` /
+> `cmd_uninstall_agent` in `pdda-sync.sh`. `install-agent` writes the plist and `launchctl bootstrap`s
+> it into `gui/$(id -u)`; `--no-load` writes the plist only (used by the static QA); `uninstall-agent`
+> `bootout`s + removes it. `PDDA_SYNC_LABEL` / `PDDA_SYNC_INTERVAL` / `PDDA_SYNC_PLIST` are overridable.
+> Validated with `plutil -lint` + `plutil -extract` on the generated plist (StartInterval 1800,
+> RunAtLoad true, ProgramArguments = `pdda-sync.sh push`, logs → `temp/pdda-sync.log`) AND a live
+> `launchctl bootstrap`/`print`/`bootout` round-trip using a throwaway `/usr/bin/true` agent — proving
+> the mechanism without installing the real recurring daemon (that stays the operator's explicit opt-in).
 
 Wrap the on-demand `push` in a native macOS job — **opt-in**, for operators who want hands-off
 propagation. The manual `push` is the primary interface; this just schedules it.
