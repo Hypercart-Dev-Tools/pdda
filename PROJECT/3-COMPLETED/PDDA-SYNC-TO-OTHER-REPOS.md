@@ -1,6 +1,6 @@
 ---
 title: Sync the PDDA runtime to other repos (HQ → registered targets, push-based)
-status: Active
+status: Completed (2026-06-29 — all 5 phases shipped, every QA gate green; moved to 3-COMPLETED)
 created: 2026-06-27
 updated: 2026-06-29
 owner: noel
@@ -27,7 +27,7 @@ phases: 5
 
 | What was just completed | What's next |
 |---|---|
-| **Phase 4 SHIPPED (2026-06-29) — optional launchd wrapper.** `install-agent` writes `~/Library/LaunchAgents/com.hiqs.rebalance.pdda-sync.plist` (`ProgramArguments`=`pdda-sync.sh push`, `StartInterval` 1800, `RunAtLoad`, logs → `temp/pdda-sync.log`) then `launchctl bootstrap`+`enable`; `--no-load` writes the plist only; `uninstall-agent` does `bootout`+`rm`. Label/interval/plist-path overridable. **Phase 4 QA gate GREEN (11/11)**, including a live `launchctl` bootstrap/print/bootout round-trip with a throwaway harmless agent — the **real recurring daemon is opt-in, not auto-installed**. Manual `push` stays primary. Phases 1–3 prior. | **Phase 5 — docs + dogfood:** document push in `PDDA-INSTALL.md`, `ROUTER.md` hints, CHANGELOG, `.gitignore` note; one real propagation (copy + delete) end-to-end. |
+| **COMPLETE (2026-06-29) — all 5 phases shipped, every QA gate green.** Phase 5 (docs + dogfood) landed: `pdda-sync.sh` documented in `PDDA-INSTALL.md` + `ROUTER.md`, a CHANGELOG entry, `.gitignore`/`install.sh`-header updates; **end-to-end dogfood GREEN (19/19)** — register → push → source bump → local-edit preservation → delete-mirror + backup recovery → idempotent no-op, on a faithful throwaway HQ driving the real `install.sh` + runtime. Phases 1–4 (manifest+skeleton 8/8 · push engine 26/26 · registry mgmt 17/17 · launchd 11/11) shipped + QA-green prior. | **Done.** Operator opt-in remains: `register` real secondary repos and (optionally) `install-agent` when live propagation is wanted. |
 
 ## Realignment (2026-06-29)
 
@@ -330,6 +330,19 @@ and the gate does not depend on it). `uninstall-agent` fully removes it (`launch
 shows the label, plist gone); with NO agent installed, manual `push` is fully functional on its own.
 
 ## Phase 5 — Docs + dogfood verification
+
+> **SHIPPED (2026-06-29) — dogfood GREEN (19/19).** Docs: a "Syncing the runtime to other repos"
+> section in `utils/pdda/PDDA-INSTALL.md`, routing hints + command rails in `ROUTER.md`, a CHANGELOG
+> entry, a `.gitignore` comment clarifying what `temp/` holds, and an `install.sh` header update noting
+> the shared manifest. Dogfood: a faithful throwaway HQ (copied real `install.sh` + runtime) registers
+> two targets and drives the full path — post-register all-skip, genuine source bump propagating to
+> both, a deliberate target-local edit preserved across pushes, a newly-added runtime file propagating
+> then its HQ-side deletion mirroring with a recoverable backup, and a clean idempotent no-op — plus a
+> doc-walk asserting register→push→install/uninstall-agent are all documented, and the repo self-check
+> green. **Note (operator opt-in):** registering *real* secondary repos + installing the *live* launchd
+> agent are deliberately left to the operator (the `register` confirmation prompt exists for exactly
+> that); the dogfood proves the same code paths on throwaway repos without touching real repos or the
+> real registry.
 
 Make it discoverable and prove it end-to-end.
 

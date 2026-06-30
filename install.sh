@@ -6,8 +6,10 @@ set -euo pipefail
 #
 #   ./install.sh /path/to/your-repo
 #
-# It copies the shipped runtime (the 4 canonical files), creates the PROJECT/** lifecycle tree,
-# and SYNTHESES blank seed ledger/changelog/activity/mode files — it never copies this repo's own
+# It copies the shipped runtime — exactly the set declared in utils/pdda/pdda-sync-manifest.conf and
+# expanded by utils/pdda/pdda-manifest.sh (the SAME manifest pdda-sync.sh pushes, so the install set
+# and the steady-state push set can never drift) — creates the PROJECT/** lifecycle tree, and
+# SYNTHESISES blank seed ledger/changelog/activity/mode files. It never copies this repo's own
 # ROADMAP/CHANGELOG/activity content, so the target starts empty but immediately valid. Existing
 # target files are never clobbered unless you pass --force.
 #

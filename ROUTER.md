@@ -61,10 +61,21 @@ utils/pdda/pdda.sh doc-ready   # LLM readiness review — set PDDA_LLM_BIN (code
 utils/pdda/pdda.sh help        # list every command
 ```
 
+To distribute this runtime from this clone (HQ) to other registered repos:
+
+```bash
+utils/pdda/pdda-sync.sh register --yes /path/to/repo   # enroll + initial install
+utils/pdda/pdda-sync.sh push                           # update all registered targets (or push <repo>)
+utils/pdda/pdda-sync.sh status                          # read-only drift report; help lists every command
+```
+
 ## Routing hints
 
 - If the task is about installing PDDA into another repo, run `install.sh <target>`; for the
   underlying spec or a by-hand/adapted install, start in `utils/pdda/PDDA-INSTALL.md`.
+- If the task is about keeping PDDA current across *several* repos from this one (HQ → targets:
+  register / push / status / optional launchd schedule), use `utils/pdda/pdda-sync.sh` — design and
+  rationale in `PROJECT/2-WORKING/PDDA-SYNC-TO-OTHER-REPOS.md`, usage in `utils/pdda/PDDA-INSTALL.md`.
 - If the task is about document quality, active-doc lifecycle, roadmap sprawl, or automation policy, start in `PROJECT/PDDA.md`.
 - If the task is about repo-local maintenance state, start in `ROADMAP.md`.
 - If the task is about the changelog, provenance, or end-of-iteration logging, the governance is in `PROJECT/PDDA.md` (the "CHANGELOG.md — end-of-iteration record" contract).

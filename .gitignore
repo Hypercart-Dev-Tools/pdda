@@ -2,6 +2,8 @@
 PROJECT/PDDA-ACTIVITY.jsonl
 .DS_Store
 .DS_Store
+# pdda-sync.sh HQ-side runtime state: state stamps, manifest snapshots, backups, run log, lock.
+# (The target registry is NOT here — it is machine-local under ~/.config/pdda/registry.tsv.)
 /temp/
 # Install registry is machine-local (~/.config/pdda/); never track a stray in-repo .config
 .config/

@@ -2,6 +2,33 @@
 
 ## 2026-06-29
 
+### PDDA sync/push system (HQ → registered targets)
+
+Built the steady-state distribution layer the registry foundation was for: `utils/pdda/pdda-sync.sh`
+keeps the PDDA runtime current across several repos from one canonical source ("HQ" = this clone),
+on-demand. Realigned + Codex relay-approved (4 rounds), then built phase-by-phase with a QA gate per
+phase.
+
+- **Auto-regenerated manifest** (`utils/pdda/pdda-sync-manifest.conf` + `pdda-manifest.sh`), shared
+  with `install.sh` so the install set == the push set by construction; new files/folders under
+  `utils/pdda/` propagate with no list edit. (Phase 1, QA 8/8.)
+- **`push` engine** — content-hash state-stamp table (new/updated/updated+bak/skip; local target edits
+  preserved between releases), delete-mirror (backup-then-delete for HQ-side removals), a
+  manifest-poisoning guard (zero-root / empty / shrink > `PDDA_SYNC_MAX_SHRINK`% + `--force-delete`),
+  atomic temp-then-`mv`, backups + retention, mkdir lock, dirty-source guard, `--dry-run`/`--no-delete`.
+  (Phase 2, QA 26/26.)
+- **`register`/`list`/`status`/`remove`/`prune`** — `register` delegates the copy + registry write to
+  `install.sh` (single writer) then seeds sync state so the next push is all-skip; confirms unless
+  `--yes`. (Phase 3, QA 17/17.)
+- **Optional launchd wrapper** — `install-agent`/`uninstall-agent` (30-min `push` over the whole
+  registry); the live daemon is opt-in. (Phase 4, QA 11/11.)
+- State lives under gitignored `temp/`; the registry stays machine-local under
+  `${XDG_CONFIG_HOME:-$HOME/.config}/pdda/`. Docs: `utils/pdda/PDDA-INSTALL.md` + `ROUTER.md`.
+
+Verification: per-phase QA gates green; end-to-end dogfood (register → push → source bump → source
+delete) propagates with backups intact and no clobbered local edits. See
+`PROJECT/2-WORKING/PDDA-SYNC-TO-OTHER-REPOS.md`.
+
 ### `install.sh`: per-user install registry (sync foundation)
 
 `install.sh` now records every install/upgrade in a machine-local registry so a future sync layer
