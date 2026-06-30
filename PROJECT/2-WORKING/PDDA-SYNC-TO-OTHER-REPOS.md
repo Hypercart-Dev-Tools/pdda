@@ -27,7 +27,7 @@ phases: 5
 
 | What was just completed | What's next |
 |---|---|
-| Planned + QA-reviewed (Codex). **Shipped the registry foundation early:** `install.sh` writes `${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv` (sync-ready schema) on every install/upgrade. **Realigned 2026-06-29** to an HQ→targets *push* model: manual `push` primary, launchd optional; auto-regenerated manifest; **mirror HQ-side deletes (backup-first)**. Three prior "Resolved decisions" were deliberately reopened (trigger, deletions, manifest) — see [Realignment](#realignment-2026-06-29). | Codex relay review of this realignment, then defer the build until requested; the registry is already populated. |
+| Realigned + Codex relay-approved (4 rounds). **Phase 1 SHIPPED (2026-06-29):** the shared manifest declaration (`utils/pdda/pdda-sync-manifest.conf`) + expander (`pdda-manifest.sh`), the `pdda-sync.sh` skeleton (dispatch + `manifest`/`list` + registry read helpers), and `install.sh` **refactored to consume the same expander** (so the install set == the push set by construction — adds `PDDA-INSTALL.md` to the synced set). Registry foundation already shipped. **Phase 1 QA gate GREEN (8/8).** | **Phase 2 — the push engine** (`pdda-sync.sh push`): state-stamp copy + delete-mirror + manifest-poisoning guard, atomic writes, backups, lock, dirty-source guard, `--dry-run`. |
 
 ## Realignment (2026-06-29)
 
@@ -203,10 +203,13 @@ the target created itself (never in any HQ manifest) is never touched.
 
 Establish the data layer before any copying.
 
-> **Partially SHIPPED (2026-06-29):** the registry itself is done — `install.sh` writes
-> `${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv` (machine-local, sync-ready schema incl. `source_commit`) on every
-> install/upgrade, latest-wins per target, `--no-register`/`PDDA_REGISTRY` knobs. No push built yet.
-> Remaining Phase 1 work below is for when the push project starts.
+> **SHIPPED (2026-06-29) — QA gate GREEN (8/8).** Delivered: `utils/pdda/pdda-sync-manifest.conf`
+> (the one declaration), `utils/pdda/pdda-manifest.sh` (the `pdda_manifest_expand` expander, git-ls-files
+> backed + exclude globs), `utils/pdda/pdda-sync.sh` (router with `manifest`/`list`/help live; registry
+> READ helpers; `push`/`register`/`status`/`remove`/`prune`/`*-agent` stubbed for later phases), and
+> `install.sh` refactored to copy exactly `pdda_manifest_expand` output (install set == push set by
+> construction). The registry remains install.sh-owned (single writer). `temp/` layout is created lazily
+> by the engine in Phase 2.
 
 - Create the `temp/` layout above (lazily, on first use — no tracked files).
 - Add `utils/pdda-sync.sh` skeleton with subcommand dispatch mirroring `pdda.sh`'s thin-router style:

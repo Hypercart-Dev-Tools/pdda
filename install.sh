@@ -19,6 +19,12 @@ set -euo pipefail
 
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Shared manifest expander — the synced runtime set is declared ONCE in
+# utils/pdda/pdda-sync-manifest.conf and consumed by both this installer and pdda-sync.sh (push), so
+# the two never drift (GUIDING-PRINCIPLES #4). New runtime files under utils/pdda/ ship automatically.
+# shellcheck source=utils/pdda/pdda-manifest.sh
+. "$SOURCE_DIR/utils/pdda/pdda-manifest.sh"
+
 FORCE=0
 WITH_STARTUP_DOCS=0
 MIGRATE=1
@@ -254,12 +260,12 @@ register_install() {
 say "Installing PDDA into: $TARGET"
 say ""
 say "Runtime + contract:"
-copy_runtime "utils/pdda/pdda.sh"
-copy_runtime "utils/pdda/pdda-lib.sh"
-copy_runtime "utils/pdda/pdda-doc-ready.sh"
-copy_runtime "utils/pdda/pdda-catchup.sh"
-copy_runtime "PROJECT/PDDA.md"
-chmod +x "$TARGET/utils/pdda/pdda.sh" "$TARGET/utils/pdda/pdda-lib.sh" "$TARGET/utils/pdda/pdda-doc-ready.sh" "$TARGET/utils/pdda/pdda-catchup.sh"
+# Copy exactly the shared manifest set (DRY with pdda-sync.sh), restoring the exec bit on scripts.
+while IFS= read -r rel; do
+  [ -n "$rel" ] || continue
+  copy_runtime "$rel"
+  case "$rel" in *.sh) chmod +x "$TARGET/$rel" ;; esac
+done < <(pdda_manifest_expand "$SOURCE_DIR")
 
 if [ "$WITH_STARTUP_DOCS" -eq 1 ]; then
   copy_runtime "ROUTER.md"
