@@ -171,11 +171,26 @@ pdda_emit_summary() {
     "summary"
 }
 
+# When PDDA_ONLY_FILE is set (the single-file lint used by the PostToolUse doc-health hook), each list
+# returns just that file IF it falls under the list's directory — so every check transparently scopes
+# to the one edited doc with no other change. Unset (the normal case) => full directory scan as before.
 pdda_list_working_docs() {
+  if [ -n "${PDDA_ONLY_FILE:-}" ]; then
+    case "$PDDA_ONLY_FILE" in
+      "$PDDA_WORKING_DIR"/*.md) [ -f "$PDDA_ONLY_FILE" ] && printf '%s\n' "$PDDA_ONLY_FILE" ;;
+    esac
+    return
+  fi
   find "$PDDA_WORKING_DIR" -type f -name '*.md' ! -name 'blank.md' | LC_ALL=C sort
 }
 
 pdda_list_inbox_issue_docs() {
+  if [ -n "${PDDA_ONLY_FILE:-}" ]; then
+    case "$PDDA_ONLY_FILE" in
+      "$PDDA_INBOX_DIR"/GH-*.md) [ -f "$PDDA_ONLY_FILE" ] && printf '%s\n' "$PDDA_ONLY_FILE" ;;
+    esac
+    return
+  fi
   find "$PDDA_INBOX_DIR" -type f -name 'GH-*.md' ! -name 'blank.md' | LC_ALL=C sort
 }
 

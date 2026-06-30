@@ -434,6 +434,27 @@ It should not:
   is clamped to `warn` in `pdda-doc-ready.sh`), so a non-deterministic oracle can never fail a build —
   the same doc must not pass at 2pm and fail at 3pm. Only deterministic checks earn blocking power.
 
+### 3. Doc-health hooks (event-triggered delivery)
+
+The deterministic checks above can also run automatically from Claude Code hooks, as a two-tier
+doc-health system. The hooks are pure **delivery** — they run the SAME section-1 checks on a trigger;
+they add no new analysis class. Both are **warn-only and fail-open: they always exit `0` and can never
+block** an edit or a stop (a doc-hygiene reminder is never worth interrupting work — the calibration
+principle, same as `pdda.sh changelog`).
+
+- **Tier 1 — `pdda-edit-doc-hook.sh` (`PostToolUse` on `Edit|Write|MultiEdit`).** Reads the edited
+  `tool_input.file_path`; exits `0` instantly unless it is `ROADMAP.md` or a `PROJECT/**/*.md` doc;
+  otherwise runs the fast **local single-file** subset for just that file — `frontmatter`,
+  `status-table`, `hardcoded-paths`, `roadmap-coverage` (and `roadmap` for `ROADMAP.md`), scoped via
+  `PDDA_ONLY_FILE`. **No network, no `gh`, no LLM**, so it stays instant and cannot gate an edit.
+- **Tier 2 — Stop full-scan (`pdda-stop-doc-health.sh`).** The companion that runs one consolidated,
+  system-wide doc-health scan per turn (the deterministic suite plus `issue-doc-sync` against the
+  cached gh-state file). See [Suggested Stop doc-health scan](#suggested-stop-doc-health-scan).
+
+`PDDA_ONLY_FILE=<path>` is the seam that scopes any check to a single file (unset = full scan, the
+default everywhere else). Wiring is repo-local in `.claude/settings.json`; installs receive the hook
+scripts via the manifest and opt in by adding the hook entries.
+
 ## Enforcement modes
 
 PDDA runs in one of three modes. The mode is resolved in this order: **the `PDDA_MODE` env var wins if
