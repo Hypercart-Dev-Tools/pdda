@@ -2,6 +2,25 @@
 
 ## 2026-06-29
 
+### `install.sh`: per-user install registry (sync foundation)
+
+`install.sh` now records every install/upgrade in a machine-local registry so a future sync layer
+knows where each copy of the PDDA runtime lives — the registry only, no sync yet (deliberate).
+
+- **Location:** `${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv`. Per-user, per-device, lives in
+  `$HOME` (not the repo), so it can't leak into the eventually-public repo and survives the temp-clone
+  upgrade flow. Override with `PDDA_REGISTRY`; skip with `--no-register`. `.config/` also gitignored
+  defensively.
+- **Schema (sync-ready):** one tab-delimited row per target —
+  `target · last_install_utc · mode · source_commit · startup_docs`, latest-wins dedup on the path.
+  `source_commit` is the field a later sync uses to tell which targets are behind, so no schema change
+  is needed when the sync project starts.
+- Best-effort: a registry-write failure never fails the install. `PDDA-INSTALL.md` updated in lockstep;
+  the sync plan doc records the registry as shipped (its Phase 1 registry slice).
+
+Verification: `bash -n` clean; tested fresh write, latest-wins dedup on re-install, `--no-register`,
+and a custom `PDDA_REGISTRY` path; `source_commit` recorded from the source clone's HEAD.
+
 ### `install.sh`: hardening from an Agy review relay
 
 Drove `install.sh` through a headless Agy review relay; landed all three findings (2 blockers + 1 nit),

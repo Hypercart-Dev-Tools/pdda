@@ -3,3 +3,5 @@ PROJECT/PDDA-ACTIVITY.jsonl
 .DS_Store
 .DS_Store
 /temp/
+# Install registry is machine-local (~/.config/pdda/); never track a stray in-repo .config
+.config/

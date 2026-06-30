@@ -8,7 +8,7 @@ goal: >
   Let one canonical PDDA source repo push its utils/pdda/ runtime into other registered repos —
   an initial install/update on registration, then a launchd job every 30 minutes that re-copies
   only files whose content has actually changed, backing up the target's version first. The set of
-  synced repos lives in a gitignored registry under temp/.
+  synced repos lives in a machine-local registry at ~/.config/pdda/registry.tsv (written by install.sh).
 branch: pdda-sync-to-other-repos
 gh_issue: pending (open once scope is approved; rename this doc to GH-<n>-… then)
 non_goals: >
@@ -24,7 +24,7 @@ phases: 5
 
 | What was just completed | What's next |
 |---|---|
-| Wrote this phased plan, resolved all five open questions (see [Resolved decisions](#resolved-decisions)), and ran a Codex QA review — applied its valid finding (dirty-guard now manifest-driven so `PROJECT/PDDA.md` is covered); rejected a false-positive "blocker" that misread the repo. | Build Phase 1 (registry + manifest + state model). Open question still pending: GH issue intake. |
+| Planned + QA-reviewed (Codex). **Shipped the registry foundation early:** `install.sh` now writes a machine-local `~/.config/pdda/registry.tsv` (sync-ready schema) on every install/upgrade — the data the future sync consumes. No sync built yet, by request. | Defer the sync build until requested; when it starts, the registry is already populated. Open question still pending: GH issue intake. |
 
 ## Table of contents
 
@@ -63,19 +63,30 @@ The four locked decisions:
 
 ## Design
 
-### Files & layout (all source-side, under gitignored `temp/`)
+### Files & layout
+
+**The registry (SHIPPED — see below) is machine-local, in `$HOME`, NOT in the repo:**
 
 ```text
-temp/pdda-sync-registry.conf     # one absolute target-repo-root per line; '#' comments; blanks ignored
+${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv   # one row per target:
+  # target <TAB> last_install_utc <TAB> mode <TAB> source_commit <TAB> startup_docs
+```
+
+Per-user, per-device, never committed (the repo will be public). Written by `install.sh` on every
+install/upgrade (latest-wins dedup on the target path); `source_commit` is what lets sync later tell
+which targets are behind. Lives in `$HOME` rather than the source clone so it survives the
+temp-clone upgrade flow and can't leak into the public repo.
+
+Sync-only runtime (built later, source-side under gitignored `temp/`):
+
+```text
 temp/pdda-sync-state/<slug>.tsv  # per-target: <relpath>\t<last-synced-source-hash>
 temp/pdda-sync-backups/<slug>/<utc-timestamp>/<relpath>   # pre-overwrite backups
 temp/pdda-sync.log               # append-only run log (also launchd stdout/stderr sink)
 temp/pdda-sync.lock              # mkdir-based lock; prevents overlapping runs
 ```
 
-`<slug>` = the target root path sanitized to a filename. The registry is line-based (not JSON) so a
-whole line is one path — robust to spaces, and append-only like `PDDA-ACTIVITY.jsonl`, with no
-read-modify-write.
+`<slug>` = the target root path sanitized to a filename.
 
 ### The canonical manifest (shared with `install.sh`)
 
@@ -123,6 +134,11 @@ has genuinely advanced.
 ## Phase 1 — Registry, manifest & state model
 
 Establish the data layer before any copying.
+
+> **Partially SHIPPED (2026-06-29):** the registry itself is done — `install.sh` writes
+> `~/.config/pdda/registry.tsv` (machine-local, sync-ready schema incl. `source_commit`) on every
+> install/upgrade, latest-wins per target, `--no-register`/`PDDA_REGISTRY` knobs. No sync built yet.
+> Remaining Phase 1 work below is for when the sync project starts.
 
 - Create the `temp/` layout above (lazily, on first use — no tracked files).
 - Add `utils/pdda-sync.sh` skeleton with subcommand dispatch mirroring `pdda.sh`'s thin-router style:

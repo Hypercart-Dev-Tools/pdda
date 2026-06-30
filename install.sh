@@ -22,8 +22,15 @@ SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FORCE=0
 WITH_STARTUP_DOCS=0
 MIGRATE=1
+REGISTER=1
 MODE="observe"
 TARGET=""
+
+# Per-user, per-device install registry — records WHERE each copy was installed and on which source
+# commit. Lives in $HOME (never in the repo, so it can't leak into the eventually-public repo). Not
+# portable by design. A future sync layer reads this to find targets that are behind. Override the
+# path with PDDA_REGISTRY; skip writing it with --no-register.
+PDDA_REGISTRY="${PDDA_REGISTRY:-${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv}"
 
 usage() {
   cat <<'USAGE'
@@ -41,6 +48,9 @@ Options:
   --no-migrate           Skip auto-migration of a pre-utils/pdda/ (flat) layout. By default, when the
                          target keeps the runtime flat under utils/, install removes the duplicate
                          PDDA-owned flat files and repoints old-path references to utils/pdda/.
+  --no-register          Skip recording this install in the per-user registry
+                         (default: $XDG_CONFIG_HOME/pdda/registry.tsv or ~/.config/pdda/registry.tsv;
+                         override with PDDA_REGISTRY). The registry is machine-local and never committed.
   --mode <m>             Initial .pdda-mode: observe (default) | light | full.
   -h, --help             This message.
 
@@ -51,6 +61,9 @@ What gets installed (zero state):
   ROADMAP.md CHANGELOG.md PROJECT/PDDA-ACTIVITY.jsonl .pdda-mode   (blank seeds, create-only)
   .gitignore += PROJECT/PDDA-ACTIVITY.jsonl                        (the churning log is runtime state)
 
+It also records the install in a per-user, machine-local registry (~/.config/pdda/registry.tsv) so a
+future sync layer knows where every copy lives. The registry is never committed. --no-register skips it.
+
 After install it runs `utils/pdda/pdda.sh run` in the target so you see it working immediately.
 USAGE
 }
@@ -60,6 +73,7 @@ while [ "$#" -gt 0 ]; do
     --force) FORCE=1; shift ;;
     --with-startup-docs) WITH_STARTUP_DOCS=1; shift ;;
     --no-migrate) MIGRATE=0; shift ;;
+    --no-register) REGISTER=0; shift ;;
     --mode) MODE="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     -*) printf 'install.sh: unknown option %q\n\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -203,6 +217,40 @@ ensure_activity_ignored() {
   fi
 }
 
+# Record this install in the per-user, per-device registry (one row per target, latest wins). This is
+# the data a future sync layer reads to find copies that are behind — recording source_commit now means
+# that layer needs no schema change. Machine-local; never committed. Best-effort: a failure here never
+# fails the install.
+register_install() {
+  [ "$REGISTER" -eq 1 ] || return 0
+  local reg="$PDDA_REGISTRY" dir
+  dir="$(dirname "$reg")"
+  mkdir -p "$dir" 2>/dev/null || { say "  (registry dir $dir not writable — skipped)"; return 0; }
+
+  local ts src_commit sdocs row tmp
+  ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  src_commit="$(git -C "$SOURCE_DIR" rev-parse --short HEAD 2>/dev/null || printf 'unknown')"
+  sdocs=$([ "$WITH_STARTUP_DOCS" -eq 1 ] && printf 'yes' || printf 'no')
+
+  if [ ! -f "$reg" ]; then
+    {
+      printf '# PDDA install registry — per-user, per-device. Machine-local; do NOT commit.\n'
+      printf '# target\tlast_install_utc\tmode\tsource_commit\tstartup_docs\n'
+    } > "$reg"
+  fi
+
+  # One row per target: drop any prior row for this exact path (tab-delimited col 1), then append fresh.
+  # awk keeps comment lines (their col 1 never equals an absolute target path).
+  row="$(printf '%s\t%s\t%s\t%s\t%s' "$TARGET" "$ts" "$MODE" "$src_commit" "$sdocs")"
+  tmp="$reg.tmp.$$"
+  if awk -F'\t' -v t="$TARGET" '$1 != t' "$reg" > "$tmp" 2>/dev/null; then
+    printf '%s\n' "$row" >> "$tmp" && mv "$tmp" "$reg" && say "  register  $TARGET -> $reg"
+  else
+    rm -f "$tmp"
+    say "  (registry write failed — skipped)"
+  fi
+}
+
 say "Installing PDDA into: $TARGET"
 say ""
 say "Runtime + contract:"
@@ -299,6 +347,10 @@ ensure_activity_ignored
 seed_file ".pdda-mode" <<MODE
 $MODE
 MODE
+
+say ""
+say "Registry:"
+register_install
 
 say ""
 say "Verifying install (utils/pdda/pdda.sh run):"
