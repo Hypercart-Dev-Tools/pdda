@@ -27,7 +27,7 @@ phases: 5
 
 | What was just completed | What's next |
 |---|---|
-| **Phase 2 SHIPPED (2026-06-29) — the push engine.** `pdda-sync.sh push` implements the full state-stamp table (new / updated / updated+bak / skip), delete-mirror (deleted+bak), the manifest-poisoning guard (zero-root / empty / shrink-threshold + `--force-delete`), atomic temp-then-`mv`, backups + retention (N=5), mkdir lock + stale age-out, dirty-source guard, and `--dry-run` / `--target` / `--no-delete`. **Phase 2 QA gate GREEN (26/26).** Phase 1 (manifest expander + skeleton + install.sh DRY refactor) shipped prior. | **Phase 3 — onboarding/registry mgmt:** `register` (delegates initial install to `install.sh`, seeds state + snapshot), `list`/`status`/`remove`/`prune`. |
+| **Phase 3 SHIPPED (2026-06-29) — onboarding & registry mgmt.** `register` (validates git repo, confirms unless `--yes`/no-TTY-refuses, delegates the copy + registry write to `install.sh`, then seeds state + snapshot so the next push is all-skip), `list` (mode / source-commit / sync state), `status` (current / behind / diverged / missing / to-delete, read-only), `remove` (de-register, keep files), `prune` (drop targets whose dir is gone). **Phase 3 QA gate GREEN (17/17).** Phases 1–2 (manifest expander + push engine) shipped prior. | **Phase 4 — optional launchd wrapper** (`install-agent` / `uninstall-agent` scheduling the same `push`; manual push stays primary). |
 
 ## Realignment (2026-06-29)
 
@@ -270,6 +270,15 @@ zero-root/empty/shrink reason logged, and `--force-delete` is required to procee
 `push` is a clean all-`skip` no-op.
 
 ## Phase 3 — `register` / initial sync (reuse `install.sh`) + `list` / `remove` / `prune`
+
+> **SHIPPED (2026-06-29) — QA gate GREEN (17/17).** `cmd_register/list/status/remove/prune` in
+> `pdda-sync.sh`. `register` validates the git repo, confirms before the first write (reads `/dev/tty`;
+> **refuses on a non-TTY** unless `--yes`), passes `--mode`/`--with-startup-docs` through to
+> `install.sh` (the single registry writer), then `seed_target_state` stamps the per-target state +
+> manifest snapshot so the next push is all-skip. `remove`/`prune` delete registry rows + their state
+> files via `registry_remove` (a deletion op `install.sh` never performs, so no two-writer conflict) and
+> leave target files intact. `status` is a read-only classifier (current/behind/diverged/missing/
+> to-delete). Verified against the real `install.sh` + runtime on throwaway repos.
 
 Onboarding and registry management.
 

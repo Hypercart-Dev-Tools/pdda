@@ -77,6 +77,37 @@ state_get() {  # <statefile> <rel>
   awk -F'\t' -v r="$2" '$1==r{print $2; exit}' "$1"
 }
 
+# Read one registry column for a target (1=target 2=utc 3=mode 4=source_commit 5=startup_docs).
+registry_field() {  # <target> <col>
+  [ -f "$PDDA_REGISTRY" ] || return 0
+  awk -F'\t' -v t="$1" -v c="$2" '$1==t{print $c; exit}' "$PDDA_REGISTRY"
+}
+
+# Drop a target's row from the registry (used by remove/prune — NOT a duplicate of install.sh's
+# install/upgrade writes; deletion is an operation install.sh never performs).
+registry_remove() {  # <target>
+  [ -f "$PDDA_REGISTRY" ] || return 0
+  local tmp="$PDDA_REGISTRY.tmp.$$"
+  awk -F'\t' -v t="$1" '$1!=t' "$PDDA_REGISTRY" > "$tmp" && mv "$tmp" "$PDDA_REGISTRY"
+}
+
+# Seed per-target sync state + manifest snapshot from what is currently on disk in the target, so the
+# very next push is an all-skip no-op. Called by register after install.sh copies the runtime.
+seed_target_state() {  # <target>
+  ensure_tmp
+  local target="$1" slug rel f cur; slug="$(slug_for "$target")"
+  cur="$(pdda_manifest_expand "$SOURCE_DIR")"
+  local tmp="$STATE_DIR/$slug.tsv.tmp.$$"; : > "$tmp"
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    f="$target/$rel"; [ -e "$f" ] && printf '%s\t%s\n' "$rel" "$(hash_file "$f")" >> "$tmp"
+  done <<EOF
+$cur
+EOF
+  mv "$tmp" "$STATE_DIR/$slug.tsv"
+  printf '%s\n' "$cur" | grep . > "$MANIFEST_SNAP_DIR/$slug.tsv"
+}
+
 # mkdir-based lock with stale age-out.
 acquire_lock() {
   ensure_tmp
@@ -294,20 +325,123 @@ EOF
   return 0
 }
 
-# list — show registered targets (Phase 1: plain list; Phase 3 adds last-push summary from the log).
+# list — registered targets with mode, source commit, and sync state.
 cmd_list() {
-  local any=0 t
-  while IFS= read -r t; do any=1; say "$t"; done < <(registry_targets)
-  [ "$any" -eq 0 ] && return 0
+  local t mode src slug synced
+  while IFS= read -r t; do
+    [ -n "$t" ] || continue
+    mode="$(registry_field "$t" 3)"; src="$(registry_field "$t" 4)"; slug="$(slug_for "$t")"
+    if [ ! -d "$t" ]; then synced="MISSING"
+    elif [ -f "$STATE_DIR/$slug.tsv" ]; then synced="synced"
+    else synced="not-yet-pushed"; fi
+    printf '%s\tmode=%s\tsrc=%s\t%s\n' "$t" "${mode:-?}" "${src:-?}" "$synced"
+  done < <(registry_targets)
+  return 0
+}
+
+# register <dir> — enroll a target + initial install (install.sh does the copy AND the registry write).
+cmd_register() {
+  local YES=0 target=""; local -a passthru=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --yes|-y) YES=1; shift ;;
+      --with-startup-docs) passthru+=( "--with-startup-docs" ); shift ;;
+      --mode) passthru+=( "--mode" "${2:-}" ); shift 2 ;;
+      -*) warn "register: unknown option $1"; return 2 ;;
+      *) target="$1"; shift ;;
+    esac
+  done
+  [ -n "$target" ] || { warn "register: missing <target-repo-dir>"; return 2; }
+  [ -d "$target" ] || { warn "register: not a directory: $target"; return 1; }
+  target="$(cd "$target" && pwd)"
+  git -C "$target" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { warn "register: $target is not a git repo (git init first)"; return 1; }
+
+  # Confirm before the first write — friction only at the rare, consequential enrollment step.
+  if [ "$YES" -ne 1 ]; then
+    if [ -t 0 ]; then
+      printf 'Register + install PDDA into %s ? [y/N] ' "$target"
+      local ans; read -r ans </dev/tty 2>/dev/null || ans=""
+      case "$ans" in y|Y|yes|YES) ;; *) say "register: aborted (no changes)"; return 0 ;; esac
+    else
+      warn "register: refusing to write without confirmation (no TTY) — pass --yes for unattended onboarding"
+      return 1
+    fi
+  fi
+
+  say "register: installing PDDA into $target ..."
+  if [ "${#passthru[@]}" -gt 0 ]; then
+    "$SOURCE_DIR/install.sh" "${passthru[@]}" "$target" || { warn "register: install.sh failed"; return 1; }
+  else
+    "$SOURCE_DIR/install.sh" "$target" || { warn "register: install.sh failed"; return 1; }
+  fi
+  # install.sh already wrote the registry row (the single registry writer). Seed sync state + snapshot.
+  seed_target_state "$target"
+  say "register: $target enrolled — state seeded, next push is all-skip."
+}
+
+# remove <dir> — de-register a target but leave its files in place.
+cmd_remove() {
+  local target="${1:-}"
+  [ -n "$target" ] || { warn "remove: missing <target>"; return 2; }
+  [ -d "$target" ] && target="$(cd "$target" && pwd)"
+  registry_has "$target" || { warn "remove: not registered: $target"; return 1; }
+  registry_remove "$target"
+  local slug; slug="$(slug_for "$target")"
+  rm -f "$STATE_DIR/$slug.tsv" "$MANIFEST_SNAP_DIR/$slug.tsv"
+  say "remove: de-registered $target (files left intact)."
+}
+
+# prune — drop registry entries whose directory no longer exists.
+cmd_prune() {
+  local t slug pruned=0
+  while IFS= read -r t; do
+    [ -n "$t" ] || continue
+    if [ ! -d "$t" ]; then
+      registry_remove "$t"; slug="$(slug_for "$t")"
+      rm -f "$STATE_DIR/$slug.tsv" "$MANIFEST_SNAP_DIR/$slug.tsv"
+      say "prune: dropped missing target $t"; pruned=$((pruned+1))
+    fi
+  done < <(registry_targets)
+  [ "$pruned" -eq 0 ] && say "prune: nothing to prune."
+  return 0
+}
+
+# status [<dir>] — read-only per-target summary (current / behind / diverged / missing / to-delete).
+cmd_status() {
+  local one="${1:-}"; local -a targets=()
+  if [ -n "$one" ]; then
+    [ -d "$one" ] && one="$(cd "$one" && pwd)"; targets=( "$one" )
+  else
+    local t; while IFS= read -r t; do [ -n "$t" ] && targets+=( "$t" ); done < <(registry_targets)
+  fi
+  [ "${#targets[@]}" -eq 0 ] && { say "status: no targets."; return 0; }
+  local CUR; CUR="$(pdda_manifest_expand "$SOURCE_DIR")"
+  local tgt slug statefile snapfile rel src tgt_f src_hash tgt_hash last
+  for tgt in "${targets[@]}"; do
+    if [ ! -d "$tgt" ]; then printf '%s\tMISSING (dir gone)\n' "$tgt"; continue; fi
+    slug="$(slug_for "$tgt")"; statefile="$STATE_DIR/$slug.tsv"; snapfile="$MANIFEST_SNAP_DIR/$slug.tsv"
+    local current=0 behind=0 diverged=0 missing=0 todelete=0
+    while IFS= read -r rel; do
+      [ -n "$rel" ] || continue
+      src="$SOURCE_DIR/$rel"; tgt_f="$tgt/$rel"; src_hash="$(hash_file "$src")"
+      if [ ! -e "$tgt_f" ]; then missing=$((missing+1)); continue; fi
+      tgt_hash="$(hash_file "$tgt_f")"; last="$(state_get "$statefile" "$rel")"
+      if [ "$src_hash" = "$tgt_hash" ]; then current=$((current+1))
+      elif [ -n "$last" ] && [ "$tgt_hash" != "$last" ]; then diverged=$((diverged+1))
+      else behind=$((behind+1)); fi
+    done <<EOF
+$CUR
+EOF
+    if [ -f "$snapfile" ]; then
+      todelete="$(comm -23 <(LC_ALL=C sort -u "$snapfile") <(printf '%s\n' "$CUR" | LC_ALL=C sort -u) 2>/dev/null | grep -c . || true)"
+    fi
+    printf '%s\tcurrent=%d behind=%d diverged=%d missing=%d to-delete=%d\n' "$tgt" "$current" "$behind" "$diverged" "$missing" "$todelete"
+  done
   return 0
 }
 
 # Stubs filled in by later phases — fail loudly rather than silently no-op.
 not_yet() { warn "pdda-sync.sh: '$1' is not implemented yet (planned: $2)"; return 3; }
-cmd_register()        { not_yet register "Phase 3"; }
-cmd_status()          { not_yet status "Phase 3"; }
-cmd_remove()          { not_yet remove "Phase 3"; }
-cmd_prune()           { not_yet prune "Phase 3"; }
 cmd_install_agent()   { not_yet install-agent "Phase 4"; }
 cmd_uninstall_agent() { not_yet uninstall-agent "Phase 4"; }
 
