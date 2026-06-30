@@ -27,7 +27,7 @@ phases: 5
 
 | What was just completed | What's next |
 |---|---|
-| Realigned + Codex relay-approved (4 rounds). **Phase 1 SHIPPED (2026-06-29):** the shared manifest declaration (`utils/pdda/pdda-sync-manifest.conf`) + expander (`pdda-manifest.sh`), the `pdda-sync.sh` skeleton (dispatch + `manifest`/`list` + registry read helpers), and `install.sh` **refactored to consume the same expander** (so the install set == the push set by construction — adds `PDDA-INSTALL.md` to the synced set). Registry foundation already shipped. **Phase 1 QA gate GREEN (8/8).** | **Phase 2 — the push engine** (`pdda-sync.sh push`): state-stamp copy + delete-mirror + manifest-poisoning guard, atomic writes, backups, lock, dirty-source guard, `--dry-run`. |
+| **Phase 2 SHIPPED (2026-06-29) — the push engine.** `pdda-sync.sh push` implements the full state-stamp table (new / updated / updated+bak / skip), delete-mirror (deleted+bak), the manifest-poisoning guard (zero-root / empty / shrink-threshold + `--force-delete`), atomic temp-then-`mv`, backups + retention (N=5), mkdir lock + stale age-out, dirty-source guard, and `--dry-run` / `--target` / `--no-delete`. **Phase 2 QA gate GREEN (26/26).** Phase 1 (manifest expander + skeleton + install.sh DRY refactor) shipped prior. | **Phase 3 — onboarding/registry mgmt:** `register` (delegates initial install to `install.sh`, seeds state + snapshot), `list`/`status`/`remove`/`prune`. |
 
 ## Realignment (2026-06-29)
 
@@ -177,8 +177,12 @@ the target created itself (never in any HQ manifest) is never touched.
   file outside that folder (notably the contract `PROJECT/PDDA.md`) can't slip past the guard
   half-edited. (QA: Codex review 2026-06-27.)
 - **chmod:** restore the executable bit on copied `*.sh` (mirrors `install.sh`).
-- **Recoverability:** every overwrite *and every delete* leaves a timestamped backup under
-  `temp/pdda-sync-backups/`.
+- **Recoverability:** every overwrite **of a locally-diverged target** and **every delete** leaves a
+  timestamped backup under `temp/pdda-sync-backups/`. A clean `updated` (the target still matched the
+  last-synced stamp, i.e. no local edits) is *not* backed up — its prior content is just the previous
+  shipped version, recoverable from HQ history, and backing it up every release would be the backup
+  spam the state-stamp model exists to avoid. Backups protect **local work**, which a clean target has
+  none of. (Implemented per the [state-stamp decision table](#per-file-push-decision-the-state-stamp-model).)
 - **Backup retention:** prune to the last `N` backups per target (default `N=5`, `PDDA_SYNC_BACKUPS`
   override) so the backup tree stays bounded — same spirit as the activity-log rotation in
   `pdda-lib.sh`.
@@ -227,6 +231,16 @@ code edit.
 
 ## Phase 2 — Push engine (`pdda-sync.sh push`)
 
+> **SHIPPED (2026-06-29) — QA gate GREEN (26/26).** `cmd_push` in `utils/pdda/pdda-sync.sh` implements
+> the full state-stamp table, delete-mirror with the deferred-deletion snapshot (poison-blocked or
+> `--no-delete` removals stay tracked for a later `--force-delete`), the three poisoning guards
+> (zero-root / empty / shrink ≥ `PDDA_SYNC_MAX_SHRINK`%, default 25), atomic temp-then-`mv`, backup +
+> `prune_backups` retention, mkdir lock with stale age-out, and the dirty-source guard. Flags:
+> `--dry-run`, `--target`/positional, `--allow-dirty`, `--no-delete`, `--force-delete`. Engine state
+> lives under `temp/` (created lazily). Verified against a throwaway HQ + two targets across 13
+> scenarios (26 assertions): new/updated/skip, local-edit preservation, `updated+bak` recovery,
+> delete-mirror recovery, folder propagation, dry-run no-write, idempotent no-op, and all poison paths.
+
 The steady-state distributor — the heart of the feature.
 
 - Implement the state-stamp decision table per file, per target, **including the `deleted+backup` row**
@@ -243,7 +257,7 @@ The steady-state distributor — the heart of the feature.
   delete-diff).
 
 **QA gate:** against two throwaway target repos — unchanged source ⇒ all `skip`; bump a source file ⇒
-exactly that file `updated` in both targets, backup written, state stamp advanced; add a NEW file under
+exactly that file `updated` in both targets (no backup — target was unchanged), state stamp advanced; add a NEW file under
 a declared root ⇒ it copies as `new` in both; **add a NEW nested subfolder + file (e.g.
 `utils/pdda/sub/new.sh`) ⇒ the subfolder is created AND the file copies as `new` in both targets, with
 no manifest/code edit** (folder propagation, not just file); **delete a file from HQ ⇒ it is backed up
