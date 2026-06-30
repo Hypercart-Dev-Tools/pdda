@@ -28,13 +28,13 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| Completed **GH-5** — `pdda.sh issue-doc-sync` (deterministic drift check) + `pdda.sh gh-refresh` (offline gh-state cache) + two-tier PostToolUse/Stop doc-health hooks; all phases shipped, tested (31), committed + pushed; issue #5 closed, doc archived to `PROJECT/3-COMPLETED/`. | The `install.sh` + onboarding item remains in progress. Operator opt-in: `register` real secondary repos (and optionally `install-agent`) for live sync propagation. |
+| Completed **GH-7** — `install.sh` now auto-detects the git-pulse repo path for the multi-device projection (`PDDA_GITPULSE_DIR` → git-pulse `config.sh` `sync_repo_dir` → candidate list), fixing the silent skip on devices where the sync repo isn't at the default; 17/17 tests + real-world verified, lockstep docs synced, issue #7 closed, doc archived to `PROJECT/3-COMPLETED/`. | The `install.sh` + onboarding item remains in progress. Operator opt-in: `register` real secondary repos (and optionally `install-agent`) for live sync propagation. |
 
 ## Ledger
 
 ### Queue / parked intake
 
-- **GH-7 — auto-detect git-pulse repo path for the registry projection** (2026-06-30) - the install's multi-device projection silently skipped when git-pulse's sync repo isn't at the hardcoded default `~/.config/git-pulse/repo`; fix resolves the path via `PDDA_GITPULSE_DIR` → git-pulse `config.sh` `sync_repo_dir` → candidate list. Issue [#7](https://github.com/Hypercart-Dev-Tools/pdda/issues/7). -> [PROJECT/1-INBOX/GH-7-GITPULSE-PATH-AUTODETECT.md](PROJECT/1-INBOX/GH-7-GITPULSE-PATH-AUTODETECT.md)
+- No parked intake docs.
 
 ### In progress
 
@@ -43,6 +43,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Completed
 
+- **GH-7 — auto-detect git-pulse repo path for the registry projection** (2026-06-30) - the multi-device projection silently skipped on devices where git-pulse's sync repo isn't at the hardcoded default `~/.config/git-pulse/repo` (e.g. `~/git-pulse-sync` on Mac Studio); `publish_registry_projection()` now resolves it via `PDDA_GITPULSE_DIR` → git-pulse `config.sh` `sync_repo_dir` → candidate list, still best-effort/fail-open. 17/17 publish tests (new autodetect case) + real-world plain-install verification; lockstep `install.sh`/`PDDA-INSTALL.md`. Issue [#7](https://github.com/Hypercart-Dev-Tools/pdda/issues/7) (closed). -> [PROJECT/3-COMPLETED/GH-7-GITPULSE-PATH-AUTODETECT.md](PROJECT/3-COMPLETED/GH-7-GITPULSE-PATH-AUTODETECT.md)
 - **Multi-device PDDA status via git-pulse piggyback** (2026-06-30) - `install.sh` now publishes a per-device, **path-normalized** registry projection (repo name + date + source commit + mode, no folder path) into a `pdda/` folder of git-pulse's sync repo on every install/upgrade; git-pulse's existing sync carries it across devices. Best-effort/fail-open, no new command or git logic. 10/10 publish test green; today's ledger backfilled. -> [PROJECT/3-COMPLETED/PDDA-MULTI-DEVICE-STATUS-VIA-GITPULSE.md](PROJECT/3-COMPLETED/PDDA-MULTI-DEVICE-STATUS-VIA-GITPULSE.md)
 
 - **Issue↔doc sync check + two-tier doc-health hooks** (2026-06-29) - new warn-only `pdda.sh issue-doc-sync` flags 2-WORKING/GH-*.md docs drifted from their GitHub issue state (both directions); `pdda.sh gh-refresh` writes the offline gh-state cache; two-tier PostToolUse (single-file lint) + Stop (consolidated full-scan) doc-health hooks. Deterministic, warn-only, fail-open; 31 tests; all phases shipped, committed + pushed. Issue [#5](https://github.com/Hypercart-Dev-Tools/pdda/issues/5) (closed). -> [PROJECT/3-COMPLETED/GH-5-ISSUE-DOC-SYNC.md](PROJECT/3-COMPLETED/GH-5-ISSUE-DOC-SYNC.md)

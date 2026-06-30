@@ -1,6 +1,6 @@
 ---
 title: install.sh — auto-detect git-pulse repo path for the registry projection
-status: Implemented (2026-06-30 — fix + test + lockstep docs landed on branch fix/gh-7-gitpulse-path-autodetect; verified 17/17 + real-world; pending merge/close)
+status: Completed (2026-06-30 — fix + test + lockstep docs merged to main; #7 closed; archived to 3-COMPLETED)
 created: 2026-06-30
 updated: 2026-06-30
 owner: noel
@@ -27,7 +27,7 @@ phases: 1
 
 | What was just completed | What's next |
 |---|---|
-| Fix landed on branch `fix/gh-7-gitpulse-path-autodetect` (atop newest main `05862e1`): `publish_registry_projection()` resolves the git-pulse path via override → `config.sh` `sync_repo_dir` → candidate list; lockstep updated (`install.sh` comment/usage + `PDDA-INSTALL.md` step 4c); `CHANGELOG.md` recorded. Verified: `test/pdda-publish-projection.sh` 17/17 (new Case 4), `bash -n` clean, and a real-world plain `./install.sh` (no override) on `noels-mac-studio` re-published the deleted projection. | Operator: merge branch to `main`, push, close issue [#7](https://github.com/Hypercart-Dev-Tools/pdda/issues/7); on merge, move this doc to `PROJECT/3-COMPLETED/` and shift its ROADMAP pointer to Completed. |
+| Done. `publish_registry_projection()` resolves the git-pulse path via override → `config.sh` `sync_repo_dir` → candidate list; lockstep updated (`install.sh` comment/usage + `PDDA-INSTALL.md` step 4c); `CHANGELOG.md` recorded; verified `test/pdda-publish-projection.sh` 17/17 + real-world plain `./install.sh` (no override) on `noels-mac-studio`. Merged to `main`, pushed; issue [#7](https://github.com/Hypercart-Dev-Tools/pdda/issues/7) closed; doc archived to `3-COMPLETED/`, ROADMAP pointer moved to Completed. | Nothing — closed. Other devices pick up the fix on their next PDDA sync/upgrade. |
 
 ## Problem
 
