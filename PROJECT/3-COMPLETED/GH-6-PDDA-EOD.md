@@ -1,6 +1,6 @@
 ---
 title: PDDA-EOD skill — end-of-day wrap
-status: Active
+status: Completed (2026-06-29 — /pdda-eod skill shipped at SKILLS/PDDA-EOD/SKILL.md; moved to 3-COMPLETED)
 created: 2026-06-29
 updated: 2026-06-29
 owner: noel
@@ -25,7 +25,7 @@ phases: 5
 
 | What was just completed | What's next |
 |---|---|
-| Scoped the EOD skill (this-repo v1, dated summary artifact, issue-first), opened issue #6, and wrote this phased plan. | Build Phase 1 (read-only gather + EOD report) — the safe core that mutates nothing. |
+| **COMPLETE (2026-06-29).** The `/pdda-eod` skill shipped at `SKILLS/PDDA-EOD/SKILL.md`: read-only gather + EOD report, doc/ROADMAP/CHANGELOG reconciliation, summary-before-commit + issue-close-after-push ordering, propose-then-confirm throughout, graceful `gh`/`pdda.sh`-absent degradation. Plan scoped + built. | **Done.** Open follow-ups (left as enhancements, not blockers): the `pdda.sh eod-gather` helper (Q1) and `--with-startup-docs` packaging (Q3) remain optional. |
 
 ## Table of contents
 
