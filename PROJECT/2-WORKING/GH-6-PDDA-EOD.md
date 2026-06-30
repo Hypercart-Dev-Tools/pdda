@@ -58,12 +58,16 @@ a confirmation, in an order that's safe to re-run.
 1. Gather + run checks (read-only).
 2. Reconcile project docs (frontmatter "what's done/next"; move done docs to `3-COMPLETED`) — confirm.
 3. Update ROADMAP.md + draft today's CHANGELOG entry — confirm.
-4. Git wrap: commit + push to a clean tree — confirm.
-5. Close 100%-done GH issues (user-verified) — **after push**, so closure cites the pushed commit/PR.
-6. Write the dated EOD summary.
+4. **Write the dated EOD summary** (`PROJECT/4-MISC/EOD-<date>.md`) — *before* the commit, so it rides
+   in the pushed commit rather than re-dirtying the tree afterward.
+5. Git wrap: commit the approved paths (**including the summary**) + push to a clean, in-sync tree — confirm.
+6. Close 100%-done GH issues (user-verified) — **after push** (a remote-only action that does not touch
+   the working tree), so closure cites the pushed commit/PR.
 
-The push-before-close ordering is load-bearing: closing an issue whose work isn't yet on the remote
-points reviewers at nothing.
+Two ordering constraints are load-bearing: (a) the summary is written **before** the final commit so
+the terminal state is genuinely clean *and* the summary is on the remote for the next operator
+(Principle #2); (b) issue-close runs **after** push so it cites work that's actually on the remote —
+and because it's remote-only, it doesn't re-dirty the tree.
 
 ## Design
 
@@ -104,20 +108,29 @@ The safe core: mutate nothing, just surface the day's state.
 - Read git state: dirty files, un-pushed commits (ahead of remote), stashes, current branch.
 - Render a structured EOD report to stdout (no writes yet).
 
-**QA gate:** on a repo with mixed state, the report correctly lists the day's commits/PRs, the open
-findings from `pdda.sh run`, and an accurate dirty/ahead/stash summary; writes nothing; `gh` being
-down degrades to a clear note, not a crash.
+**QA gate:**
+- [ ] On a repo with the day's commits + ≥1 merged/open PR, the report lists each with correct hashes/numbers and states the resolved window boundary.
+- [ ] Open `pdda.sh run` + `issue-doc-sync` findings appear verbatim; the dirty / un-pushed / stash summary matches `git status` + `git stash list`.
+- [ ] The run writes zero files (`git status` unchanged; no new `PROJECT/4-MISC/EOD-*.md`).
+- [ ] With `gh` unavailable (simulated auth failure), it prints a clear "PR/issue data skipped" note and still completes the rest.
 
 ## Phase 2 — Reconcile project docs (frontmatter + lifecycle)
 
 - For each `PROJECT/2-WORKING` doc, propose frontmatter updates to the "## Status" table
   (what's done / what's next) based on the day's activity.
-- Detect 100%-done docs (empty "what's next" + acceptance met) and propose moving them
-  `2-WORKING → 3-COMPLETED`.
-- Apply only on confirmation; never move a doc the user hasn't OK'd.
+- Detect done docs by **acceptance criteria met (QA gates checked) + explicit user move-confirmation** —
+  *not* by an empty "What's next". A doc that stays in `2-WORKING` must keep a non-empty "What's next"
+  (the status-table contract requires it); a doc judged done keeps a non-empty cell like
+  "Ready to move to 3-COMPLETED" until the confirmed move lands, so EOD never has to violate PDDA to
+  satisfy its own completion rule.
+- Propose moving confirmed-done docs `2-WORKING → 3-COMPLETED`; apply only on confirmation, never move a
+  doc the user hasn't OK'd.
 
-**QA gate:** a done doc is proposed for move + frontmatter close and lands in `3-COMPLETED` only after
-yes; an in-progress doc is left in place; `pdda.sh run` stays green (status-table contract intact).
+**QA gate:**
+- [ ] A 100%-done doc is proposed for frontmatter close + move and lands in `3-COMPLETED` only after an explicit yes.
+- [ ] An in-progress doc is left untouched in `2-WORKING`.
+- [ ] Declining the prompt leaves every doc in place (no partial move, no half-edited frontmatter).
+- [ ] `pdda.sh run` stays green afterward (status-table intact; the moved doc no longer needs a 2-WORKING ROADMAP pointer).
 
 ## Phase 3 — ROADMAP + CHANGELOG updates
 
@@ -125,29 +138,45 @@ yes; an in-progress doc is left in place; `pdda.sh run` stays green (status-tabl
   plan body) and re-verify `roadmap-coverage` after.
 - Draft today's CHANGELOG entry from the day's commits/PRs; confirm before writing.
 
-**QA gate:** after apply, `pdda.sh roadmap` + `roadmap-coverage` + `changelog` are clean; the CHANGELOG
-has exactly one new dated entry; no execution detail leaked into ROADMAP.
+**QA gate:**
+- [ ] After apply, `pdda.sh roadmap`, `roadmap-coverage`, and `changelog` all report clean.
+- [ ] CHANGELOG gains exactly one new dated entry for today; a second EOD run the same day updates, not duplicates, it.
+- [ ] No execution detail (phase checklists / build steps) leaks into ROADMAP — it stays a pointer/ledger.
+- [ ] Declining leaves ROADMAP + CHANGELOG byte-for-byte unchanged.
 
 ## Phase 4 — Git wrap to a clean, pushed tree
 
 - Summarize uncommitted/untracked/stashed/un-pushed state; propose a commit grouping + message(s).
-- On confirmation, commit and `git push` (un-sandboxed) to reach a clean, in-sync tree.
+- **Each proposed commit names its exact path set + a summary diff**, and EOD stages **only the approved
+  paths** (`git add <paths>`, never `git add -A`). Dirty files the user did not select are left
+  untouched and explicitly reported as "tree not fully clean" — so a concurrent edit or unrelated WIP
+  (possibly from another agent/window) is never swept into an EOD wrap commit.
+- On confirmation, commit the approved paths (**including the EOD summary from runtime step 4, if
+  present**) and `git push` (un-sandboxed) toward a clean, in-sync tree.
 - Respects the direct-to-main workflow for this repo; never force-push.
 
-**QA gate:** after the wrap, `git status` is clean and `main` is in sync with `origin/main`; nothing
-pushed without explicit confirmation; a failed/declined push leaves a clear state, not a half-commit.
+**QA gate:**
+- [ ] *Happy path* (user approves all PDDA-owned dirty paths): after the wrap `git status` is clean and `git status -sb` shows `main` in sync with `origin/main`.
+- [ ] *Partial-selection path* (user leaves some dirty files out): only the approved paths are committed + pushed; the unselected files remain untouched and are clearly reported as "tree not fully clean" — this is a success, not a failed phase.
+- [ ] Nothing is committed or pushed without an explicit yes; `--dry-run` performs zero git writes.
+- [ ] A declined/failed push leaves a coherent state (commits intact, nothing half-staged) and is reported clearly; never force-pushes; existing stashes are surfaced, never silently dropped.
 
 ## Phase 5 — Issue close (user-verified) + summary + packaging
 
+- Write `PROJECT/4-MISC/EOD-<date>.md` (what shipped, what's next, open findings carried forward)
+  **before** the Phase-4 commit (runtime step 4), so the summary is committed + pushed with the rest and
+  the wrap ends in a genuinely clean, fully-pushed state — not with an uncommitted summary left behind.
 - Present candidate 100%-done issues (cross-checked against their docs via `issue-doc-sync`); close
-  **only** the ones the user verifies, **after** the push, with a closing comment citing the
-  commit/PR + doc.
-- Write `PROJECT/4-MISC/EOD-<date>.md`: what shipped, what's next, open findings carried forward.
+  **only** the ones the user verifies, **after** the push. Issue-close is a remote-only action, so it
+  does not re-dirty the working tree; the closing comment cites the pushed commit/PR + doc.
 - Package as the `/pdda-eod` skill (`.claude/skills/pdda-eod/SKILL.md`); decide whether it ships via
   `install.sh --with-startup-docs` like `/pdda` (Q3). Update ROUTER.md/PDDA-INSTALL.md if so.
 
-**QA gate:** a verified-done issue closes with a back-reference and only after push; an unverified one
-stays open; the EOD summary file is written and is a faithful resumable record; `pdda.sh run` green.
+**QA gate:**
+- [ ] The EOD summary is part of the pushed commit; after the wrap the tree is clean with **no** uncommitted `EOD-<date>.md` left behind, and the summary is on the remote.
+- [ ] A user-verified 100%-done issue closes only after the push (citing commit/PR + doc) and leaves the tree clean (remote-only action); an unverified/not-done issue stays open; declining verification closes nothing.
+- [ ] `PROJECT/4-MISC/EOD-<date>.md` reads as a faithful resumable record (what-shipped / what's-next / carried-forward findings).
+- [ ] `pdda.sh run` is green and the `/pdda-eod` `SKILL.md` is discoverable (loads as a skill).
 
 ## Open questions
 
