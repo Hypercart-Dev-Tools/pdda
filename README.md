@@ -34,7 +34,7 @@ Installer options:
 
 ```text
 --force                overwrite existing seed files (your real PROJECT/** docs are never touched)
---with-startup-docs    also install adapted ROUTER.md + AGENTS.md (agent read-order scaffold)
+--with-startup-docs    also install adapted ROUTER.md + AGENTS.md + GUIDING-PRINCIPLES.md (agent read-order scaffold)
 --mode observe|light|full   initial enforcement mode (default: observe)
 -h, --help
 ```

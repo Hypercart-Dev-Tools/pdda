@@ -1,5 +1,35 @@
 # CHANGELOG.md
 
+## 2026-07-03
+
+### New `pdda.sh governance` check + `/governance-audit` skill for cross-doc consistency
+
+PDDA had no check for the governance docs themselves (`ROUTER.md`, `AGENTS.md`,
+`GUIDING-PRINCIPLES.md`, `README.md`, `CLAUDE.md`, `PROJECT/PDDA.md`, `utils/pdda/PDDA-INSTALL.md`) —
+only project docs in `PROJECT/2-WORKING` were linted. Added `pdda.sh governance`: dead `.md`
+cross-references (`warn`; bare filenames fall back to a repo-wide basename search so multi-copy names
+like `blank.md` don't false-flag, and `GH-<n>-*.md` naming-convention examples are exempt), orphan
+governance docs `ROUTER.md` never points at (`warn`), `pdda.sh` dispatcher subcommands undocumented in
+`ROUTER.md` (`error` — mechanical, parses the real `case` block), and `PDDA_*` env vars documented but
+implemented in no shipped script (`error`). Wired into `pdda.sh run`'s deterministic suite. Companion
+`.claude/skills/governance-audit/SKILL.md` runs the check, then reads the doc set for the semantic
+contradictions a regex can't prove (conflicting thresholds/ownership claims across docs).
+
+Dogfooding the new check against this repo surfaced two real, pre-existing drifts, both fixed in this
+change: `ROUTER.md` and `utils/pdda/PDDA-INSTALL.md` still pointed at
+`PROJECT/2-WORKING/PDDA-SYNC-TO-OTHER-REPOS.md`, which had since been completed and moved to
+`PROJECT/3-COMPLETED/`; and `ROUTER.md`'s command-rails list never mentioned the shipped `gh-refresh`
+and `catchup` subcommands. `PROJECT/PDDA.md` still has two known, left-as-flagged findings (`RECAP.md`
+and `REAL-AGENT-OBSERVATIONS.md` referenced as if live but absent from the repo) — a content call left
+for a human to triage rather than rewritten here.
+
+Verification: new `test/pdda-governance-check.sh` (9/9: dead-ref detection, bare-filename fallback,
+GH-doc exemption, orphan-doc, subcommand drift, env-var drift); full existing suite still green
+(`pdda-changelog.sh`, `pdda-doc-health-hooks.sh`, `pdda-issue-doc-sync.sh`,
+`pdda-publish-projection.sh`); `pdda.sh run` clean end-to-end. Lockstep:
+`PROJECT/PDDA.md` § "I. `pdda.sh governance`", `utils/pdda/PDDA-INSTALL.md` (env-var list + Purpose
+section), `ROUTER.md` (Command rails).
+
 ## 2026-06-30
 
 ### install.sh auto-detects the git-pulse repo path for the projection (GH-7)
