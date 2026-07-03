@@ -24,7 +24,7 @@ a change to the install surface updates both.
 Re-run `install.sh` (no flags) against the target — `copy_runtime` overwrites the runtime + contract
 unconditionally, while seed/state files (`ROADMAP.md`, `CHANGELOG.md`, `.pdda-mode`, `PROJECT/**`,
 the activity log) are create-only and stay untouched. Do **not** pass `--force` (it overwrites seeds)
-or `--with-startup-docs` (it overwrites any repo-adapted `ROUTER.md`/`AGENTS.md`).
+or `--with-startup-docs` (it overwrites any repo-adapted `ROUTER.md`/`AGENTS.md`/`GUIDING-PRINCIPLES.md`).
 
 ### Migrating a repo that predates the `utils/pdda/` layout
 
@@ -49,11 +49,14 @@ PDDA installs two things:
 - the canonical document contract in `PROJECT/PDDA.md`
 - the runnable shell checks in `utils/pdda-*.sh`
 
-This standalone repo also carries repo-local startup docs (`ROUTER.md`, `AGENTS.md`, `README.md`) and
-the `/pdda` re-orient skill (`.claude/skills/pdda/SKILL.md`) so the installer source stays
-self-consistent, but those files are not part of the target-repo install surface unless the target
-explicitly wants them. `install.sh --with-startup-docs` ships `ROUTER.md`, `AGENTS.md`, and the
-`/pdda` skill together as the agent read-order scaffold.
+This standalone repo also carries repo-local startup docs (`ROUTER.md`, `AGENTS.md`,
+`GUIDING-PRINCIPLES.md`, `README.md`) and the `/pdda` re-orient skill
+(`.claude/skills/pdda/SKILL.md`) so the installer source stays self-consistent, but those files are
+not part of the target-repo install surface unless the target explicitly wants them. `install.sh
+--with-startup-docs` ships `ROUTER.md`, `AGENTS.md`, `GUIDING-PRINCIPLES.md`, and the `/pdda` skill
+together as the agent read-order scaffold. `.claude/skills/governance-audit/SKILL.md`
+(the `pdda.sh governance` companion — see `PROJECT/PDDA.md` § "I. `pdda.sh governance`") is the same
+kind of repo-local, not-installed-by-default skill; copy it manually into a target repo if wanted.
 
 Do not install deprecated PDDA companion docs from `PROJECT/4-MISC/`.
 
@@ -156,6 +159,8 @@ PDDA_FORMAT
 PDDA_ACTIVITY_MAX_LINES
 PDDA_ROADMAP_MAX_LINES
 PDDA_ROADMAP_MAX_HEADINGS
+PDDA_GOVERNANCE_DOCS
+PDDA_GOVERNANCE_INDEX
 PDDA_LLM_BIN
 PDDA_LLM_ARGS
 PDDA_LLM_MODEL
@@ -165,6 +170,11 @@ PDDA_LLM_MODEL
 flag), `PDDA_GH_STATE_CACHE` (the cached GitHub issue-state file used when `gh` is offline; written by
 `pdda-gh-refresh.sh`), and `PDDA_ISSUE_SYNC_SOURCE` = `auto` (default: live `gh`, else cache) | `gh` |
 `cache` (the Stop doc-health hook forces `cache` to stay fast and offline-tolerant).
+
+`governance` adds two: `PDDA_GOVERNANCE_DOCS` (space-separated, repo-relative — the curated governance
+doc set it scans; default `ROUTER.md AGENTS.md GUIDING-PRINCIPLES.md README.md CLAUDE.md PROJECT/PDDA.md
+utils/pdda/PDDA-INSTALL.md`) and `PDDA_GOVERNANCE_INDEX` (the doc every other governance doc must be
+reachable from; default `ROUTER.md`).
 
 ## Minimal target-repo expectations
 
@@ -219,7 +229,7 @@ Once PDDA lives in several repos, keep them current from one canonical source ("
 the auto-regenerated manifest (`utils/pdda/pdda-sync-manifest.conf`, shared with `install.sh`), so a new
 runtime file under `utils/pdda/` propagates with no list edit. Per-repo adapted startup docs
 (`ROUTER.md`, `AGENTS.md`) are never touched. Full design + rationale:
-[`PROJECT/2-WORKING/PDDA-SYNC-TO-OTHER-REPOS.md`](../../PROJECT/2-WORKING/PDDA-SYNC-TO-OTHER-REPOS.md).
+[`PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md`](../../PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md).
 
 ```bash
 # Enroll a target (initial install via install.sh, then seeds sync state). Confirms first;

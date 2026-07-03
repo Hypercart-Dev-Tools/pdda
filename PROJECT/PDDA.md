@@ -256,7 +256,7 @@ Implementation note:
   `utils/pdda/pdda-lib.sh`
 - every deterministic check is a subcommand: `pdda.sh frontmatter`, `pdda.sh status-table`,
   `pdda.sh hardcoded-paths`, `pdda.sh roadmap`, `pdda.sh roadmap-coverage`, `pdda.sh changelog`,
-  `pdda.sh stale`, `pdda.sh issue-doc-sync`
+  `pdda.sh stale`, `pdda.sh issue-doc-sync`, `pdda.sh governance`
 - the aggregate runner is `pdda.sh run` (it runs the deterministic checks in order, then the LLM
   review)
 - each finding still carries a stable `check` id (e.g. `pdda-check-frontmatter`) in stdout and the
@@ -404,6 +404,51 @@ Why warn-only + flag-only:
 - every drift class here is mechanical, so the check carries zero false-judgment risk; a false flag is
   one ignorable warn line and a missed flag just leaves today's manual reconciliation — both cheap, so
   warn-only never-blocks is the right calibration (same stance as `pdda.sh stale` and `pdda.sh changelog`)
+
+#### I. `pdda.sh governance`
+
+Purpose:
+- evaluate the repo's own governance docs — `ROUTER.md`, `AGENTS.md`, `GUIDING-PRINCIPLES.md`,
+  `README.md`, `CLAUDE.md`, `PROJECT/PDDA.md`, `utils/pdda/PDDA-INSTALL.md` — for the specific class of
+  drift that Principle #4 (*one canonical place per fact*) exists to prevent: a doc pointing at a file
+  that has moved or never existed, a doc that exists but no cold agent's read order will ever reach it,
+  or a contract doc and the shipped code silently disagreeing about what commands or env vars exist
+
+Minimum behavior (four checks, one shared `pdda-check-governance` id):
+- **dead references** (`warn`) — every backtick-wrapped filename ending in `.md`, and every markdown
+  link whose target ends in `.md`, found inside a governance doc must resolve to a real file, checked
+  against the repo root or (for `./`/`../` links) the referencing file's own directory. A bare filename
+  with no directory component (e.g. `blank.md`,
+  which legitimately exists once per lifecycle folder) additionally falls back to a repo-wide basename
+  search before being called dead — only a name absent *everywhere* is flagged. A `GH-<n>-*.md` name is
+  never flagged; those are illustrative instances of the issue-doc naming convention, not fixed
+  cross-references. `warn`, not `error`: prose extraction is inherently more heuristic than the
+  mechanical checks above, so a false flag should cost one ignorable line, not a blocked build (same
+  calibration as `pdda.sh stale`/`pdda.sh changelog`).
+- **orphan governance docs** (`warn`) — a present governance doc whose filename never appears anywhere
+  in the index doc (`ROUTER.md` by default) — a doc a cold agent's startup sequence would never surface.
+- **subcommand drift** (`error`) — every subcommand in `utils/pdda/pdda.sh`'s dispatcher `case` block
+  must be named somewhere in the index doc. Parsing the `case` statement is mechanical (zero prose
+  ambiguity), so this earns the same blocking severity as the structural checks — it is the concrete
+  enforcement of AGENTS.md #5 ("keep the installer surface in lockstep").
+- **env-var drift** (`warn`) — every `PDDA_*` token mentioned in a governance doc should actually be
+  read or set somewhere in a shipped script (`utils/pdda/*.sh` or the repo-root `install.sh`). `warn`,
+  not `error`: `utils/pdda/PDDA-INSTALL.md` ships to every target install but also documents
+  `utils/pdda/pdda-sync.sh` — an HQ-only tool never copied to targets (it isn't in the "Canonical
+  install set" above) — so a var like `PDDA_SYNC_BACKUPS` legitimately won't resolve in a target
+  install's own scripts. That's expected, not drift, confirmed by installing this check into a second
+  repo and seeing exactly that false positive fire — same calibration as dead-reference above.
+
+Expected exceptions:
+- fenced `console`/`text`/`transcript` blocks and blockquote lines are not scanned (same carve-out as
+  `pdda.sh hardcoded-paths`)
+- override the doc set with `PDDA_GOVERNANCE_DOCS` (space-separated, repo-relative) and the index doc
+  with `PDDA_GOVERNANCE_INDEX` (default `ROUTER.md`) for a repo with a different layout
+
+This check is deterministic-only; it catches the mechanical drift classes above. Semantic
+contradictions in prose (two docs stating conflicting policy, a claim that quietly went stale) are a
+judgment call for the LLM layer or a human — see the `/governance-audit` skill, which runs this check
+first and then reads the same doc set for that fuzzier class of inconsistency.
 
 ### 2. LLM-assisted doc readiness review
 
@@ -605,10 +650,11 @@ Run the deterministic checks every hour in this order:
 6. `pdda.sh changelog`
 7. `pdda.sh stale`
 8. `pdda.sh issue-doc-sync`
+9. `pdda.sh governance`
 
 Then run:
 
-9. `pdda.sh doc-ready`
+10. `pdda.sh doc-ready`
 
 (`pdda.sh run` runs exactly this sequence and applies the active `PDDA_MODE` gate. Scheduling the
 single aggregate command is the recommended hourly cron entry.)

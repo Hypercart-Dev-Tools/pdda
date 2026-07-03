@@ -58,7 +58,10 @@ utils/pdda/pdda.sh roadmap-coverage
 utils/pdda/pdda.sh changelog
 utils/pdda/pdda.sh stale
 utils/pdda/pdda.sh issue-doc-sync   # flag GH-*.md docs drifted from their GitHub issue state (warn-only; gh-degrades to cache)
+utils/pdda/pdda.sh governance  # governance-doc cross-reference + doc/code drift (this file, AGENTS.md, CLAUDE.md, ...)
+utils/pdda/pdda.sh gh-refresh  # refresh the cached GitHub issue-state file issue-doc-sync reads offline (needs gh)
 utils/pdda/pdda.sh doc-ready   # LLM readiness review — set PDDA_LLM_BIN (codex/claude/agy) for recommendations, else it self-skips
+utils/pdda/pdda.sh catchup     # LLM repo triage and ROUTER.md recommendations — opt-in like doc-ready
 utils/pdda/pdda.sh help        # list every command
 ```
 
@@ -76,7 +79,7 @@ utils/pdda/pdda-sync.sh status                          # read-only drift report
   underlying spec or a by-hand/adapted install, start in `utils/pdda/PDDA-INSTALL.md`.
 - If the task is about keeping PDDA current across *several* repos from this one (HQ → targets:
   register / push / status / optional launchd schedule), use `utils/pdda/pdda-sync.sh` — design and
-  rationale in `PROJECT/2-WORKING/PDDA-SYNC-TO-OTHER-REPOS.md`, usage in `utils/pdda/PDDA-INSTALL.md`.
+  rationale in `PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md`, usage in `utils/pdda/PDDA-INSTALL.md`.
 - If the task is about document quality, active-doc lifecycle, roadmap sprawl, or automation policy, start in `PROJECT/PDDA.md`.
 - If the task is about repo-local maintenance state, start in `ROADMAP.md`.
 - If the task is about the changelog, provenance, or end-of-iteration logging, the governance is in `PROJECT/PDDA.md` (the "CHANGELOG.md — end-of-iteration record" contract).

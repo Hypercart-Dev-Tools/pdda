@@ -61,8 +61,8 @@ Options:
   --force                Overwrite existing seed files (ROADMAP.md, CHANGELOG.md, .pdda-mode,
                          blank.md placeholders). Runtime scripts + PROJECT/PDDA.md are always
                          refreshed. Never touches your real PROJECT/** docs.
-  --with-startup-docs    Also install adapted ROUTER.md + AGENTS.md + the /pdda re-orient skill
-                         (operator read-order scaffold).
+  --with-startup-docs    Also install adapted ROUTER.md + AGENTS.md + GUIDING-PRINCIPLES.md + the
+                         /pdda re-orient skill (operator read-order scaffold).
   --no-migrate           Skip auto-migration of a pre-utils/pdda/ (flat) layout. By default, when the
                          target keeps the runtime flat under utils/, install removes the duplicate
                          PDDA-owned flat files and repoints old-path references to utils/pdda/.
@@ -346,6 +346,7 @@ done < <(pdda_manifest_expand "$SOURCE_DIR")
 if [ "$WITH_STARTUP_DOCS" -eq 1 ]; then
   copy_runtime "ROUTER.md"
   copy_runtime "AGENTS.md"
+  copy_runtime "GUIDING-PRINCIPLES.md"
   copy_runtime ".claude/skills/pdda/SKILL.md"
 fi
 

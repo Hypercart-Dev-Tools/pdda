@@ -15,6 +15,8 @@ set -u
 #   pdda.sh roadmap-coverage
 #   pdda.sh changelog
 #   pdda.sh stale
+#   pdda.sh issue-doc-sync
+#   pdda.sh governance          # repo-root governance-doc cross-reference + doc/code drift
 #   pdda.sh doc-ready           # delegates to utils/pdda/pdda-doc-ready.sh (the LLM layer)
 #   pdda.sh help
 #
@@ -545,6 +547,187 @@ check_issue_doc_sync() {
 }
 
 # ------------------------------------------------------------------------------------------------
+# I. governance (repo-root contract docs: cross-reference + doc/code drift consistency)
+# ------------------------------------------------------------------------------------------------
+# Targets the small, curated "read this to understand the repo's rules" doc set (ROUTER.md, AGENTS.md,
+# GUIDING-PRINCIPLES.md, README.md, CLAUDE.md, PROJECT/PDDA.md, utils/pdda/PDDA-INSTALL.md) — not every
+# markdown file in the tree (PROJECT/** plan docs have their own checks above). CLAUDE.md is in the
+# default set because many installs carry one at the repo root beside AGENTS.md; a repo without one
+# (like this one) just has it silently skipped. Override the set via PDDA_GOVERNANCE_DOCS
+# (space-separated, repo-relative) and the index doc via PDDA_GOVERNANCE_INDEX (default ROUTER.md).
+PDDA_GOVERNANCE_DOCS_DEFAULT="ROUTER.md AGENTS.md GUIDING-PRINCIPLES.md README.md CLAUDE.md PROJECT/PDDA.md utils/pdda/PDDA-INSTALL.md"
+PDDA_GOVERNANCE_INDEX_DEFAULT="ROUTER.md"
+
+# Print "<line>\t<text>" for lines outside an exempt fence/blockquote — same carve-out convention as
+# check_hardcoded_paths (fenced console/text/transcript blocks and blockquotes are not scanned).
+_pdda_gov_scannable_lines() {
+  awk '
+    /^[[:space:]]*```/ {
+      if (in_fence) { in_fence=0; fexempt=0 }
+      else {
+        info=$0; sub(/^[[:space:]]*`+/,"",info); gsub(/[[:space:]]/,"",info); info=tolower(info)
+        in_fence=1
+        fexempt=(info=="console"||info=="text"||info=="transcript")?1:0
+      }
+      next
+    }
+    in_fence && fexempt { next }
+    /^[[:space:]]*>/ { next }
+    { print NR "\t" $0 }
+  ' "$1"
+}
+
+# Extract candidate .md file references from one line: markdown-link targets `](target.md)` and
+# backtick-wrapped `` `target.md` `` spans, each optionally carrying a `#anchor`. Anchor-only links and
+# non-doc code spans (e.g. `` `pdda.sh run` ``) don't end in .md, so they never match — this check
+# validates file existence, not heading anchors. A bare `GH-<n>-*.md` name is filtered out — those are
+# illustrative instances of the issue-doc naming convention (PDDA.md's own examples), not fixed
+# cross-references to a real file.
+_pdda_gov_extract_refs() {
+  local text="$1"
+  { printf '%s\n' "$text" \
+      | grep -oE '\]\([^)[:space:]]+\.md(#[A-Za-z0-9_-]*)?\)' \
+      | sed -E 's/^\]\(//; s/\)$//'
+    printf '%s\n' "$text" \
+      | grep -oE '`[A-Za-z0-9_./-]+\.md(#[A-Za-z0-9_-]*)?`' \
+      | sed -E 's/^`//; s/`$//'
+  } | grep -Ev '(^|/)GH-[0-9]+-[^/]*\.md(#.*)?$'
+}
+
+# Resolve a raw ref (its #anchor stripped) against repo root or the referencing file's directory.
+# Prints nothing (and returns non-zero) for an external URL — the caller then skips it. A bare
+# filename (no directory component) that doesn't resolve at its expected spot falls back to a
+# repo-wide basename search — bare mentions (e.g. "blank.md", used generically across four lifecycle
+# folders) aren't precise path claims, so only a filename absent everywhere counts as truly dead. A
+# ref WITH a directory component stays a precise claim: if that exact path is wrong, that IS the bug
+# (e.g. a doc pointing at PROJECT/2-WORKING/X.md after X.md was completed and moved to 3-COMPLETED/).
+_pdda_gov_resolve_ref() {
+  local ref="$1" from_dir="$2" path candidate found
+  path="${ref%%#*}"
+  case "$path" in
+    http://*|https://*|//*) return 1 ;;
+    /*) candidate="$PDDA_REPO_ROOT$path" ;;
+    ./*|../*) candidate="$from_dir/$path" ;;
+    */*) candidate="$PDDA_REPO_ROOT/$path" ;;
+    *)
+      candidate="$PDDA_REPO_ROOT/$path"
+      if [ ! -f "$candidate" ]; then
+        found="$(find "$PDDA_REPO_ROOT" -name "$path" -not -path '*/.git/*' 2>/dev/null | head -1)"
+        [ -n "$found" ] && candidate="$found"
+      fi
+      ;;
+  esac
+  printf '%s\n' "$candidate"
+}
+
+check_governance() {
+  pdda_reset_counts
+  local CHECK_NAME="pdda-check-governance" rc=0
+  local docs="${PDDA_GOVERNANCE_DOCS:-$PDDA_GOVERNANCE_DOCS_DEFAULT}"
+  local index_doc="${PDDA_GOVERNANCE_INDEX:-$PDDA_GOVERNANCE_INDEX_DEFAULT}"
+  local doc file abs_file from_dir line_no text ref resolved base var line
+  local present_docs="" index_abs
+
+  for doc in $docs; do
+    [ -f "$PDDA_REPO_ROOT/$doc" ] && present_docs="$present_docs $doc"
+  done
+
+  if [ -z "$(pdda_trim "$present_docs")" ]; then
+    pdda_record_finding info "$CHECK_NAME" "$PDDA_REPO_ROOT" 0 \
+      "no governance docs found in the configured set ($docs)" "skip"
+    pdda_emit_summary "$CHECK_NAME" 0
+    return "$(pdda_gated_exit 0)"
+  fi
+
+  # --- (1) dead references: every .md ref in a governance doc must resolve to a real file ---------
+  # warn-only: markdown-reference extraction from free-form prose is inherently more heuristic than
+  # the mechanical checks above (frontmatter, status-table), so a false flag costs one ignorable line
+  # rather than blocking a build even in full mode — same calibration as check_stale/check_changelog.
+  for doc in $present_docs; do
+    abs_file="$PDDA_REPO_ROOT/$doc"
+    from_dir="$(dirname "$abs_file")"
+    while IFS=$'\t' read -r line_no text; do
+      [ -n "$line_no" ] || continue
+      while IFS= read -r ref; do
+        [ -n "$ref" ] || continue
+        resolved="$(_pdda_gov_resolve_ref "$ref" "$from_dir")" || continue
+        [ -f "$resolved" ] && continue
+        pdda_record_finding warn "$CHECK_NAME" "$abs_file" "$line_no" \
+          "dead reference '$ref' — no file at $(pdda_relpath "$resolved")" "fix-dead-reference"
+      done < <(_pdda_gov_extract_refs "$text")
+    done < <(_pdda_gov_scannable_lines "$abs_file")
+  done
+
+  # --- (2) orphan governance docs: a present doc the index doc never points at --------------------
+  index_abs="$PDDA_REPO_ROOT/$index_doc"
+  if [ -f "$index_abs" ]; then
+    for doc in $present_docs; do
+      [ "$doc" = "$index_doc" ] && continue
+      base="$(basename "$doc")"
+      if ! grep -Fq "$base" "$index_abs"; then
+        pdda_record_finding warn "$CHECK_NAME" "$PDDA_REPO_ROOT/$doc" 1 \
+          "governance doc is not referenced anywhere in $index_doc — a cold agent following its read order won't discover it" \
+          "add-index-pointer"
+      fi
+    done
+  else
+    pdda_record_finding info "$CHECK_NAME" "$index_abs" 0 \
+      "governance index doc '$index_doc' not found; skipping orphan-doc check" "skip"
+  fi
+
+  # --- (3) subcommand drift: every pdda.sh dispatcher subcommand must be named in the index doc ---
+  if [ -f "$index_abs" ]; then
+    local subcommands sub
+    subcommands="$(awk '
+      /case "\$cmd" in/ { in_case = 1; next }
+      in_case && /^esac/ { in_case = 0 }
+      in_case && /^[[:space:]]*[A-Za-z*][A-Za-z0-9*_-]*(\|[A-Za-z0-9*_-]+)*\)/ {
+        line = $0
+        sub(/^[[:space:]]*/, "", line)
+        sub(/\).*/, "", line)
+        n = split(line, parts, "|")
+        for (i = 1; i <= n; i++) print parts[i]
+      }
+    ' "$HERE/pdda.sh" | grep -Ev '^(run|help|-h|--help|\*)$' | LC_ALL=C sort -u)"
+
+    for sub in $subcommands; do
+      if ! grep -Eq "(^|[^A-Za-z0-9_-])${sub}([^A-Za-z0-9_-]|\$)" "$index_abs"; then
+        pdda_record_finding error "$CHECK_NAME" "$index_abs" 1 \
+          "pdda.sh subcommand '$sub' is not documented anywhere in $index_doc — keep the installer surface in lockstep (AGENTS.md #5)" \
+          "document-subcommand"
+        rc=1
+      fi
+    done
+  fi
+
+  # --- (4) env-var drift: a PDDA_* var named in a governance doc should exist in a shipped script ---
+  # warn-only: PDDA_GOVERNANCE_INDEX_DEFAULT names ONLY the files a target install actually receives
+  # (utils/pdda/*.sh + install.sh). PDDA-INSTALL.md itself ships to every target but also documents
+  # utils/pdda/pdda-sync.sh (an HQ-only tool never copied to targets, per its own "Canonical install
+  # set" list) — so a var like PDDA_SYNC_BACKUPS legitimately mentioned there will never resolve in a
+  # target install. That's expected, not drift, so a false flag must cost one ignorable line, not a
+  # blocked build (same calibration as the dead-reference check above).
+  local shipped_vars doc_vars install_sh
+  install_sh="$PDDA_REPO_ROOT/install.sh"
+  shipped_vars="$(grep -ohE 'PDDA_[A-Z0-9_]+' "$HERE"/*.sh "$install_sh" 2>/dev/null | LC_ALL=C sort -u)"
+  for doc in $present_docs; do
+    abs_file="$PDDA_REPO_ROOT/$doc"
+    doc_vars="$(grep -ohE 'PDDA_[A-Z0-9_]+' "$abs_file" | LC_ALL=C sort -u)"
+    for var in $doc_vars; do
+      if ! printf '%s\n' "$shipped_vars" | grep -Fxq "$var"; then
+        line="$(grep -nF "$var" "$abs_file" | head -1 | cut -d: -f1)"
+        pdda_record_finding warn "$CHECK_NAME" "$abs_file" "${line:-1}" \
+          "governance doc references env var '$var' which no shipped script in this install reads or sets" \
+          "remove-or-implement-envvar"
+      fi
+    done
+  done
+
+  pdda_emit_summary "$CHECK_NAME" "$rc"
+  return "$(pdda_gated_exit "$rc")"
+}
+
+# ------------------------------------------------------------------------------------------------
 # run — the aggregate deterministic suite, then the LLM readiness review (in order)
 # ------------------------------------------------------------------------------------------------
 # Decoration -> stdout in text mode, stderr in json mode, so PDDA_FORMAT=json leaves stdout a clean
@@ -561,6 +744,7 @@ pdda-check-roadmap-coverage:check_roadmap_coverage
 pdda-check-changelog:check_changelog
 pdda-stale-working-docs:check_stale
 pdda-check-issue-doc-sync:check_issue_doc_sync
+pdda-check-governance:check_governance
 "
 
 cmd_run() {
@@ -638,6 +822,7 @@ Commands:
   changelog          end-of-iteration changelog nudge (warn-only)
   stale              flag stale working docs (flag-only; never moves)
   issue-doc-sync     flag 2-WORKING/GH-*.md docs drifted from their GitHub issue state (warn-only)
+  governance         repo-root governance-doc (ROUTER/AGENTS/CLAUDE/...) cross-reference + doc/code drift
   gh-refresh         refresh the cached GitHub issue-state file issue-doc-sync reads offline (needs gh)
   doc-ready          LLM readiness review (delegates to pdda-doc-ready.sh; opt-in via PDDA_LLM_BIN)
   catchup            LLM repo triage and ROUTER.md recommendations (delegates to pdda-catchup.sh)
@@ -660,6 +845,7 @@ case "$cmd" in
   changelog)        check_changelog; exit "$?" ;;
   stale)            check_stale; exit "$?" ;;
   issue-doc-sync)   check_issue_doc_sync; exit "$?" ;;
+  governance)       check_governance; exit "$?" ;;
   gh-refresh)       exec "$HERE/pdda-gh-refresh.sh" "$@" ;;
   doc-ready)        exec "$HERE/pdda-doc-ready.sh" "$@" ;;
   catchup)          exec "$HERE/pdda-catchup.sh" "$@" ;;
