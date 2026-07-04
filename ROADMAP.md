@@ -34,7 +34,11 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Queue / parked intake
 
-- No parked intake docs.
+- **GH-9 — weekly progress counter (open GH issues + closed tasks this week)** (2026-07-03) - new
+  deterministic `pdda.sh progress` subcommand for maintainer visibility; builds on the existing
+  gh-state cache + `3-COMPLETED/` doc lifecycle. "Closed Marathons" (a `tick`/xyz-3-agents-swarm
+  concept, not a PDDA one) is explicitly out of scope for this issue. Issue
+  [#9](https://github.com/Hypercart-Dev-Tools/pdda/issues/9). -> [PROJECT/1-INBOX/GH-9-WEEKLY-PROGRESS-COUNTER.md](PROJECT/1-INBOX/GH-9-WEEKLY-PROGRESS-COUNTER.md)
 
 ### In progress
 
