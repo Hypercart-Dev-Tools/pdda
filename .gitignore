@@ -7,3 +7,5 @@ PROJECT/PDDA-ACTIVITY.jsonl
 /temp/
 # Install registry is machine-local (~/.config/pdda/); never track a stray in-repo .config
 .config/
+# aider/consult local session artifacts (chat + input history, tag cache) — never track
+.aider*
