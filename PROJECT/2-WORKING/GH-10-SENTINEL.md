@@ -1,8 +1,8 @@
 ---
 title: Sentinel — repo-driven doc-governance automation (act on PDDA findings)
-status: Active — Phase 1 complete (dry-run orchestrator + structured output + untrusted-input boundary + kill-switch shipped, 26/26 tests); Phase 2 next
+status: Active — Phase 1 complete (26/26 tests); Phase 2 split into 2a (design spike) + 2b (executor) after a Codex+agy consult; Phase 2a next
 created: 2026-07-04
-updated: 2026-07-04
+updated: 2026-07-06
 owner: noel
 gh_issue: 10
 source: https://github.com/Hypercart-Dev-Tools/pdda/issues/10
@@ -27,7 +27,7 @@ non_goals:
 effort: 4
 complexity: 4
 risk: 3
-phases: 7
+phases: 8
 ---
 
 # Sentinel — repo-driven doc-governance automation
@@ -40,7 +40,7 @@ phases: 7
 
 | What was just completed | What's next |
 |---|---|
-| **Phase 1 complete.** Shipped [`sentinel/run.sh`](../../sentinel/run.sh) — the dry-run orchestrator: kill-switch first, resolve SHA, build a size-bounded first-parent diff behind the [untrusted-input boundary](#untrusted-input-boundary) (skip on `diff_too_large`), invoke the model via the `PDDA_LLM_BIN` seam (clean self-skip when unset), parse + **validate** the [structured-output contract](#structured-output-contract) (reject malformed), and emit the recommendation to `PROJECT/PDDA-ACTIVITY.jsonl` in PDDA's finding schema. **Writes nothing to the tree.** 26/26 tests in [`test/sentinel-run.sh`](../../test/sentinel-run.sh) (valid rec, kill-switch env + `.sentinel-mode`, oversize skip, injection-doesn't-flip-mode, malformed/schema-invalid reject, unset seam, fenced-JSON extraction); real-HEAD smoke test green, tree untouched. (Phase 0 + GLM 5.2 review folded in earlier — see history below.) | **Phase 2** — add safe application **inside a git worktree only**, still finalizing as dry-run: worktree on a temp branch, edits confined to the write allowlist (out-of-allowlist target aborts), `pdda.sh run` as the gate, emit the diff artifact, tear the worktree down. **Still lands nothing.** |
+| **Phase 1 complete.** Shipped [`sentinel/run.sh`](../../sentinel/run.sh) — the dry-run orchestrator: kill-switch first, resolve SHA, build a size-bounded first-parent diff behind the [untrusted-input boundary](#untrusted-input-boundary) (skip on `diff_too_large`), invoke the model via the `PDDA_LLM_BIN` seam (clean self-skip when unset), parse + **validate** the [structured-output contract](#structured-output-contract) (reject malformed), and emit the recommendation to `PROJECT/PDDA-ACTIVITY.jsonl` in PDDA's finding schema. **Writes nothing to the tree.** 26/26 tests in [`test/sentinel-run.sh`](../../test/sentinel-run.sh) (valid rec, kill-switch env + `.sentinel-mode`, oversize skip, injection-doesn't-flip-mode, malformed/schema-invalid reject, unset seam, fenced-JSON extraction); real-HEAD smoke test green, tree untouched. A **Codex+agy consult** then split Phase 2 into a design spike (2a) + executor (2b) and corrected [assumption #2](#preflight-contract) (the gate). | **[Phase 2a](#phase-2a--apply-contract--gate-hardening-spike-discovery)** (design spike) — settle the apply payload format by spiking **both** full-file replacement and search/replace over real docs and picking on measured apply-failure rate; write the gate/base-ref/allowlist decisions into this doc. **No executor code.** Then **2b** builds the worktree executor to that locked contract. |
 
 ## Table of contents
 
@@ -55,6 +55,8 @@ phases: 7
 - [Phase 0 — Issue, doc, park, preflight](#phase-0--issue-doc-park-preflight)
 - [Phase 1 — Orchestrator skeleton + structured output, untrusted-input boundary, kill-switch (dry-run)](#phase-1--orchestrator-skeleton--structured-output-untrusted-input-boundary-kill-switch-dry-run)
 - [Phase 2 — Worktree apply + deterministic gate (dry-run finalizer)](#phase-2--worktree-apply--deterministic-gate-dry-run-finalizer)
+  - [Phase 2a — Apply-contract + gate-hardening spike (discovery)](#phase-2a--apply-contract--gate-hardening-spike-discovery)
+  - [Phase 2b — Worktree executor (dry-run finalizer)](#phase-2b--worktree-executor-dry-run-finalizer)
 - [Phase 3 — Replay/eval harness: validate diff→doc mapping before go-live (discovery)](#phase-3--replayeval-harness-validate-diffdoc-mapping-before-go-live-discovery)
 - [Phase 4 — Policy gate + PR finalizer + self-retrigger guard (steady state)](#phase-4--policy-gate--pr-finalizer--self-retrigger-guard-steady-state)
 - [Phase 5 — Trust registry fed by real PR outcomes](#phase-5--trust-registry-fed-by-real-pr-outcomes)
@@ -72,10 +74,16 @@ Per `AGENTS.md` #2/#3 — state the bet, the reversibility, and the blast radius
   rate in dry-run replay is high, or acceptance never clears the promotion bar, Sentinel stays in PR mode
   forever — which is still a net win over manual application.
 - **Assumptions.** (1) The model runs through the existing `PDDA_LLM_BIN` seam (`pdda-doc-ready.sh`
-  already shells `codex`/`claude`/`agy`), so no new serving infra. (2) `pdda.sh run` is a sufficient
-  deterministic gate — if it passes, the doc edit is structurally safe. (3) Git worktrees give real
-  isolation from the primary tree. (4) The activity log (`PROJECT/PDDA-ACTIVITY.jsonl`) is the right
-  audit sink; Sentinel appends, never rewrites.
+  already shells `codex`/`claude`/`agy`), so no new serving infra. (2) ~~`pdda.sh run` is a sufficient
+  deterministic gate — if it passes, the doc edit is structurally safe.~~ **Corrected by the Phase 2
+  consult (Codex + agy, 2026-07-06):** bare `pdda.sh run` is **not** a usable gate — it only exits
+  non-zero in `PDDA_MODE=full` (default is `observe`, so it "passes" unconditionally), it invokes the
+  **non-deterministic** LLM `doc-ready` layer, and it **writes/rotates `PROJECT/PDDA-ACTIVITY.jsonl`**,
+  dirtying the very worktree diff Phase 2 must produce clean. The gate must run the **deterministic
+  checks only**, decide on **finding counts** (not the mode-gated exit code), and redirect
+  `PDDA_ACTIVITY_LOG` outside the worktree. (3) Git worktrees give real isolation from the primary
+  tree. (4) The activity log (`PROJECT/PDDA-ACTIVITY.jsonl`) is the right audit sink; Sentinel appends,
+  never rewrites.
 - **Failure modes.** A wrong recommendation in dry-run is one ignorable log line. A wrong edit in
   PR mode is a reviewable diff a human rejects. The only genuinely costly failure is a wrong
   **local-commit** — contained by (a) worktree isolation, (b) the strict write allowlist, (c) the
@@ -264,18 +272,63 @@ self-skip; `pdda.sh run` still green. Shippable alone.
 
 ## Phase 2 — Worktree apply + deterministic gate (dry-run finalizer)
 
-Add safe application **inside a worktree only**, still finalizing as dry-run (produce a diff artifact,
+> **Split into 2a (spike) + 2b (executor) after a Codex + agy consult (2026-07-06).** Both advisors
+> independently returned *"not sound enough to build as written"*: the apply payload is undefined
+> (Phase 1's contract carries `targets[]` but **no edit content** to apply), the gate is broken (see
+> [Preflight assumption #2](#preflight-contract)), and the base ref is a correctness bug (branching the
+> worktree from `origin/main` applies against a tree Phase 1 never reviewed). Transcripts (gitignored):
+> `relay-system/2026-07-05/sentinel-phase2-222804/`. The four decisions below are the consult's
+> resolved design; the one open question (apply payload format) is what the 2a spike settles.
+
+### Phase 2a — Apply-contract + gate-hardening spike (discovery)
+
+Pin the four load-bearing decisions **before** the executor is written. This is a **discovery phase** —
+its findings must be written back into this doc before its QA gate can pass (`PROJECT/PDDA.md` →
+Discovery & spike phases).
+
+- **Apply mechanism (open — spike both, then pick).** Phase 1 stays recommendation-only; a **second,
+  tightly-scoped model call** in Phase 2 produces the actual edit against the checked-out target
+  contents. Unified diffs are ruled out by both advisors (hallucinated context lines, fuzzy/partial
+  applies). The spike builds a tiny harness that tries **both** finalist formats over a handful of real
+  docs and picks on measured apply-failure rate:
+  - **(A) full-file replacement** per allowlisted target, applied atomically (Codex) — kills the
+    anchor-match failure class; risk is silent rewrite of unrelated sections in a large doc.
+  - **(B) Aider-style search/replace blocks** (agy) — region-scoped and cheap on large docs; risk is
+    anchor-not-found / ambiguous / partial-apply.
+  - Guard either choice with a diff **size/scope** bound (reuse the [policy gate](#policy-gate) limits).
+- **Gate (resolved).** Run the **deterministic checks only** (not the LLM `doc-ready` layer), decide on
+  **finding counts** rather than the mode-gated exit code, and set `PDDA_ACTIVITY_LOG` to a temp path
+  **outside** the worktree so the gate can't dirty the diff artifact. Prefer a scoped/edited-file check
+  over a full-tree run so a pre-existing unrelated error elsewhere doesn't block a clean edit.
+- **Base ref (resolved).** Branch (or detach) the worktree from the **reviewed `<sha>`**, never
+  `origin/main`.
+- **Allowlist hardening (resolved).** Not a prefix check: `realpath`-resolve every target, reject
+  absolute/empty/`..`, refuse any symlinked path component, enforce exact-case match on case-folding
+  filesystems, and assert physical containment within the allowlisted doc dirs inside the worktree.
+
+**QA gate:** the two apply formats are measured over ≥5 real doc edits and the **chosen format +
+apply-failure numbers are written into this doc**; the gate/base-ref/allowlist decisions above are
+finalized in writing; no executor code lands in this phase.
+
+### Phase 2b — Worktree executor (dry-run finalizer)
+
+Build the executor to the 2a-locked contract, still finalizing as dry-run (produce a diff artifact,
 land nothing).
 
-- Create a worktree on a temp branch (`git worktree add ../pdda-docgov-<sha> -b docgov/<sha> origin/main`);
-  run all edits there, **never** in the primary tree.
-- Apply the model's edits confined to the write allowlist; any target outside it aborts the run.
-- Run `utils/pdda/pdda.sh run` inside the worktree as the gate; a failing gate blocks/annotates.
-- Emit the resulting diff as an artifact + activity-log entry; tear the worktree down. No PR, no commit.
+- Create a worktree from the **reviewed `<sha>`** on a **collision-safe** temp branch/dir
+  (suffix a PID/token, e.g. `docgov/<sha>-<token>`); run all edits there, **never** in the primary tree.
+- Second model call produces the edit in the **2a-chosen format**; apply it confined to the
+  **realpath-hardened** write allowlist — any target outside it aborts the run.
+- Run the **hardened deterministic gate** from 2a (checks-only, count-based, activity-log redirected).
+- Emit the resulting diff as an artifact + activity-log entry; tear the worktree down with a `trap` on
+  `EXIT INT TERM HUP` doing `git worktree remove --force` + `git branch -D` (idempotent, even on failure).
+- No PR, no commit.
 
-**QA gate:** an allowlisted edit produces a clean worktree diff and passes the gate; an out-of-allowlist
-target is refused; the primary working tree is provably untouched after the run (`git status` clean);
-worktree is always cleaned up (even on failure). Shippable alone.
+**QA gate:** an allowlisted edit produces a clean worktree diff and passes the hardened gate; an
+out-of-allowlist / `../` / symlinked / absolute target is refused; the primary working tree is provably
+untouched after the run (`git status` clean) **including** the activity log; the worktree + temp branch
+are always cleaned up (even on gate-fail, error, and SIGINT); two concurrent runs don't collide.
+Shippable alone.
 
 ## Phase 3 — Replay/eval harness: validate diff→doc mapping before go-live (discovery)
 
