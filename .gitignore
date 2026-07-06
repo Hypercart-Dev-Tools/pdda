@@ -21,3 +21,5 @@ sentinel/spike/work/
 .tick/
 /phases/
 ESCALATION.md
+# codebase-memory MCP local index — machine-local, never track
+.codebase-memory/
