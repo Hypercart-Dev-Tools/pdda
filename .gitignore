@@ -15,3 +15,5 @@ relay-system/
 
 # Aider Studio (auto-added)
 REPO_MAP.md
+# Sentinel Phase 2a spike transient outputs (model responses, doc copies, results) — never track
+sentinel/spike/work/

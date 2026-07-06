@@ -1,6 +1,6 @@
 ---
 title: Sentinel — repo-driven doc-governance automation (act on PDDA findings)
-status: Active — Phase 1 complete (26/26 tests); Phase 2 split into 2a (design spike) + 2b (executor) after a Codex+agy consult; Phase 2a next
+status: Active — Phase 2a complete (apply-format spike: full-file chosen, gate/allowlist/base-ref resolved; 10/10 selftest + 5/5 live both formats); Phase 2b (worktree executor) next
 created: 2026-07-04
 updated: 2026-07-06
 owner: noel
@@ -40,7 +40,7 @@ phases: 8
 
 | What was just completed | What's next |
 |---|---|
-| **Phase 1 complete.** Shipped [`sentinel/run.sh`](../../sentinel/run.sh) — the dry-run orchestrator: kill-switch first, resolve SHA, build a size-bounded first-parent diff behind the [untrusted-input boundary](#untrusted-input-boundary) (skip on `diff_too_large`), invoke the model via the `PDDA_LLM_BIN` seam (clean self-skip when unset), parse + **validate** the [structured-output contract](#structured-output-contract) (reject malformed), and emit the recommendation to `PROJECT/PDDA-ACTIVITY.jsonl` in PDDA's finding schema. **Writes nothing to the tree.** 26/26 tests in [`test/sentinel-run.sh`](../../test/sentinel-run.sh) (valid rec, kill-switch env + `.sentinel-mode`, oversize skip, injection-doesn't-flip-mode, malformed/schema-invalid reject, unset seam, fenced-JSON extraction); real-HEAD smoke test green, tree untouched. A **Codex+agy consult** then split Phase 2 into a design spike (2a) + executor (2b) and corrected [assumption #2](#preflight-contract) (the gate). | **[Phase 2a](#phase-2a--apply-contract--gate-hardening-spike-discovery)** (design spike) — settle the apply payload format by spiking **both** full-file replacement and search/replace over real docs and picking on measured apply-failure rate; write the gate/base-ref/allowlist decisions into this doc. **No executor code.** Then **2b** builds the worktree executor to that locked contract. |
+| **Phase 1 complete.** Shipped [`sentinel/run.sh`](../../sentinel/run.sh) — the dry-run orchestrator: kill-switch first, resolve SHA, build a size-bounded first-parent diff behind the [untrusted-input boundary](#untrusted-input-boundary) (skip on `diff_too_large`), invoke the model via the `PDDA_LLM_BIN` seam (clean self-skip when unset), parse + **validate** the [structured-output contract](#structured-output-contract) (reject malformed), and emit the recommendation to `PROJECT/PDDA-ACTIVITY.jsonl` in PDDA's finding schema. **Writes nothing to the tree.** 26/26 tests in [`test/sentinel-run.sh`](../../test/sentinel-run.sh) (valid rec, kill-switch env + `.sentinel-mode`, oversize skip, injection-doesn't-flip-mode, malformed/schema-invalid reject, unset seam, fenced-JSON extraction); real-HEAD smoke test green, tree untouched. A **Codex+agy consult** then split Phase 2 into a design spike (2a) + executor (2b) and corrected [assumption #2](#preflight-contract) (the gate). **Phase 2a complete** (2026-07-06). Spiked **both** apply formats over 5 real docs ([`sentinel/spike/apply-spike.sh`](../../sentinel/spike/apply-spike.sh)): deterministic selftest 10/10, live both formats 5/5 — a tie, so **full-file chosen** (its lossiness risk is locally guardable; search/replace kept as large-doc fallback). Gate hardened (deterministic-only, count-based, log-redirected — fixes assumption #2), allowlist realpath-hardened, base ref = reviewed `<sha>`; all [written back](#phase-2a-findings-spike-run-2026-07-06). | **[Phase 2b](#phase-2b--worktree-executor-dry-run-finalizer)** — build the worktree executor to the 2a-locked contract: worktree from the reviewed `<sha>` on a collision-safe branch, second model call renders the edit (full-file), realpath-hardened allowlist, hardened gate, emit the diff artifact, `trap`-based teardown. **Still lands nothing.** |
 
 ## Table of contents
 
@@ -286,11 +286,11 @@ Pin the four load-bearing decisions **before** the executor is written. This is 
 its findings must be written back into this doc before its QA gate can pass (`PROJECT/PDDA.md` →
 Discovery & spike phases).
 
-- **Apply mechanism (open — spike both, then pick).** Phase 1 stays recommendation-only; a **second,
-  tightly-scoped model call** in Phase 2 produces the actual edit against the checked-out target
-  contents. Unified diffs are ruled out by both advisors (hallucinated context lines, fuzzy/partial
-  applies). The spike builds a tiny harness that tries **both** finalist formats over a handful of real
-  docs and picks on measured apply-failure rate:
+- **Apply mechanism (RESOLVED — full-file primary, search/replace fallback; see [findings](#phase-2a-findings-spike-run-2026-07-06)).**
+  Phase 1 stays recommendation-only; a **second, tightly-scoped model call** in Phase 2 produces the
+  actual edit against the checked-out target contents. Unified diffs are ruled out by both advisors
+  (hallucinated context lines, fuzzy/partial applies). The spike tried **both** finalist formats over 5
+  real docs and measured apply-failure rate:
   - **(A) full-file replacement** per allowlisted target, applied atomically (Codex) — kills the
     anchor-match failure class; risk is silent rewrite of unrelated sections in a large doc.
   - **(B) Aider-style search/replace blocks** (agy) — region-scoped and cheap on large docs; risk is
@@ -306,9 +306,54 @@ Discovery & spike phases).
   absolute/empty/`..`, refuse any symlinked path component, enforce exact-case match on case-folding
   filesystems, and assert physical containment within the allowlisted doc dirs inside the worktree.
 
-**QA gate:** the two apply formats are measured over ≥5 real doc edits and the **chosen format +
-apply-failure numbers are written into this doc**; the gate/base-ref/allowlist decisions above are
-finalized in writing; no executor code lands in this phase.
+**QA gate (✅ met — see findings below):** the two apply formats are measured over ≥5 real doc edits and
+the **chosen format + apply-failure numbers are written into this doc**; the gate/base-ref/allowlist
+decisions above are finalized in writing; no executor code lands in this phase.
+
+#### Phase 2a findings (spike run 2026-07-06)
+
+Harness: [`sentinel/spike/apply-spike.sh`](../../sentinel/spike/apply-spike.sh) — `selftest` runs
+deterministic mechanical fixtures (no model); `live` makes **one `codex` call per scenario** that
+renders the same edit in **both** formats (controls for model variance), applies each to a fresh copy
+of the real doc, and scores `applied · intended · no-collateral · gate-pass`. Corpus: 5 real repo docs
+(`ROUTER.md` ×2, `README.md`, `CHANGELOG.md`, `utils/pdda/PDDA-INSTALL.md`), small targeted edits.
+
+**Measured (live, codex gpt-5.4, n=5) — a dead heat:**
+
+| format | applied | intended | no-collateral | gate-pass | clean (all 4) |
+|---|---|---|---|---|---|
+| full-file replacement | 5/5 | 5/5 | 5/5 | 5/5 | **5/5** |
+| search/replace blocks | 5/5 | 5/5 | 5/5 | 5/5 | **5/5** |
+
+**Read.** On small edits to real governance docs, the two formats **tie** — neither feared failure mode
+fired live (search/replace anchor-miss = 0; full-file lost-lines = 0). But the **deterministic
+selftest (10/10) proves both failure modes are real**: search/replace cleanly reports `anchor-not-found`
+on a whitespace-drifted SEARCH and refuses an ambiguous (>1) match; full-file's scope guard trips on an
+oversized line-delta and refuses an empty body.
+
+**Decision (tiebreak).** **Full-file replacement is 2b's primary apply format; search/replace is the
+documented fallback** for very large docs (where a full-file round-trip is token-heavy or lossiness risk
+climbs). Rationale: full-file's one failure mode (lossiness) is **locally guardable without a perfect
+model** — the line-delta scope bound + the lost-lines collateral check + the hardened gate all catch it,
+and all three are proven to trip in the selftest. Search/replace's anchor-fidelity failures can't be
+guarded as cleanly and are known to worsen on large / multi-hunk / repeated-content docs that n=5 small
+edits didn't stress. **The Phase 3 replay** (a larger, more varied corpus) is where this tie breaks if
+it ever does — revisit the fallback threshold there.
+
+**Resolved-decision validation (built + exercised in the spike, promoted to 2b):**
+
+- **Gate — hardened.** `hardened_gate()` runs the **deterministic checks only** (`frontmatter` +
+  `status-table` + `hardcoded-paths`), decides on **error counts** (not the mode-gated exit code), and
+  redirects `PDDA_ACTIVITY_LOG` outside the tree. It never invokes the LLM `doc-ready` layer. Passed on
+  all applied results. ✔ (fixes [assumption #2](#preflight-contract))
+- **Allowlist — realpath-hardened.** `allowlist_check()` rejects absolute / empty / `..` / symlinked /
+  outside-allow-root / wrong-case targets; selftest verifies traversal + absolute + outside-root
+  rejection and in-tree accept. ✔
+- **Base ref.** Branch/detach the worktree from the **reviewed `<sha>`**, never `origin/main`
+  (enforced in 2b). ✔
+
+The `apply_full_file`, `apply_search_replace`, `hardened_gate`, and `allowlist_check` primitives in the
+spike are the tested building blocks 2b promotes into the worktree executor.
 
 ### Phase 2b — Worktree executor (dry-run finalizer)
 
