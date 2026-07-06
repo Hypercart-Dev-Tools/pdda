@@ -9,3 +9,4 @@ PROJECT/PDDA-ACTIVITY.jsonl
 .config/
 # aider/consult local session artifacts (chat + input history, tag cache) — never track
 .aider*
+.xyz/
