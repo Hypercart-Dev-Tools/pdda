@@ -23,10 +23,23 @@ Reuse `utils/pdda/pdda-lib.sh` and mirror the idiom of the shipped `sentinel/run
 - Tear the worktree + temp branch down with a `trap` on `EXIT INT TERM HUP`
   (`git worktree remove --force` + `git branch -D`), idempotent, even on gate-fail / error / SIGINT.
 
+## Your write lane (STRICT — containment-enforced)
+
+You may edit **only** these three files. Editing anything else fails the turn (containment violation):
+
+- `sentinel/apply.sh` — the executor entrypoint.
+- `sentinel/apply-lib.sh` — put ALL shared helpers here (this is your only extra slot).
+- `test/sentinel-apply.sh` — the test suite.
+
+To reuse the four Phase-2a primitives (`apply_full_file`, `apply_search_replace`, `hardened_gate`,
+`allowlist_check`), **copy them into `sentinel/apply-lib.sh`** — do NOT edit `sentinel/spike/*`,
+`sentinel/run.sh`, `utils/pdda/*`, the plan doc, or any file outside your lane (read them for reference
+only). The harness commits for you; do not run git.
+
 ## Guardrails
 
 - Dry-run only. The PRIMARY working tree must be provably untouched (`git status` clean, incl. the
-  activity log). Do not open a PR, push, or commit anything outside `artifact`.
+  activity log). Do not open a PR, push, or commit anything outside your write lane.
 - Model seam unset → clean self-skip (mirror `sentinel/run.sh`).
 
 ## Definition of Done (reviewer gate)

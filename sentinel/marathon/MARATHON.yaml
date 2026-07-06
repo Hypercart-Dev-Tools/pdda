@@ -26,7 +26,7 @@ phases:
     name: Worktree executor (dry-run finalizer)
     reviewer: agy
     brief: sentinel/marathon/briefs/p2b-worktree-executor.md
-    artifact: sentinel/apply.sh,test/sentinel-apply.sh
+    artifact: sentinel/apply.sh,sentinel/apply-lib.sh,test/sentinel-apply.sh
     max_review_rounds: 3
 
   - id: p3
