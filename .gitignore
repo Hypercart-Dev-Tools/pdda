@@ -19,3 +19,4 @@ REPO_MAP.md
 sentinel/spike/work/
 # codebase-memory MCP local index — machine-local, never track
 .codebase-memory/
+/.tick

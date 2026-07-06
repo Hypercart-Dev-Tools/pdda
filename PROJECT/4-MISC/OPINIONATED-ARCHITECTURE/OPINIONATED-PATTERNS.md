@@ -136,6 +136,23 @@ dictate the architecture.
 **Use this as your GUIDING-PRINCIPLES:**
 Simplicity is the default (Pragmatism). Build the simplest thing that satisfies the stated requirement and nothing more — no interface with one implementation, no config for a value that never changes, no scaffolding "for later." Reach for the standard library before custom code and a native platform feature before a dependency. Ship the lazy version and question extra scope in the same breath; do not relitigate an explicit requirement, only the machinery around it. Simplicity governs unless the Precedence stack gives another principle a specific reason to override.
 
+**Daily operating playbook** for the Radical Pragmatists — the working rules a KISS/YAGNI engineer actually runs on, not the philosophy poster.
+Do (constructive patterns)
+
+Ship the vertical slice first. One thin path all the way through — request to DB to response — beats three polished layers with no seam between them. You learn what the product is by using it, not by diagramming it.
+Delete before you add. The default move on any change is "can existing code do this?" A removed branch is a bug that can't happen; the shortest working diff wins.
+Inline until it hurts twice. Write it straight, duplicated, in place. Extract the abstraction only when the third caller shows up and the shape has stopped moving — not on the second, and never on the first.
+Name the shortcut where you take it. A shortcut with a // ponytail: global lock, per-account if throughput matters-style comment is a decision; the same shortcut silent is a landmine. Leave the ceiling and the upgrade trigger, not an apology.
+Reach for stdlib → native → installed dep → custom, in that order. Every rung down the ladder is code you don't own and can't be paged for. Stop at the first rung that holds.
+
+**Don't (anti-patterns)**
+
+Building for the scale you don't have. Sharding, queues, and a service mesh for 200 users a day is renting complexity against revenue that doesn't exist. Solve the load you can measure, not the load you imagine.
+The speculative interface. One implementation behind an abstraction isn't flexibility, it's a guess about the future wearing a costume. You'll refactor it anyway when the second implementation actually arrives and it doesn't fit the shape you invented.
+"Worse is Better" as cover for careless. KISS licenses less code, not flimsier code. Skipping input validation at a trust boundary or picking the algorithm that's wrong on edge cases isn't lazy-efficient, it's just wrong — the Correctness override sits above you for exactly this.
+Debt with no ledger. Shortcuts are fine; unnamed, untracked, unbounded shortcuts compound into the Big Ball of Mud the critics warn about. If you never write down what you deferred, "we'll refactor later" is a lie you're telling on purpose.
+Relitigating the requirement to avoid the work. YAGNI cuts machinery, not stated needs. "The user doesn't really need restart" when they asked for restart is cost-shifting dressed as minimalism — shrink how it's built, never wave away that it's built.
+
 ## 6. The Correctness Zealots (The "Make Illegal States Unrepresentable" Camp)
 
 Runtime bugs are design failures the compiler or model checker should have caught. This camp's enemy
