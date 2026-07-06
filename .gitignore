@@ -17,3 +17,7 @@ relay-system/
 REPO_MAP.md
 # Sentinel Phase 2a spike transient outputs (model responses, doc copies, results) — never track
 sentinel/spike/work/
+# XYZ marathon runtime state (tick coordinator + per-phase work dirs) — never track
+.tick/
+/phases/
+ESCALATION.md

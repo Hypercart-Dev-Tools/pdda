@@ -1,0 +1,54 @@
+# MARATHON.yaml — Sentinel remaining-phase build, driven sequentially by marathon.sh.
+#
+# Run (operating on the pdda repo, using the vendored .xyz/ binaries):
+#   MARATHON_ROOT="$PWD" \
+#   MARATHON_YAML_BIN="$PWD/.xyz/bin/marathon-yaml" \
+#   TICK_BIN="$PWD/.xyz/bin/tick" \
+#   MARATHON_DRIVE="$PWD/.xyz/relay-automation/marathon-drive.sh" \
+#   bash .xyz/relay-automation/marathon.sh --plan sentinel/marathon/MARATHON.yaml [--dry-run]
+#
+# Each phase = a builder writes the artifact(s) -> the reviewer relays until approved or the round cap;
+# the chain runs in depends_on order and HALTS on the first phase that fails its gate.
+#
+# SCOPE GUARDRAILS (baked into every brief):
+#   * Every phase stays DRY-RUN / LOCAL — Sentinel still "lands nothing". No PR is opened, no GitHub
+#     Action is pushed, no commit is made outside the declared `artifact` set.
+#   * Phase 4 here is CODE + TESTS ONLY. The live GitHub-Action trigger and real PR opening are a
+#     deliberate HUMAN step, excluded from this unattended run.
+#   * Phase 6 (local-commit finalizer) is intentionally ABSENT — the plan forbids building it until
+#     Phases 1–5 have production data.
+#   * Phase 3 builds + runs the replay harness; its go/no-go on real-data quality is a HUMAN checkpoint
+#     (the reviewer approves the harness code, not the empirical decision).
+
+name: sentinel-phases-2b-to-5
+phases:
+  - id: p2b
+    name: Worktree executor (dry-run finalizer)
+    reviewer: agy
+    brief: sentinel/marathon/briefs/p2b-worktree-executor.md
+    artifact: sentinel/apply.sh,test/sentinel-apply.sh
+    max_review_rounds: 3
+
+  - id: p3
+    name: Replay/eval harness (build + run; human scores)
+    reviewer: agy
+    brief: sentinel/marathon/briefs/p3-replay-harness.md
+    artifact: sentinel/replay.sh,test/sentinel-replay.sh
+    depends_on: p2b
+    max_review_rounds: 2
+
+  - id: p4
+    name: Policy gate + PR-finalizer logic (code + tests only; no live wiring)
+    reviewer: agy
+    brief: sentinel/marathon/briefs/p4-policy-and-finalizer.md
+    artifact: sentinel/policy.sh,sentinel/finalize.sh,test/sentinel-policy.sh
+    depends_on: p3
+    max_review_rounds: 3
+
+  - id: p5
+    name: Trust registry fed by PR outcomes
+    reviewer: agy
+    brief: sentinel/marathon/briefs/p5-trust-registry.md
+    artifact: sentinel/trust.sh,test/sentinel-trust.sh
+    depends_on: p4
+    max_review_rounds: 2
