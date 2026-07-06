@@ -1,5 +1,32 @@
 # CHANGELOG.md
 
+## 2026-07-06
+
+### Reframe PDDA as a de facto project memory layer (contract + LLM nudges)
+
+PDDA already enforced document hygiene so work could be *resumed*; this iteration strengthens that
+contract into a practical memory layer that also keeps durable context, decisions, and lessons a cold
+agent would otherwise re-learn the hard way. Three coordinated changes, no new deterministic shell
+surface:
+
+- **`ROUTER.md`** — the startup sequence now tells an agent that is exploring an unknown system,
+  proposing a spike, or blocked to first search `PROJECT/3-COMPLETED/` and `CHANGELOG.md` for prior
+  context (memory *retrieval*).
+- **`PROJECT/PDDA.md`** — a `## Lessons Learned (For Future Agents)` section is now required before a
+  doc moves to `PROJECT/3-COMPLETED/`; the discovery/spike phase is reframed as **Memory Injection**
+  (findings must be written back into the plan, not left in chat context); and `context_tags` is
+  documented as an optional recommended frontmatter field. `context_tags` needs no change to `pdda.sh`
+  — `check_frontmatter` ignores unknown keys — so it stays a documentation-only convention.
+- **`utils/pdda/pdda-doc-ready.sh`** — the LLM readiness rubric gained two warn-capped nudges: a
+  medium-large plan/project with an empty `related:` field, and a `risk: 4`/`risk: 5` plan that links
+  no `decisions/` record. Both remain warnings — they add memory pressure without ever blocking a
+  deterministic run.
+
+Verification: `pdda.sh governance` clean (`errors=0`; the 10 pre-existing `blank.md`/`RECAP.md`-style
+warns in `PROJECT/PDDA.md` are unrelated and left as flagged). Full plan doc moved to
+`PROJECT/3-COMPLETED/PROJECT-MEMORY-LAYER.md`. Lockstep: `README.md` § "The project memory layer",
+`ROUTER.md` (startup sequence), `PROJECT/PDDA.md` (Lessons Learned + Memory Injection + frontmatter).
+
 ## 2026-07-03
 
 ### New `pdda.sh governance` check + `/governance-audit` skill for cross-doc consistency

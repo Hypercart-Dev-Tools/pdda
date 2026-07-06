@@ -28,7 +28,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| Completed **GH-7** — `install.sh` now auto-detects the git-pulse repo path for the multi-device projection (`PDDA_GITPULSE_DIR` → git-pulse `config.sh` `sync_repo_dir` → candidate list), fixing the silent skip on devices where the sync repo isn't at the default; 17/17 tests + real-world verified, lockstep docs synced, issue #7 closed, doc archived to `PROJECT/3-COMPLETED/`. | The `install.sh` + onboarding item remains in progress. Operator opt-in: `register` real secondary repos (and optionally `install-agent`) for live sync propagation. |
+| Completed the **Defacto Project Memory Layer** reframing — `ROUTER.md` retrieval step, `PROJECT/PDDA.md` Memory Injection + Lessons Learned + `context_tags`, and two warn-only memory nudges in `pdda-doc-ready.sh`; CHANGELOG logged, README "The project memory layer" section added, doc archived to `PROJECT/3-COMPLETED/`. | GH-10 Sentinel is the active build (Phase 2b executor next). Operator opt-in still open: `register` real secondary repos for live sync propagation. |
 
 ## Ledger
 
@@ -42,7 +42,6 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
-- **Defacto Project Memory Layer** (2026-07-06) - Implement quick wins to reframe PDDA as a project memory layer. -> [PROJECT/2-WORKING/PROJECT-MEMORY-LAYER.md](PROJECT/2-WORKING/PROJECT-MEMORY-LAYER.md)
 - **GH-10 — Sentinel: repo-driven doc-governance automation** (2026-07-04) - the act-on-it layer for
   PDDA: on merge to `main`, build context from the diff, ask the model (via `PDDA_LLM_BIN`) whether
   governance docs should change, apply edits inside a git worktree on an allowlisted path set, gate on
@@ -56,6 +55,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Completed
 
+- **Defacto Project Memory Layer** (2026-07-06) - reframed PDDA as a de facto project memory layer via three coordinated conventions and no new deterministic surface: `ROUTER.md` startup now retrieves prior context from `3-COMPLETED/`/`CHANGELOG.md` when exploring or blocked; spikes are framed as **Memory Injection** and a `## Lessons Learned (For Future Agents)` section is required before completion; optional `context_tags` frontmatter + two warn-only LLM nudges (`related:` on medium-large plans, `decisions/` link on `risk: 4`/`5`). Governance clean; README "The project memory layer" section added. -> [PROJECT/3-COMPLETED/PROJECT-MEMORY-LAYER.md](PROJECT/3-COMPLETED/PROJECT-MEMORY-LAYER.md)
 - **GH-7 — auto-detect git-pulse repo path for the registry projection** (2026-06-30) - the multi-device projection silently skipped on devices where git-pulse's sync repo isn't at the hardcoded default `~/.config/git-pulse/repo` (e.g. `~/git-pulse-sync` on Mac Studio); `publish_registry_projection()` now resolves it via `PDDA_GITPULSE_DIR` → git-pulse `config.sh` `sync_repo_dir` → candidate list, still best-effort/fail-open. 17/17 publish tests (new autodetect case) + real-world plain-install verification; lockstep `install.sh`/`PDDA-INSTALL.md`. Issue [#7](https://github.com/Hypercart-Dev-Tools/pdda/issues/7) (closed). -> [PROJECT/3-COMPLETED/GH-7-GITPULSE-PATH-AUTODETECT.md](PROJECT/3-COMPLETED/GH-7-GITPULSE-PATH-AUTODETECT.md)
 - **Multi-device PDDA status via git-pulse piggyback** (2026-06-30) - `install.sh` now publishes a per-device, **path-normalized** registry projection (repo name + date + source commit + mode, no folder path) into a `pdda/` folder of git-pulse's sync repo on every install/upgrade; git-pulse's existing sync carries it across devices. Best-effort/fail-open, no new command or git logic. 10/10 publish test green; today's ledger backfilled. -> [PROJECT/3-COMPLETED/PDDA-MULTI-DEVICE-STATUS-VIA-GITPULSE.md](PROJECT/3-COMPLETED/PDDA-MULTI-DEVICE-STATUS-VIA-GITPULSE.md)
 

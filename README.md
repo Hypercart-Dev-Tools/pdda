@@ -81,6 +81,42 @@ Wire `./utils/pdda/pdda.sh run` into a pre-commit hook, CI, or an hourly cron on
 
 ---
 
+## The project memory layer
+
+The hygiene rails above exist for one payoff: a repo an agent (or a human returning cold) can pick up
+without re-learning what the last session already discovered. PDDA treats its own documents as a **de
+facto project memory layer** — the same `PROJECT/**` docs that keep work resumable also carry the
+durable context, decisions, and gotchas that stop a fresh agent from re-hitting a wall someone already
+walked around. Nothing new is stored; the conventions just make the memory *retrievable* and *durable*.
+
+Three lightweight conventions make it work:
+
+- **Retrieval on start.** `ROUTER.md`'s startup sequence tells an agent that is exploring an unknown
+  system, proposing a spike, or blocked to first search `PROJECT/3-COMPLETED/` and `CHANGELOG.md` —
+  past docs are the first place to look, not the last.
+- **Spikes are memory injection.** A discovery/spike phase isn't done when the code is understood — it's
+  done when the findings are *written back into the plan doc*. `PROJECT/PDDA.md` frames this as active
+  **Memory Injection**: quirks, mechanics, and gotchas become project state, not chat context that
+  evaporates when the session ends.
+- **Lessons captured at closeout.** Before a doc moves to `PROJECT/3-COMPLETED/`, it needs a
+  `## Lessons Learned (For Future Agents)` section — the one-paragraph "here's what would have saved us
+  an hour" that the next agent gets for free.
+
+Two optional aids sharpen recall without adding any blocking check:
+
+- **`context_tags`** — an optional frontmatter field (e.g. `context_tags: [auth, flaky-tests, build]`)
+  that tags a doc by topic so related work is easy to find later. It needs no shell change — the
+  deterministic checks ignore unknown frontmatter keys — so it stays a pure documentation convention.
+- **Memory nudges in the LLM pass.** The opt-in readiness review (`pdda-doc-ready.sh`) emits a
+  *warning* (never a block) when a medium-large plan leaves `related:` empty, or when a high-risk
+  (`risk: 4`/`5`) plan links no `decisions/` record — gentle pressure to connect new work to the
+  context and decisions it depends on.
+
+Because all of this rides on the existing hygiene contract, the memory is only as trustworthy as the
+docs are honest — which is exactly what the deterministic checks are there to keep true.
+
+---
+
 ## Maintaining this repo (contributors)
 
 This repo's job is to keep the PDDA contract and the shipped surface in lockstep:

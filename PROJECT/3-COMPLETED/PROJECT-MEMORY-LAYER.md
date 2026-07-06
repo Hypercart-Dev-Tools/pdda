@@ -1,6 +1,6 @@
 ---
-title: Defacto Project Memory Layer Reframing
-status: Active
+title: De Facto Project Memory Layer Reframing
+status: Completed
 created: 2026-07-06
 updated: 2026-07-06
 owner: Agent
@@ -8,18 +8,18 @@ goal: Implement quick wins to reframe PDDA as a project memory layer, providing 
 effort: 2
 complexity: 2
 risk: 1
-phases: 2
+phases: 3
 ---
 
-# Defacto Project Memory Layer Reframing
+# De Facto Project Memory Layer Reframing
 
-This project implements quick wins to help PDDA act as a defacto project memory layer. Instead of just hygiene, PDDA will actively collect intelligence, lessons, and context to prevent agents from repeating mistakes.
+PDDA already enforces document hygiene so work can be resumed reliably. This project implements quick wins to strengthen that contract into a practical de facto project memory layer by capturing durable context, decisions, and lessons that prevent cold agents from re-learning the same failures.
 
 ## Status
 
 | What was just completed | What's next |
 |---|---|
-| Phase 2 execution: Added automation nudges to LLM layer. | All phases complete. Ready for 3-COMPLETED movement. |
+| Closed out: logged the iteration in `CHANGELOG.md` (2026-07-06), added the README "The project memory layer" section, and moved this doc to `PROJECT/3-COMPLETED/`. | Nothing — project complete. Future memory-layer work opens a new doc. |
 
 ## Table of contents
 
@@ -72,3 +72,9 @@ Update the LLM readiness script to enforce or suggest memory linking.
 
 - [x] `utils/pdda/pdda.sh doc-ready` successfully runs on this plan doc and correctly reports any memory-related warnings.
 - [x] No deterministic tests or builds are blocked (LLM findings remain warn-capped).
+
+## Lessons Learned (For Future Agents)
+
+- Memory framing works best as an extension of PDDA's existing resumability goal, not as a replacement for hygiene. The hygiene rails are what make the memory durable and queryable.
+- Discovery/spike output needed to be framed as "memory injection" in the canonical contract so agents treat findings as project state that must be written back into the plan, not left in chat context.
+- Lightweight LLM nudges (`related:` for medium-large tasks and `decisions/` links for high-risk work) were the cheapest way to add memory pressure without expanding the deterministic shell surface.
