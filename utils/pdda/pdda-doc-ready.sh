@@ -46,6 +46,8 @@ frontmatter/status-table/hardcoded-path issues (separate deterministic checks ow
 - a medium-large plan or project (NOT a typo / path repoint / <=2-3 line fix) whose frontmatter is
   missing the triage ratings effort, complexity, risk, phases (used by automation to select work);
   do NOT flag genuinely small/trivial docs for this
+- a medium-large plan or project where the `related` frontmatter field is empty or missing (suggest they link past context or docs from PROJECT/3-COMPLETED/)
+- a plan with frontmatter `risk: 4` or `risk: 5` that does not reference a `decisions/` record anywhere in the doc
 - a status table that is present but stale versus the body
 - the next action buried in prose instead of stated explicitly
 - detail duplicated from another canonical doc

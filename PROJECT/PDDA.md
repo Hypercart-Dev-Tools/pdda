@@ -61,12 +61,14 @@ Every doc in `PROJECT/2-WORKING` should have:
    cold agent can see the full phase span and jump to the live one without scrolling the whole body
 5. QA gates or acceptance criteria after each phase if the plan is multi-phase
 6. for any discovery or spike phase, its findings written **back into this doc** before its QA gate can
-   pass (see [Discovery & spike phases](#discovery--spike-phases))
+   pass (see [Discovery & spike phases (Memory Injection)](#discovery--spike-phases-memory-injection))
 7. repo-relative paths only; no hardcoded absolute local paths
+8. before moving to `PROJECT/3-COMPLETED`, a `## Lessons Learned (For Future Agents)` section appended to capture quirks and gotchas
 
 Recommended fields when relevant:
 
 - `related`
+- `context_tags` (e.g. `[auth, flaky-tests, build]`)
 - `reviewed`
 - `branch`
 - `non_goals`
@@ -150,21 +152,21 @@ exactly `What was just completed | What's next` — there is no alias/compatibil
 specced with a `2026-07-31` cutover, but a single-repo system controls its own docs: no doc here used
 an old alias, so a dated, silently-changing branch guarded nothing and was removed 2026-06-22.)
 
-## Discovery & spike phases
+## Discovery & spike phases (Memory Injection)
 
 Discovery and spike phases exist to *learn* — reverse-engineer an existing system, probe an unknown,
-prove or kill a risky approach before committing the plan to it. Their output is knowledge, and under
+prove or kill a risky approach before committing the plan to it. Their output is durable **memory**, and under
 Principle #1 (*docs are the runtime state, not a record of it*) that knowledge is project state. If it
 lives only in an agent's context or a throwaway scratch note, a cold agent resuming the plan cannot see
 what was learned, why a path was chosen or abandoned, or what the spike actually proved — and the work
 gets re-done.
 
 Contract: **a phase tagged as discovery or spike must write its findings back into the originating plan
-doc before its QA gate can pass.** Concretely, that phase's section (or a clearly linked sibling
+doc before its QA gate can pass.** This is active memory injection. Concretely, that phase's section (or a clearly linked sibling
 section in the same doc) must capture:
 
 - **what was investigated** — the system/area reverse-engineered or the question the spike asked
-- **what was found** — the concrete mechanics learned, with repo-relative pointers (`file:line`) where
+- **what was found (quirks, gotchas, mechanics)** — the concrete mechanics learned, with repo-relative pointers (`file:line`) where
   the finding lives in code, not a vague summary
 - **what it changes** — how the finding confirms, redirects, or kills the plan's later phases; an
   unfinished "we'll know after the spike" left dangling is itself the gap

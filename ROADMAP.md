@@ -42,6 +42,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
+- **Defacto Project Memory Layer** (2026-07-06) - Implement quick wins to reframe PDDA as a project memory layer. -> [PROJECT/2-WORKING/PROJECT-MEMORY-LAYER.md](PROJECT/2-WORKING/PROJECT-MEMORY-LAYER.md)
 - **GH-10 — Sentinel: repo-driven doc-governance automation** (2026-07-04) - the act-on-it layer for
   PDDA: on merge to `main`, build context from the diff, ask the model (via `PDDA_LLM_BIN`) whether
   governance docs should change, apply edits inside a git worktree on an allowlisted path set, gate on

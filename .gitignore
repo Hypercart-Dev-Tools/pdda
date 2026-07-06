@@ -10,3 +10,8 @@ PROJECT/PDDA-ACTIVITY.jsonl
 # aider/consult local session artifacts (chat + input history, tag cache) — never track
 .aider*
 .xyz/
+# relay/consult run transcripts (machine-local audit output) — never track
+relay-system/
+
+# Aider Studio (auto-added)
+REPO_MAP.md

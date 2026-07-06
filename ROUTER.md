@@ -26,6 +26,7 @@ This file is the first entry point for an AI agent working in this repo: it tell
 6. If the task is about installation or extraction into another repo, read `utils/pdda/PDDA-INSTALL.md`. -> expect the canonical copy/create list and first-run verification path.
 7. Read `ROADMAP.md` only for repo-local maintenance state. -> expect a pointer ledger, not a copied plan body from another repo.
 8. Before reporting success on repo changes, run `utils/pdda/pdda.sh run` or the relevant single check (`utils/pdda/pdda.sh <check>`). -> expect deterministic findings first, then any LLM review.
+9. If you are exploring an unknown system, proposing a new spike, or are blocked, search `PROJECT/3-COMPLETED/` and `CHANGELOG.md` for past context first. -> expect to recover memory of past struggles, gotchas, or decisions.
 
 ## Canonical rules
 
