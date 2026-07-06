@@ -39,6 +39,106 @@ LAUNCH_PLIST="${PDDA_SYNC_PLIST:-$HOME/Library/LaunchAgents/$LAUNCH_LABEL.plist}
 say() { printf '%s\n' "$*"; }
 warn() { printf '%s\n' "$*" >&2; }
 
+HELD_LOCKS=""
+cleanup_advisory_locks() {
+  local entry owner
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    owner="$(cat "$entry/pid" 2>/dev/null || true)"
+    if [ -z "$owner" ] || [ "$owner" = "$$" ]; then
+      rm -rf "$entry" 2>/dev/null || true
+    fi
+  done <<EOF
+$HELD_LOCKS
+EOF
+}
+trap cleanup_advisory_locks EXIT INT TERM HUP
+
+remember_lock() {
+  HELD_LOCKS="${HELD_LOCKS}${HELD_LOCKS:+
+}$1"
+}
+
+forget_lock() {
+  local needle="$1" kept="" entry
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    [ "$entry" = "$needle" ] && continue
+    kept="${kept}${kept:+
+}$entry"
+  done <<EOF
+$HELD_LOCKS
+EOF
+  HELD_LOCKS="$kept"
+}
+
+advisory_lock_path() {
+  local target="$1" dir stem
+  dir="$(dirname "$target")"
+  stem="$(basename "$target")"
+  case "$stem" in *.*) stem="${stem%.*}" ;; esac
+  printf '%s/%s.lock' "$dir" "$stem"
+}
+
+acquire_advisory_lock() {
+  local target="$1" label="$2" lockdir holder deadline empty_streak
+  lockdir="$(advisory_lock_path "$target")"
+  deadline=$(( $(date +%s) + 30 ))
+  empty_streak=0
+  while :; do
+    if mkdir -p "$(dirname "$lockdir")" 2>/dev/null && mkdir "$lockdir" 2>/dev/null; then
+      printf '%s\n' "$$" > "$lockdir/pid" 2>/dev/null || true
+      remember_lock "$lockdir"
+      ADVISORY_LOCK_DIR="$lockdir"
+      return 0
+    fi
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      warn "$label: lock $lockdir held too long; proceeding without lock"
+      ADVISORY_LOCK_DIR=""
+      return 1
+    fi
+    holder="$(cat "$lockdir/pid" 2>/dev/null || true)"
+    if [ -z "$holder" ]; then
+      empty_streak=$((empty_streak + 1))
+      if [ "$empty_streak" -ge 20 ]; then
+        rm -rf "$lockdir" 2>/dev/null || true
+        empty_streak=0
+      fi
+      sleep 0.1 2>/dev/null || sleep 1
+      continue
+    fi
+    empty_streak=0
+    if kill -0 "$holder" 2>/dev/null; then
+      sleep 0.1 2>/dev/null || sleep 1
+      continue
+    fi
+    rm -rf "$lockdir" 2>/dev/null || true
+  done
+}
+
+release_advisory_lock() {
+  local lockdir="${1:-}" owner
+  [ -n "$lockdir" ] || return 0
+  owner="$(cat "$lockdir/pid" 2>/dev/null || true)"
+  if [ -z "$owner" ] || [ "$owner" = "$$" ]; then
+    rm -rf "$lockdir" 2>/dev/null || true
+  fi
+  forget_lock "$lockdir"
+}
+
+run_with_advisory_lock() {
+  local target="$1" label="$2"
+  shift 2
+  if ! acquire_advisory_lock "$target" "$label"; then
+    return 0
+  fi
+  local lockdir="$ADVISORY_LOCK_DIR" rc
+  "$@"
+  rc=$?
+  release_advisory_lock "$lockdir"
+  return "$rc"
+}
+
 # --- registry read helpers (READ-ONLY — install.sh owns all writes) ------------------------------
 
 # Print every registered target path (col 1), skipping comments + blank lines.
@@ -88,12 +188,17 @@ registry_field() {  # <target> <col>
   awk -F'\t' -v t="$1" -v c="$2" '$1==t{print $c; exit}' "$PDDA_REGISTRY"
 }
 
+write_registry_remove() {
+  local reg="$1" target="$2"
+  local tmp="$reg.tmp.$$"
+  awk -F'\t' -v t="$target" '$1!=t' "$reg" > "$tmp" && mv "$tmp" "$reg"
+}
+
 # Drop a target's row from the registry (used by remove/prune — NOT a duplicate of install.sh's
 # install/upgrade writes; deletion is an operation install.sh never performs).
 registry_remove() {  # <target>
   [ -f "$PDDA_REGISTRY" ] || return 0
-  local tmp="$PDDA_REGISTRY.tmp.$$"
-  awk -F'\t' -v t="$1" '$1!=t' "$PDDA_REGISTRY" > "$tmp" && mv "$tmp" "$PDDA_REGISTRY"
+  run_with_advisory_lock "$PDDA_REGISTRY" "registry" write_registry_remove "$PDDA_REGISTRY" "$1"
 }
 
 # Seed per-target sync state + manifest snapshot from what is currently on disk in the target, so the
@@ -228,7 +333,7 @@ cmd_push() {
 
   acquire_lock || return 1
   # shellcheck disable=SC2064
-  trap 'release_lock' EXIT INT TERM
+  trap 'release_lock; cleanup_advisory_locks' EXIT INT TERM HUP
 
   local MAX_SHRINK="${PDDA_SYNC_MAX_SHRINK:-25}"
   local n_new=0 n_upd=0 n_updb=0 n_skip=0 n_del=0 n_miss=0

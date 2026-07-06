@@ -138,6 +138,105 @@ fi
 
 say() { printf '%s\n' "$*"; }
 
+HELD_LOCKS=""
+cleanup_advisory_locks() {
+  local entry owner
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    owner="$(cat "$entry/pid" 2>/dev/null || true)"
+    if [ -z "$owner" ] || [ "$owner" = "$$" ]; then
+      rm -rf "$entry" 2>/dev/null || true
+    fi
+  done <<EOF
+$HELD_LOCKS
+EOF
+}
+trap cleanup_advisory_locks EXIT INT TERM HUP
+
+remember_lock() {
+  HELD_LOCKS="${HELD_LOCKS}${HELD_LOCKS:+
+}$1"
+}
+
+forget_lock() {
+  local needle="$1" kept="" entry
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    [ "$entry" = "$needle" ] && continue
+    kept="${kept}${kept:+
+}$entry"
+  done <<EOF
+$HELD_LOCKS
+EOF
+  HELD_LOCKS="$kept"
+}
+
+advisory_lock_path() {
+  local target="$1" dir stem
+  dir="$(dirname "$target")"
+  stem="$(basename "$target")"
+  case "$stem" in *.*) stem="${stem%.*}" ;; esac
+  printf '%s/%s.lock' "$dir" "$stem"
+}
+
+acquire_advisory_lock() {
+  local target="$1" label="$2" lockdir holder deadline empty_streak
+  lockdir="$(advisory_lock_path "$target")"
+  deadline=$(( $(date +%s) + 30 ))
+  empty_streak=0
+  while :; do
+    if mkdir -p "$(dirname "$lockdir")" 2>/dev/null && mkdir "$lockdir" 2>/dev/null; then
+      printf '%s\n' "$$" > "$lockdir/pid" 2>/dev/null || true
+      remember_lock "$lockdir"
+      ADVISORY_LOCK_DIR="$lockdir"
+      return 0
+    fi
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      say "$label: lock $lockdir held too long; proceeding without lock"
+      ADVISORY_LOCK_DIR=""
+      return 1
+    fi
+    holder="$(cat "$lockdir/pid" 2>/dev/null || true)"
+    if [ -z "$holder" ]; then
+      empty_streak=$((empty_streak + 1))
+      if [ "$empty_streak" -ge 20 ]; then
+        rm -rf "$lockdir" 2>/dev/null || true
+        empty_streak=0
+      fi
+      sleep 0.1 2>/dev/null || sleep 1
+      continue
+    fi
+    empty_streak=0
+    if kill -0 "$holder" 2>/dev/null; then
+      sleep 0.1 2>/dev/null || sleep 1
+      continue
+    fi
+    rm -rf "$lockdir" 2>/dev/null || true
+  done
+}
+
+release_advisory_lock() {
+  local lockdir="${1:-}" owner
+  [ -n "$lockdir" ] || return 0
+  owner="$(cat "$lockdir/pid" 2>/dev/null || true)"
+  if [ -z "$owner" ] || [ "$owner" = "$$" ]; then
+    rm -rf "$lockdir" 2>/dev/null || true
+  fi
+  forget_lock "$lockdir"
+}
+
+run_with_advisory_lock() {
+  local target="$1" label="$2"
+  shift 2
+  if ! acquire_advisory_lock "$target" "$label"; then
+    return 0
+  fi
+  local lockdir="$ADVISORY_LOCK_DIR" rc
+  "$@"
+  rc=$?
+  release_advisory_lock "$lockdir"
+  return "$rc"
+}
 # Copy a runtime file verbatim, always (runtime is the shipped surface, safe to refresh).
 copy_runtime() {  # <relpath>
   local rel="$1" src="$SOURCE_DIR/$1" dst="$TARGET/$1"
@@ -246,6 +345,26 @@ ensure_runtime_ignored() {
   done
 }
 
+write_registry_projection() {
+  local out="$1"
+  local tmp="$out.tmp.$$"
+  if {
+       printf '# PDDA install status (normalized to repo name; absolute paths intentionally omitted).\n'
+       printf '# Maintainer LLM on another machine: a clone usually keeps the origin repo name as its folder,\n'
+       printf '# so locate it by exact name first:\n'
+       printf '#   find ~ -type d -name "<repo>" -exec test -d "{}/.git" \\; -print 2>/dev/null\n'
+       printf '# If that returns nothing (repo cloned into a renamed folder), fall back to a fuzzy search:\n'
+       printf '#   find ~ -type d -iname "*<repo>*" -exec test -d "{}/.git" \\; -print 2>/dev/null\n'
+       printf '# repo\tlast_install_utc\tmode\tsource_commit\tstartup_docs\n'
+       awk -F'\t' 'BEGIN{OFS="\t"} /^#/{next} NF==0{next} {n=split($1,a,"/"); $1=a[n]; print}' "$PDDA_REGISTRY"
+     } > "$tmp" 2>/dev/null && mv "$tmp" "$out"; then
+    say "  publish   pdda/registry-$dev.tsv (normalized; git-pulse carries it)"
+  else
+    rm -f "$tmp" 2>/dev/null
+    say "  (git-pulse publish failed — projection unchanged)"
+  fi
+}
+
 # Publish a path-normalized projection of the registry into git-pulse's sync repo when git-pulse is present,
 # so PDDA install status rolls up across devices with NO new sync infrastructure (git-pulse's own sync
 # carries the file). Normalized = col 1 absolute path -> bare repo name; the projection never contains a
@@ -273,27 +392,22 @@ publish_registry_projection() {
   [ -n "$dev" ] || dev="$(hostname -s 2>/dev/null || printf 'unknown-device')"
   mkdir -p "$gp/pdda" 2>/dev/null || { say "  (git-pulse pdda/ not writable — publish skipped)"; return 0; }
   out="$gp/pdda/registry-$dev.tsv"
-  tmp="$out.tmp.$$"
-  # ponytail: registry paths are pwd-normalized (no trailing slash), so basename-via-split is safe.
-  # Write to a temp file in the SAME dir, then atomic mv — git-pulse's concurrent sync must never catch a
-  # half-written projection and publish a truncated snapshot to other devices (mirrors the local registry
-  # write above; GUIDING-PRINCIPLES #6). On a failed generation the prior good projection survives untouched.
-  if {
-       printf '# PDDA install status (normalized to repo name; absolute paths intentionally omitted).\n'
-       printf '# Maintainer LLM on another machine: a clone usually keeps the origin repo name as its folder,\n'
-       printf '# so locate it by exact name first:\n'
-       printf '#   find ~ -type d -name "<repo>" -exec test -d "{}/.git" \\; -print 2>/dev/null\n'
-       printf '# If that returns nothing (repo cloned into a renamed folder), fall back to a fuzzy search:\n'
-       printf '#   find ~ -type d -iname "*<repo>*" -exec test -d "{}/.git" \\; -print 2>/dev/null\n'
-       printf '# repo\tlast_install_utc\tmode\tsource_commit\tstartup_docs\n'
-       awk -F'\t' 'BEGIN{OFS="\t"} /^#/{next} NF==0{next} {n=split($1,a,"/"); $1=a[n]; print}' "$PDDA_REGISTRY"
-     } > "$tmp" 2>/dev/null && mv "$tmp" "$out"; then
-    say "  publish   pdda/registry-$dev.tsv (normalized; git-pulse carries it)"
-  else
-    rm -f "$tmp" 2>/dev/null
-    say "  (git-pulse publish failed — projection unchanged)"
-  fi
+  run_with_advisory_lock "$out" "git-pulse projection" write_registry_projection "$out"
   return 0
+}
+
+write_install_registry_row() {
+  local reg="$1" target="$2" row="$3"
+  local tmp="$reg.tmp.$$"
+  if awk -F'\t' -v t="$target" '$1 != t' "$reg" > "$tmp" 2>/dev/null; then
+    if printf '%s\n' "$row" >> "$tmp" && mv "$tmp" "$reg"; then
+      say "  register  $target -> $reg"
+      publish_registry_projection   # best-effort multi-device rollup; never fails the install
+    fi
+  else
+    rm -f "$tmp"
+    say "  (registry write failed — skipped)"
+  fi
 }
 
 # Record this install in the per-user, per-device registry (one row per target, latest wins). This is
@@ -321,16 +435,7 @@ register_install() {
   # One row per target: drop any prior row for this exact path (tab-delimited col 1), then append fresh.
   # awk keeps comment lines (their col 1 never equals an absolute target path).
   row="$(printf '%s\t%s\t%s\t%s\t%s' "$TARGET" "$ts" "$MODE" "$src_commit" "$sdocs")"
-  tmp="$reg.tmp.$$"
-  if awk -F'\t' -v t="$TARGET" '$1 != t' "$reg" > "$tmp" 2>/dev/null; then
-    if printf '%s\n' "$row" >> "$tmp" && mv "$tmp" "$reg"; then
-      say "  register  $TARGET -> $reg"
-      publish_registry_projection   # best-effort multi-device rollup; never fails the install
-    fi
-  else
-    rm -f "$tmp"
-    say "  (registry write failed — skipped)"
-  fi
+  run_with_advisory_lock "$reg" "registry" write_install_registry_row "$reg" "$TARGET" "$row"
 }
 
 say "Installing PDDA into: $TARGET"
