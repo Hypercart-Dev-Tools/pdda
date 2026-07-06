@@ -1,6 +1,6 @@
 ---
 title: Sentinel — repo-driven doc-governance automation (act on PDDA findings)
-status: Active — Phase 2a complete (apply-format spike: full-file chosen, gate/allowlist/base-ref resolved; 10/10 selftest + 5/5 live both formats); Phase 2b (worktree executor) next
+status: Active — Phase 2b complete (worktree executor sentinel/apply.sh built via the XYZ marathon agy-builder, human-verified, 33/33 tests); Phase 3 (replay harness) next
 created: 2026-07-04
 updated: 2026-07-06
 owner: noel
@@ -40,7 +40,7 @@ phases: 8
 
 | What was just completed | What's next |
 |---|---|
-| **Phase 1 complete.** Shipped [`sentinel/run.sh`](../../sentinel/run.sh) — the dry-run orchestrator: kill-switch first, resolve SHA, build a size-bounded first-parent diff behind the [untrusted-input boundary](#untrusted-input-boundary) (skip on `diff_too_large`), invoke the model via the `PDDA_LLM_BIN` seam (clean self-skip when unset), parse + **validate** the [structured-output contract](#structured-output-contract) (reject malformed), and emit the recommendation to `PROJECT/PDDA-ACTIVITY.jsonl` in PDDA's finding schema. **Writes nothing to the tree.** 26/26 tests in [`test/sentinel-run.sh`](../../test/sentinel-run.sh) (valid rec, kill-switch env + `.sentinel-mode`, oversize skip, injection-doesn't-flip-mode, malformed/schema-invalid reject, unset seam, fenced-JSON extraction); real-HEAD smoke test green, tree untouched. A **Codex+agy consult** then split Phase 2 into a design spike (2a) + executor (2b) and corrected [assumption #2](#preflight-contract) (the gate). **Phase 2a complete** (2026-07-06). Spiked **both** apply formats over 5 real docs ([`sentinel/spike/apply-spike.sh`](../../sentinel/spike/apply-spike.sh)): deterministic selftest 10/10, live both formats 5/5 — a tie, so **full-file chosen** (its lossiness risk is locally guardable; search/replace kept as large-doc fallback). Gate hardened (deterministic-only, count-based, log-redirected — fixes assumption #2), allowlist realpath-hardened, base ref = reviewed `<sha>`; all [written back](#phase-2a-findings-spike-run-2026-07-06). | **[Phase 2b](#phase-2b--worktree-executor-dry-run-finalizer)** — build the worktree executor to the 2a-locked contract: worktree from the reviewed `<sha>` on a collision-safe branch, second model call renders the edit (full-file), realpath-hardened allowlist, hardened gate, emit the diff artifact, `trap`-based teardown. **Still lands nothing.** |
+| **Phase 1 complete.** Shipped [`sentinel/run.sh`](../../sentinel/run.sh) — the dry-run orchestrator: kill-switch first, resolve SHA, build a size-bounded first-parent diff behind the [untrusted-input boundary](#untrusted-input-boundary) (skip on `diff_too_large`), invoke the model via the `PDDA_LLM_BIN` seam (clean self-skip when unset), parse + **validate** the [structured-output contract](#structured-output-contract) (reject malformed), and emit the recommendation to `PROJECT/PDDA-ACTIVITY.jsonl` in PDDA's finding schema. **Writes nothing to the tree.** 26/26 tests in [`test/sentinel-run.sh`](../../test/sentinel-run.sh) (valid rec, kill-switch env + `.sentinel-mode`, oversize skip, injection-doesn't-flip-mode, malformed/schema-invalid reject, unset seam, fenced-JSON extraction); real-HEAD smoke test green, tree untouched. A **Codex+agy consult** then split Phase 2 into a design spike (2a) + executor (2b) and corrected [assumption #2](#preflight-contract) (the gate). **Phase 2a complete** (2026-07-06). Spiked **both** apply formats over 5 real docs ([`sentinel/spike/apply-spike.sh`](../../sentinel/spike/apply-spike.sh)): deterministic selftest 10/10, live both formats 5/5 — a tie, so **full-file chosen** (its lossiness risk is locally guardable; search/replace kept as large-doc fallback). Gate hardened, allowlist realpath-hardened, base ref = reviewed `<sha>`; all written back. **Phase 2b complete** (2026-07-06): [`sentinel/apply.sh`](../../sentinel/apply.sh) + [`sentinel/apply-lib.sh`](../../sentinel/apply-lib.sh) + [`test/sentinel-apply.sh`](../../test/sentinel-apply.sh) — worktree from the reviewed `<sha>` on a collision-safe branch, realpath allowlist, untrusted-diff boundary, full-file apply (search/replace fallback), hardened gate, diff artifact under gitignored `temp/`, trap teardown. **Lands nothing.** 33/33 tests. Built via the **XYZ marathon agy-builder** (4-attempt dogfood; see [`sentinel/marathon/`](../../sentinel/marathon/)) and human-verified. | **[Phase 3](#phase-3--replayeval-harness-validate-diffdoc-mapping-before-go-live-discovery)** — build + run the replay/eval harness over recent commits (discovery); the empirical go/no-go on diff→doc mapping quality is a human checkpoint before live PRs. **Still lands nothing.** |
 
 ## Table of contents
 
@@ -356,6 +356,12 @@ The `apply_full_file`, `apply_search_replace`, `hardened_gate`, and `allowlist_c
 spike are the tested building blocks 2b promotes into the worktree executor.
 
 ### Phase 2b — Worktree executor (dry-run finalizer)
+
+> **✅ Shipped.** [`sentinel/apply.sh`](../../sentinel/apply.sh) + [`sentinel/apply-lib.sh`](../../sentinel/apply-lib.sh)
+> + [`test/sentinel-apply.sh`](../../test/sentinel-apply.sh) (33/33). Built by the **XYZ marathon
+> agy-builder** (attempt 4 of a 4-run dogfood — the runtime's safety guards, cross-repo friction, and a
+> dropped/recovered operator commit all documented in [`sentinel/marathon/`](../../sentinel/marathon/)),
+> then salvaged and human-verified. `apply-lib.sh` promotes the four tested 2a primitives.
 
 Build the executor to the 2a-locked contract, still finalizing as dry-run (produce a diff artifact,
 land nothing).
