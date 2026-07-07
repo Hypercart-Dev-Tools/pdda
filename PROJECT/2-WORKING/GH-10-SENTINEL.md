@@ -1,6 +1,6 @@
 ---
 title: Sentinel — repo-driven doc-governance automation (act on PDDA findings)
-status: Active — Phase 2b complete (worktree executor sentinel/apply.sh built via the XYZ marathon agy-builder, human-verified, 33/33 tests); Phase 3 (replay harness) next
+status: Active — Phase 2b complete + Codex-review-hardened (3 blockers fixed: sha-mode lookup, target-class-aware gate, collateral-loss guard; 55/55 tests); Phase 3 (replay harness) next
 created: 2026-07-04
 updated: 2026-07-06
 owner: noel
@@ -357,11 +357,33 @@ spike are the tested building blocks 2b promotes into the worktree executor.
 
 ### Phase 2b — Worktree executor (dry-run finalizer)
 
-> **✅ Shipped.** [`sentinel/apply.sh`](../../sentinel/apply.sh) + [`sentinel/apply-lib.sh`](../../sentinel/apply-lib.sh)
-> + [`test/sentinel-apply.sh`](../../test/sentinel-apply.sh) (33/33). Built by the **XYZ marathon
-> agy-builder** (attempt 4 of a 4-run dogfood — the runtime's safety guards, cross-repo friction, and a
-> dropped/recovered operator commit all documented in [`sentinel/marathon/`](../../sentinel/marathon/)),
-> then salvaged and human-verified. `apply-lib.sh` promotes the four tested 2a primitives.
+> **✅ Shipped (post-review-hardened).** [`sentinel/apply.sh`](../../sentinel/apply.sh) +
+> [`sentinel/apply-lib.sh`](../../sentinel/apply-lib.sh) + [`test/sentinel-apply.sh`](../../test/sentinel-apply.sh)
+> (**55/55**). Built by the **XYZ marathon agy-builder** (attempt 4 of a 4-run dogfood — the runtime's
+> safety guards, cross-repo friction, and a dropped/recovered operator commit all documented in
+> [`sentinel/marathon/`](../../sentinel/marathon/)), then salvaged, **cross-model-reviewed by Codex**,
+> and blocker-hardened. `apply-lib.sh` promotes the four tested 2a primitives.
+>
+> **Codex review remediation (the marathon's 33 green tests hid three real defects — build-then-review
+> paid off):**
+> 1. **[Blocker] `<sha>` input mode was broken** — `apply.sh` searched the activity log for the full
+>    40-char oid, but `run.sh` logs the **short** sha, so SHA mode never matched. Fixed: `apply.sh`
+>    now derives the short sha the same way and matches either form; covered by a real `run.sh`→`apply.sh`
+>    integration test (+ an unknown-sha negative).
+> 2. **[Blocker] the hardened gate was a no-op for every non-`2-WORKING` target** — its checks iterate
+>    `pdda_list_working_docs()`, which returns nothing for `README.md`/`ROUTER.md`/`AGENTS.md`/etc., so
+>    those allowlisted docs passed with zero scrutiny. Fixed: the gate is now **target-class-aware and
+>    fail-closed** — `hardcoded-paths` is scoped per-file (via `PDDA_WORKING_DIR`) so it scans *any*
+>    class; the frontmatter/status-table plan-doc contract runs only for `PROJECT/2-WORKING`; a check
+>    that emits no parseable count fails the gate. Covered by root-doc pass/fail tests.
+> 3. **[Blocker] the full-file collateral-loss guard was dropped** — `apply_full_file` had only the
+>    line-delta bound, so a same-length destructive rewrite passed. Fixed: the Phase-2a lost-lines guard
+>    is restored (refuse if >`SENTINEL_APPLY_MAX_LOST_LINES` original non-blank lines vanish). Covered by
+>    a destructive-rewrite refusal test.
+>
+> **Remaining (Should, not blocking dry-run):** search/replace fallback is dead code (prompt only asks
+> for `FULL_FILE`) and untested; the diff artifact `temp/sentinel-diff-<sha>.diff` isn't tokenized so
+> same-sha concurrent runs can clobber it; the allowlist is validated once (no TOCTOU revalidation).
 
 Build the executor to the 2a-locked contract, still finalizing as dry-run (produce a diff artifact,
 land nothing).

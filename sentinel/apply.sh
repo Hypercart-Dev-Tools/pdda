@@ -17,6 +17,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 CHECK_NAME="sentinel-apply"
 SENTINEL_APPLY_MAX_LINE_DELTA="${SENTINEL_APPLY_MAX_LINE_DELTA:-40}"
+# collateral-loss cap for the full-file guard (see apply-lib.sh apply_full_file). Env-tunable like the
+# delta bound; default 3 mirrors the Phase 2a spike's measured no-collateral threshold.
+SENTINEL_APPLY_MAX_LOST_LINES="${SENTINEL_APPLY_MAX_LOST_LINES:-3}"
+export SENTINEL_APPLY_MAX_LINE_DELTA SENTINEL_APPLY_MAX_LOST_LINES
 
 # --- 1) kill-switch -----------------------------------------------------------------------------
 sentinel_is_disabled() {
@@ -94,11 +98,17 @@ if [ "$IS_JSON" -ne 0 ]; then
   SHA_ARG="$(echo "$parsed" | cut -f5)"
   SHA="$(git -C "$PDDA_REPO_ROOT" rev-parse --verify "${SHA_ARG:-HEAD}^{commit}" 2>/dev/null || git -C "$PDDA_REPO_ROOT" rev-parse --verify "HEAD^{commit}")"
 else
-  # Retrieve from activity log
+  # Retrieve from activity log.
+  # run.sh logs its recommendation message with the SHORT sha (git rev-parse --short), NOT the full
+  # 40-char OID. Searching the log for the full SHA (as this did originally) never matched a real
+  # run.sh entry — the Phase 2b <sha> input mode was silently broken (Codex Blocker 1). Compute the
+  # short sha the same way run.sh does and match the log line on EITHER the full or the short form.
+  SHORT_SHA_LOOKUP="$(git -C "$PDDA_REPO_ROOT" rev-parse --short "$SHA" 2>/dev/null || printf '%s' "$SHA")"
   parsed="$(PDDA_ACTIVITY_LOG="$PDDA_ACTIVITY_LOG" node -e '
     const fs = require("fs");
     const logPath = process.env.PDDA_ACTIVITY_LOG;
-    const sha = process.argv[1];
+    const fullSha = process.argv[1];
+    const shortSha = process.argv[2];
     if (!fs.existsSync(logPath)) {
       process.exit(2);
     }
@@ -108,7 +118,9 @@ else
       if (!lines[i]) continue;
       try {
         const entry = JSON.parse(lines[i]);
-        if (entry.check === "sentinel-run" && entry.message && entry.message.includes(sha)) {
+        const hit = entry.message &&
+          (entry.message.includes(fullSha) || (shortSha && entry.message.includes(shortSha)));
+        if (entry.check === "sentinel-run" && hit) {
           matchLine = entry.message;
           break;
         }
@@ -125,8 +137,8 @@ else
     const targets = getField(matchLine, /targets=\[([^\]]*)\]/);
     const reason = getField(matchLine, /reason="([^"]*)"/);
     const summary = "";
-    console.log(`${should_update}\t${targets}\t${summary}\t${reason}\t${sha}`);
-  ' "$SHA" 2>/dev/null || true)"
+    console.log(`${should_update}\t${targets}\t${summary}\t${reason}\t${fullSha}`);
+  ' "$SHA" "$SHORT_SHA_LOOKUP" 2>/dev/null || true)"
   
   rc=$?
   if [ "$rc" -eq 2 ]; then

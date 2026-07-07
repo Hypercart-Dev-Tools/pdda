@@ -219,7 +219,9 @@ assert_no_worktrees "Scenario 2d"
 assert_no_branches "Scenario 2d"
 
 
-# --- Scenario 4: cleanup on gate-fail, error, AND SIGINT ---
+# --- Scenario 4: cleanup on apply-guard refusal, gate-fail, error, AND SIGINT ---
+# 4a: a DESTRUCTIVE rewrite that drops the whole doc is refused by the collateral-loss guard at APPLY
+# time (Phase 2a guard restored — Codex Blocker 3), before it ever reaches the gate; worktree cleaned up.
 new_sandbox
 cat > "$REC_JSON" <<EOF
 {"should_update": true, "targets": ["PROJECT/2-WORKING/test-doc.md"], "summary": "test", "reason": "test"}
@@ -232,10 +234,45 @@ EOF
 fake_model "$(cat "$ROOT/response_bad.txt")"
 
 OUT="$(run_apply "$REC_JSON")"; RC=$?
-assert_rc "$RC" 1 "Scenario 4a: gate fail exits 1"
-assert_contains "$OUT" "Hardened gate check failed" "Scenario 4a: error message about gate failure"
+assert_rc "$RC" 1 "Scenario 4a: destructive rewrite refused exits 1"
+assert_contains "$OUT" "collateral loss" "Scenario 4a: collateral-loss guard message"
+assert_contains "$OUT" "Failed to apply full-file update" "Scenario 4a: apply refusal surfaced"
+assert_absent "$OUT" "=== BEGIN WORKTREE DIFF ===" "Scenario 4a: no diff emitted for refused apply"
 assert_no_worktrees "Scenario 4a"
 assert_no_branches "Scenario 4a"
+
+# 4c: an edit that APPLIES cleanly (within the collateral tolerance) but FAILS the hardened gate — here
+# by injecting a machine-absolute path, which the gate's hardcoded-paths check must catch. This is the
+# gate-fail-then-cleanup path (distinct from 4a's apply-time refusal).
+new_sandbox
+cat > "$REC_JSON" <<EOF
+{"should_update": true, "targets": ["PROJECT/2-WORKING/test-doc.md"], "summary": "test", "reason": "test"}
+EOF
+cat > "$ROOT/response_gatefail.txt" <<'EOF'
+===FULL_FILE===
+---
+title: Test Document
+status: Active — Phase 0 complete
+created: 2026-07-06
+updated: 2026-07-06
+owner: test
+goal: Test sentinel apply.sh
+---
+
+## Status
+
+| What was just completed | What's next |
+|---|---|
+| Initial seed | see /Users/attacker/notes.md |
+===END_FULL_FILE===
+EOF
+fake_model "$(cat "$ROOT/response_gatefail.txt")"
+
+OUT="$(run_apply "$REC_JSON")"; RC=$?
+assert_rc "$RC" 1 "Scenario 4c: gate fail exits 1"
+assert_contains "$OUT" "Hardened gate check failed" "Scenario 4c: error message about gate failure"
+assert_no_worktrees "Scenario 4c"
+assert_no_branches "Scenario 4c"
 
 # SIGINT cleanup test
 new_sandbox
@@ -331,6 +368,96 @@ assert_rc "$RC1" 0 "Scenario 5: concurrent run 1 exits 0"
 assert_rc "$RC2" 0 "Scenario 5: concurrent run 2 exits 0"
 assert_no_worktrees "Scenario 5"
 assert_no_branches "Scenario 5"
+
+# --- Scenario 6: <sha> INPUT MODE end-to-end (Codex Blocker 1) ---
+# run.sh logs its recommendation keyed by the SHORT sha; apply.sh <sha> must recover it even when
+# handed the FULL 40-char oid. Previously apply.sh searched the log for the full sha and never matched.
+new_sandbox
+RUN="$REPO_ROOT/sentinel/run.sh"
+# make a SMALL commit to review (the seed commit bundles utils/, whose diff trips run.sh's size bound)
+( cd "$SBOX" && printf 'a small tracked change\n' >> PROJECT/2-WORKING/test-doc.md && git commit -aqm "small doc change" )
+# stage 1: run.sh with a fake model that emits the JSON recommendation (logged with the short sha)
+fake_model '{"should_update":true,"mode_recommendation":"dry_run","risk":"low","category":"docs","targets":["PROJECT/2-WORKING/test-doc.md"],"reason":"keep the status doc in sync","summary":"sync status doc","confidence":0.9}'
+FULL_SHA="$(git -C "$SBOX" rev-parse HEAD)"
+SHORT_SHA="$(git -C "$SBOX" rev-parse --short HEAD)"
+( cd "$SBOX" && env PATH="$BIN_DIR:$PATH" PDDA_REPO_ROOT="$SBOX" PDDA_ACTIVITY_LOG="$ACTLOG" \
+    PDDA_LLM_BIN=fakemodel SENTINEL_ENABLED=1 bash "$RUN" "$FULL_SHA" >/dev/null 2>&1 )
+assert_contains "$(cat "$ACTLOG")" "recommendation for $SHORT_SHA" "Scenario 6: run.sh logged short-sha recommendation"
+# stage 2: apply.sh <FULL sha> must find that short-keyed recommendation and apply it
+cat > "$ROOT/response6.txt" <<'EOF'
+===FULL_FILE===
+---
+title: Test Document
+status: Active — Phase 0 complete
+created: 2026-07-06
+updated: 2026-07-06
+owner: test
+goal: Test sentinel apply.sh
+---
+
+## Status
+
+| What was just completed | What's next |
+|---|---|
+| Initial seed | Test runner (synced by sha mode) |
+===END_FULL_FILE===
+EOF
+fake_model "$(cat "$ROOT/response6.txt")"
+BEFORE_TREE="$(tree_fingerprint)"
+OUT="$(run_apply "$FULL_SHA")"; RC=$?
+AFTER_TREE="$(tree_fingerprint)"
+assert_rc "$RC" 0 "Scenario 6: apply.sh <full-sha> resolves short-keyed recommendation, exits 0"
+assert_contains "$OUT" "synced by sha mode" "Scenario 6: applied the recovered recommendation"
+assert_contains "$(cat "$ACTLOG")" "sentinel-apply-complete" "Scenario 6: logged apply-complete"
+[ "$BEFORE_TREE" = "$AFTER_TREE" ] && pass "Scenario 6: primary tree untouched" || fail "Scenario 6: primary tree changed"
+assert_no_worktrees "Scenario 6"
+assert_no_branches "Scenario 6"
+
+# also assert a genuinely-unknown sha still fails cleanly (no false match)
+OUT="$(run_apply "0000000000000000000000000000000000000000")"; RC=$?
+assert_rc "$RC" 1 "Scenario 6: unknown sha rejected exits 1"
+
+# --- Scenario 7: ROOT-DOC target — gate is NOT a no-op (Codex Blocker 2) ---
+# README.md is allowlisted but lives OUTSIDE PROJECT/2-WORKING, so the old gate scanned nothing and
+# passed any edit. The class-aware gate must still run hardcoded-paths on it.
+new_sandbox
+( cd "$SBOX" && printf '# Sandbox Repo\n\nGovernance readme for the sentinel apply test.\nSee the docs under PROJECT/ for details.\nNothing machine-specific here.\n' > README.md && git add -A && git commit -qm "add README" )
+cat > "$REC_JSON" <<EOF
+{"should_update": true, "targets": ["README.md"], "summary": "test", "reason": "test"}
+EOF
+# 7a: a CLEAN README edit passes the gate
+cat > "$ROOT/response7ok.txt" <<'EOF'
+===FULL_FILE===
+# Sandbox Repo
+
+Governance readme for the sentinel apply test.
+See the docs under PROJECT/ for details.
+Nothing machine-specific here. (reviewed)
+===END_FULL_FILE===
+EOF
+fake_model "$(cat "$ROOT/response7ok.txt")"
+OUT="$(run_apply "$REC_JSON")"; RC=$?
+assert_rc "$RC" 0 "Scenario 7a: clean root-doc edit passes gate, exits 0"
+assert_contains "$OUT" "=== BEGIN WORKTREE DIFF ===" "Scenario 7a: emits diff for clean root-doc edit"
+assert_no_worktrees "Scenario 7a"
+assert_no_branches "Scenario 7a"
+
+# 7b: a README edit injecting a machine-absolute path MUST be caught by the gate (proves non-vacuous)
+cat > "$ROOT/response7bad.txt" <<'EOF'
+===FULL_FILE===
+# Sandbox Repo
+
+Governance readme for the sentinel apply test.
+See the docs under PROJECT/ for details.
+Install lives at /Users/attacker/pdda per local setup.
+===END_FULL_FILE===
+EOF
+fake_model "$(cat "$ROOT/response7bad.txt")"
+OUT="$(run_apply "$REC_JSON")"; RC=$?
+assert_rc "$RC" 1 "Scenario 7b: root-doc with hardcoded path fails gate, exits 1"
+assert_contains "$OUT" "Hardened gate check failed" "Scenario 7b: gate catches hardcoded path in root doc"
+assert_no_worktrees "Scenario 7b"
+assert_no_branches "Scenario 7b"
 
 printf '\n=== sentinel-apply: %d passed, %d failed ===\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
