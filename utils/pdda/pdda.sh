@@ -171,6 +171,59 @@ check_status_table() {
 }
 
 # ------------------------------------------------------------------------------------------------
+# B2. quad-concepts (OPT-IN) — a "## Quad Concepts" section of 1..4 bullets for glance orientation.
+# Structure-only by design: it checks the section EXISTS and has 1..4 bullets. Whether the bullets are
+# good pain->fix concepts is a judgment left to the LLM readiness rubric (pdda-doc-ready.sh), not a
+# brittle regex. Runs over the quad scope (2-WORKING + 1-INBOX/GH-* + 3-COMPLETED); a doc opts out with
+# `quad_exempt: true`. Joins `run` only when the .pdda-quad / PDDA_QUAD lever is enabled (see cmd_run).
+# ------------------------------------------------------------------------------------------------
+check_quad_concepts() {
+  pdda_reset_counts
+  local CHECK_NAME="pdda-check-quad-concepts" rc=0
+  local file n
+
+  while IFS= read -r file; do
+    # per-doc escape hatch (mirrors roadmap_exempt)
+    pdda_frontmatter_true "$file" "quad_exempt" && continue
+
+    # Count the TOP-LEVEL, non-empty bullets of the FIRST "## Quad Concepts" section. Boundaries: from
+    # the header until the next h1/h2 heading, OR the first blank line AFTER a bullet has appeared (blank
+    # lines / HTML comments BEFORE the first bullet are tolerated). Fenced code blocks are data and are
+    # skipped entirely (a doc may show an EXAMPLE section in a ``` block). Indented/nested bullets and
+    # empty bullets ('- ' with no text) do not count; a wrong bullet char is lenient ('-' or '*'). CRLF
+    # is normalized. Only the first section counts, so duplicate sections can't sum. Prints -1 if absent.
+    n="$(awk '
+      { sub(/\r$/, "") }
+      done { next }
+      /^```/ { in_f = !in_f; next }
+      in_f { next }
+      !seen && /^##[ \t]+Quad[ \t]+Concepts[ \t]*$/ { in_q = 1; seen = 1; started = 0; next }
+      in_q && /^#{1,2}[ \t]/            { in_q = 0; done = 1; next }
+      in_q && started && /^[ \t]*$/     { in_q = 0; done = 1; next }
+      in_q && /^[-*][ \t]+[^ \t]/       { count += 1; started = 1; next }
+      END { if (!seen) print -1; else print count + 0 }
+    ' "$file")"
+    # awk always prints a clean integer or -1; guard against an empty capture (unreadable file) so the
+    # numeric comparisons below never see an empty operand.
+    case "$n" in ''|*[!0-9-]*) n="-1" ;; esac
+
+    if [ "$n" = "-1" ]; then
+      pdda_record_finding error "$CHECK_NAME" "$file" 1 "missing '## Quad Concepts' section (add 1-4 pain->fix bullets, or set quad_exempt: true)" "add-quad-concepts"
+      rc=1
+    elif [ "$n" -eq 0 ]; then
+      pdda_record_finding error "$CHECK_NAME" "$file" 1 "'## Quad Concepts' section has no bullets (need 1-4)" "fill-quad-concepts"
+      rc=1
+    elif [ "$n" -gt 4 ]; then
+      pdda_record_finding error "$CHECK_NAME" "$file" 1 "'## Quad Concepts' has $n bullets (max 4 — keep it glanceable)" "trim-quad-concepts"
+      rc=1
+    fi
+  done < <(pdda_list_quad_docs)
+
+  pdda_emit_summary "$CHECK_NAME" "$rc"
+  return "$(pdda_gated_exit "$rc")"
+}
+
+# ------------------------------------------------------------------------------------------------
 # C. hardcoded-paths
 # ------------------------------------------------------------------------------------------------
 check_hardcoded_paths() {
@@ -759,7 +812,15 @@ cmd_run() {
   runner_say "PDDA run starting — mode: $MODE_NOTE"
   pdda_log_activity info "pdda-run" "$PDDA_REPO_ROOT" 0 "starting deterministic PDDA run (mode=$PDDA_MODE)" "start"
 
-  for entry in $PDDA_DETERMINISTIC_CHECKS; do
+  # Quad Concepts is opt-in and orthogonal to the mode: include its check in the suite only when the
+  # .pdda-quad / PDDA_QUAD lever is enabled, so a default run's output is unchanged when it's off.
+  local CHECKS="$PDDA_DETERMINISTIC_CHECKS"
+  if quad_is_enabled; then
+    CHECKS="$CHECKS
+pdda-check-quad-concepts:check_quad_concepts"
+  fi
+
+  for entry in $CHECKS; do
     label="${entry%%:*}"
     fn="${entry##*:}"
     runner_say ""
@@ -816,6 +877,7 @@ Commands:
   run                aggregate: all deterministic checks, then the LLM readiness review (default)
   frontmatter        active-doc frontmatter contract
   status-table       exact two-column "## Status" table
+  quad-concepts      opt-in: a "## Quad Concepts" section of 1-4 bullets (lever: .pdda-quad / PDDA_QUAD)
   hardcoded-paths    no machine-specific absolute paths in working docs
   roadmap            no execution detail leaks INTO ROADMAP.md
   roadmap-coverage   nothing active goes MISSING from ROADMAP.md
@@ -839,6 +901,7 @@ case "$cmd" in
   run)              cmd_run; exit "$?" ;;
   frontmatter)      check_frontmatter; exit "$?" ;;
   status-table)     check_status_table; exit "$?" ;;
+  quad-concepts)    check_quad_concepts; exit "$?" ;;
   hardcoded-paths)  check_hardcoded_paths; exit "$?" ;;
   roadmap)          check_roadmap; exit "$?" ;;
   roadmap-coverage) check_roadmap_coverage; exit "$?" ;;

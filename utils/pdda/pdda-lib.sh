@@ -194,6 +194,40 @@ pdda_list_inbox_issue_docs() {
   find "$PDDA_INBOX_DIR" -type f -name 'GH-*.md' ! -name 'blank.md' | LC_ALL=C sort
 }
 
+# Quad Concepts scope: active plans (2-WORKING), issue intake (1-INBOX/GH-*), and archived plans
+# (3-COMPLETED — kept glanceable for cold-start recall, per the project-memory-layer reframing).
+# Excludes 4-MISC. Honors PDDA_ONLY_FILE (the single-file lint path) exactly like the lists above.
+pdda_list_quad_docs() {
+  if [ -n "${PDDA_ONLY_FILE:-}" ]; then
+    case "$PDDA_ONLY_FILE" in
+      */blank.md) : ;;   # scaffold — never in scope (matches the bulk find's blank.md exclusion)
+      "$PDDA_WORKING_DIR"/*.md|"$PDDA_INBOX_DIR"/GH-*.md|"$PDDA_COMPLETED_DIR"/*.md)
+        [ -f "$PDDA_ONLY_FILE" ] && printf '%s\n' "$PDDA_ONLY_FILE" ;;
+    esac
+    return
+  fi
+  {
+    find "$PDDA_WORKING_DIR"   -type f -name '*.md'    ! -name 'blank.md' 2>/dev/null
+    find "$PDDA_INBOX_DIR"     -type f -name 'GH-*.md' ! -name 'blank.md' 2>/dev/null
+    find "$PDDA_COMPLETED_DIR" -type f -name '*.md'    ! -name 'blank.md' 2>/dev/null
+  } | LC_ALL=C sort
+}
+
+# Quad Concepts opt-in lever — ORTHOGONAL to PDDA_MODE (observe/light/full). The lever decides whether
+# the quad-concepts check joins `pdda.sh run`; the mode still decides report-only vs blocking. Resolution
+# mirrors the .sentinel-mode resolver: env PDDA_QUAD -> first non-comment line of <repo>/.pdda-quad ->
+# default OFF. Any of 1/on/true/enabled/yes (case-insensitive) enables; everything else stays off.
+quad_is_enabled() {
+  local v="${PDDA_QUAD:-}"
+  if [ -z "$v" ] && [ -f "$PDDA_REPO_ROOT/.pdda-quad" ]; then
+    v="$(awk 'NF && $0 !~ /^[[:space:]]*#/ { gsub(/[[:space:]]/,""); print; exit }' "$PDDA_REPO_ROOT/.pdda-quad" 2>/dev/null)"
+  fi
+  case "$(printf '%s' "$v" | tr '[:upper:]' '[:lower:]')" in
+    1|on|true|enabled|yes) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 pdda_frontmatter_lines() {
   awk '
     NR == 1 { sub(/^\357\273\277/, "") }                 # strip a UTF-8 BOM if present

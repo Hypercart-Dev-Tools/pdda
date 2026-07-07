@@ -2,7 +2,7 @@
 title: PDDA Standalone Roadmap
 status: Active
 created: 2026-06-24
-updated: 2026-07-06
+updated: 2026-07-07
 branch: main
 goal: >
   Canonical pointer ledger for the standalone PDDA installer repo. This file tracks the repo's
@@ -52,6 +52,12 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
+- **GH-12 — Quad Concepts mode** (2026-07-07) - opt-in glance layer: tracked plan docs carry a
+  `## Quad Concepts` section of 1–4 `pain → fix` bullets after `## Status`, so a cold-start reader gets
+  5-second orientation and an operator can see if a plan covers the real pains. Orthogonal opt-in lever
+  (`.pdda-quad`, off by default), structure-only deterministic check + warn-only LLM rubric. Synthesizes
+  a GLM 5.2 pass. Phase 1 (check + lever) in progress. Issue
+  [#12](https://github.com/Hypercart-Dev-Tools/pdda/issues/12). -> [PROJECT/2-WORKING/GH-12-QUAD-CONCEPTS-MODE.md](PROJECT/2-WORKING/GH-12-QUAD-CONCEPTS-MODE.md)
 - **GH-10 — Sentinel: repo-driven doc-governance automation** (2026-07-04) - the act-on-it layer for
   PDDA: on merge to `main`, build context from the diff, ask the model (via `PDDA_LLM_BIN`) whether
   governance docs should change, apply edits inside a git worktree on an allowlisted path set, gate on
