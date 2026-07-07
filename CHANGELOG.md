@@ -1,5 +1,25 @@
 # CHANGELOG.md
 
+## 2026-07-07
+
+### Quad Concepts — an opt-in ≤4 pain→fix glance layer for plan docs (GH-12)
+
+A new **opt-in** convention (off by default): when the `.pdda-quad` / `PDDA_QUAD` lever is on, tracked
+plan docs carry a `## Quad Concepts` section of 1–4 `pain → fix` bullets so a human or cold-start agent
+gets a 5-second orientation and an operator can see whether a plan covers the real pains. The lever is
+**orthogonal** to the enforcement mode — the lever decides whether `pdda.sh quad-concepts` joins
+`pdda.sh run`; `observe/light/full` still decides report-vs-block. Synthesizes a GLM 5.2 design pass with
+a Codex + agy consult that hardened the parser.
+
+- **Deterministic check** `pdda.sh quad-concepts` (structure-only): first `## Quad Concepts` section,
+  1–4 top-level non-empty `-`/`*` bullets; skips fenced code, indented/nested and empty bullets;
+  normalizes CRLF; stops on the next h1/h2 or a blank line after a bullet; duplicate sections don't sum.
+  Scope: `2-WORKING` + `1-INBOX/GH-*` + `3-COMPLETED`; per-doc opt-out `quad_exempt: true`.
+- **Lever + install:** `quad_is_enabled()` resolves `PDDA_QUAD` → `.pdda-quad` file → off; `install.sh`
+  gains `--quad` and seeds a `.pdda-quad` (off by default). Contract documented in `PROJECT/PDDA.md`.
+- **Tests:** `test/pdda-quad-concepts.sh` (34/34). Default `pdda.sh run` output is unchanged when off.
+- Follow-up (Phase 3): a warn-only readiness rubric in `pdda-doc-ready.sh` for concept *quality*/staleness.
+
 ## 2026-07-06
 
 ### Reframe PDDA as a de facto project memory layer (contract + LLM nudges)

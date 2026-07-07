@@ -32,6 +32,7 @@ WITH_STARTUP_DOCS=0
 MIGRATE=1
 REGISTER=1
 MODE="observe"
+QUAD="off"
 TARGET=""
 
 # Per-user, per-device install registry — records WHERE each copy was installed and on which source
@@ -71,13 +72,16 @@ Options:
                          override with PDDA_REGISTRY). The registry is machine-local and never committed.
                          Also skips the multi-device git-pulse projection (see below).
   --mode <m>             Initial .pdda-mode: observe (default) | light | full.
+  --quad                 Enable the opt-in Quad Concepts layer (seeds .pdda-quad=on). Off by default;
+                         orthogonal to --mode. Requires a "## Quad Concepts" section (1-4 bullets) on
+                         plan docs; see PROJECT/PDDA.md. Opt a doc out with quad_exempt: true.
   -h, --help             This message.
 
 What gets installed (zero state):
   utils/pdda/{pdda.sh,pdda-lib.sh,pdda-doc-ready.sh,pdda-catchup.sh,pdda-gh-refresh.sh}   (runtime, refreshed)
   PROJECT/PDDA.md                                            (the contract, refreshed)
   PROJECT/{1-INBOX,2-WORKING,3-COMPLETED,4-MISC}/blank.md    (lifecycle buckets)
-  ROADMAP.md CHANGELOG.md PROJECT/PDDA-ACTIVITY.jsonl .pdda-mode   (blank seeds, create-only)
+  ROADMAP.md CHANGELOG.md PROJECT/PDDA-ACTIVITY.jsonl .pdda-mode .pdda-quad   (blank seeds, create-only)
   .gitignore += PROJECT/PDDA-ACTIVITY.jsonl .pdda-gh-state.tsv     (churning runtime state)
 
 It also records the install in a per-user, machine-local registry (~/.config/pdda/registry.tsv) so
@@ -101,6 +105,7 @@ while [ "$#" -gt 0 ]; do
     --no-migrate) MIGRATE=0; shift ;;
     --no-register) REGISTER=0; shift ;;
     --mode) MODE="${2:-}"; shift 2 ;;
+    --quad) QUAD="on"; shift ;;
     -h|--help) usage; exit 0 ;;
     -*) printf 'install.sh: unknown option %q\n\n' "$1" >&2; usage >&2; exit 2 ;;
     *) if [ -z "$TARGET" ]; then TARGET="$1"; shift; else printf 'install.sh: unexpected argument %q\n' "$1" >&2; exit 2; fi ;;
@@ -537,6 +542,14 @@ seed_file ".pdda-mode" <<MODE
 $MODE
 MODE
 
+# Quad Concepts opt-in lever (orthogonal to .pdda-mode). Off unless --quad was passed.
+seed_file ".pdda-quad" <<QUAD
+# Quad Concepts opt-in lever (orthogonal to .pdda-mode). Set to 'on' to require a
+# '## Quad Concepts' section (1-4 pain->fix bullets) on plan docs. See PROJECT/PDDA.md.
+# Per-doc opt-out: quad_exempt: true. Env override: PDDA_QUAD=1.
+$QUAD
+QUAD
+
 say ""
 say "Registry:"
 register_install
@@ -552,6 +565,7 @@ esac
 if ( cd "$TARGET" && PDDA_MODE="$MODE" ./utils/pdda/pdda.sh run ); then
   say ""
   say "PDDA installed. Mode: $MODE ($MODE_BLURB)."
+  [ "$QUAD" = "on" ] && say "Quad Concepts: ON — plan docs need a '## Quad Concepts' section (1-4 bullets); opt out with quad_exempt: true."
   say "Next: read PROJECT/PDDA.md, then start a doc in PROJECT/2-WORKING and point ROADMAP.md at it."
 else
   say ""

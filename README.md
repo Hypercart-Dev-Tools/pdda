@@ -36,6 +36,7 @@ Installer options:
 --force                overwrite existing seed files (your real PROJECT/** docs are never touched)
 --with-startup-docs    also install adapted ROUTER.md + AGENTS.md + GUIDING-PRINCIPLES.md (agent read-order scaffold)
 --mode observe|light|full   initial enforcement mode (default: observe)
+--quad                      enable the opt-in Quad Concepts layer (off by default; see below)
 -h, --help
 ```
 
@@ -78,6 +79,22 @@ The workflow PDDA expects:
 Set it in `.pdda-mode` (or the `PDDA_MODE` env var). No mode ever mutates your tree.
 
 Wire `./utils/pdda/pdda.sh run` into a pre-commit hook, CI, or an hourly cron once you're ready.
+
+### Quad Concepts (opt-in glance layer)
+
+An **orthogonal**, opt-in convention (off by default). The `## Status` table says *where* the work is;
+Quad Concepts says *what* it is — a 5-second read of the core problems a plan tackles and how:
+
+```md
+## Quad Concepts
+- <pain the doc addresses> → <how it addresses it>
+```
+
+Enable it with `--quad` at install (or set `.pdda-quad` to `on` / `PDDA_QUAD=1`). When on, plan docs in
+`2-WORKING`, `1-INBOX/GH-*`, and `3-COMPLETED` must carry a `## Quad Concepts` section of **1–4 bullets**;
+`pdda.sh quad-concepts` enforces the shape (structure-only), and the enforcement mode above still decides
+report-vs-block. Opt a doc out with `quad_exempt: true`. It's independent of the mode ladder — you can
+trial it in `observe` first.
 
 ---
 

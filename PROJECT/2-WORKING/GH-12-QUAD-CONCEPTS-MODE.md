@@ -1,6 +1,6 @@
 ---
 title: Quad Concepts mode — an opt-in ≤4 pain→fix glance layer atop plan docs
-status: Active — Phase 1 in progress (deterministic check + lever)
+status: Active — Phase 1 & 2 complete (check+lever consult-hardened, 34/34; contract/install/docs wired); Phase 3 (LLM rubric) next
 created: 2026-07-07
 updated: 2026-07-07
 owner: noel
@@ -31,7 +31,7 @@ that closes that gap without adding search machinery or forcing hard enforcement
 
 | What was just completed | What's next |
 |---|---|
-| Synthesized the GLM 5.2 "Quad Concepts" pass with the original design; filed issue [#12](https://github.com/Hypercart-Dev-Tools/pdda/issues/12); promoted this plan doc to `2-WORKING`. Design locked (pain→fix content, 2-WORKING+1-INBOX+3-COMPLETED scope, orthogonal `.pdda-quad` lever, structure-only check + LLM nudge). | Build Phase 1: `check_quad_concepts()` + the `.pdda-quad`/`PDDA_QUAD` lever + `pdda_list_quad_docs()` + dispatch + conditional inclusion in `run`, with `test/pdda-quad-concepts.sh`. |
+| **Phase 1 & 2 shipped.** Phase 1: `check_quad_concepts()` + `.pdda-quad`/`PDDA_QUAD` lever + `pdda_list_quad_docs()` + dispatch + conditional `run` inclusion; hardened via a Codex+agy consult (fenced code, CRLF, h1/h2-only termination, blank-after-bullets, top-level non-empty bullets, first-section-only); `test/pdda-quad-concepts.sh` 34/34. Phase 2: contract clause in `PROJECT/PDDA.md`, `install.sh --quad` + `.pdda-quad` seed, README + CHANGELOG. Both committed + pushed. | Phase 3: the warn-only readiness rubric in `pdda-doc-ready.sh` (concept quality/staleness). |
 
 ## Quad Concepts
 - Dense plan docs give no 5-second orientation → a `## Quad Concepts` section (1–4 bullets) right after `## Status`
@@ -73,6 +73,10 @@ that closes that gap without adding search machinery or forcing hard enforcement
 
 ## Phase 1 — deterministic check + lever
 
+> **✅ Shipped (consult-hardened).** `test/pdda-quad-concepts.sh` 34/34. Parser hardened after a Codex+agy
+> consult: skips fenced code, normalizes CRLF, stops on the next h1/h2 (not h3) or a blank line after a
+> bullet, counts only top-level non-empty bullets, reads only the first section.
+
 - `pdda_list_quad_docs()` in `pdda-lib.sh`: 2-WORKING + 1-INBOX(`GH-*`) + 3-COMPLETED, honoring
   `PDDA_ONLY_FILE` (single-file lint path), excluding `blank.md`.
 - `quad_is_enabled()` (env `PDDA_QUAD` → first non-comment line of `.pdda-quad` → default off), mirroring
@@ -97,10 +101,16 @@ output and exit code unchanged. Shippable alone.
 
 ## Phase 2 — contract + surfaces
 
-Document the convention where PDDA's contract lives and wire the installer: a `## Quad Concepts` clause
-in `PROJECT/PDDA.md`, the seed template (`## Quad Concepts` right after `## Status`, with the
-`quad_exempt` note), `install.sh` (seed a `.pdda-quad` off-by-default + usage/blurb text), README
-section, CHANGELOG entry, and the install manifest. Lockstep `install.sh` ↔ `utils/PDDA-INSTALL.md`.
+> **✅ Shipped.** Contract clause + `pdda.sh quad-concepts` description in `PROJECT/PDDA.md`; the
+> `## Quad Concepts` md example (right after `## Status`) documents the seed shape; `install.sh` gains
+> `--quad` and seeds a `.pdda-quad` (off by default, verified by a real `--quad` install smoke test);
+> README "Quad Concepts" subsection + `--quad` option; CHANGELOG 2026-07-07 entry. No manifest change —
+> `.pdda-quad` is a synthesized seed (like `.pdda-mode`), not part of `pdda-sync-manifest.conf`.
+
+Documented the convention where PDDA's contract lives and wired the installer: a `## Quad Concepts` clause
+in `PROJECT/PDDA.md`, the `## Quad Concepts` example (right after `## Status`, with the `quad_exempt`
+note), `install.sh` (`--quad` flag + a `.pdda-quad` off-by-default seed + usage/blurb), README section,
+and CHANGELOG entry.
 
 ## Phase 3 — LLM readiness rubric
 

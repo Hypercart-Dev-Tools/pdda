@@ -76,6 +76,30 @@ Recommended fields when relevant:
 - `effort`, `complexity`, `risk`, `phases` — triage ratings; **required for medium-large work** (see
   [Triage ratings for medium-large work](#triage-ratings-for-medium-large-work))
 
+## Quad Concepts (opt-in)
+
+An **opt-in** glance layer, **off by default**. The `## Status` table says *where* the work is; Quad
+Concepts says *what* it is — a 5-second read of the core problems a plan tackles and how, so an operator
+can see whether the real pain points are covered. (Distinct from `context_tags`: those are for search;
+this is for glance.)
+
+When enabled system-wide via the `.pdda-quad` lever (or the `PDDA_QUAD` env var — **orthogonal** to the
+enforcement mode), tracked plan docs must carry a `## Quad Concepts` section of **1–4 bullets**,
+conventionally right after `## Status`:
+
+```md
+## Quad Concepts
+- <pain the doc addresses> → <how it addresses it>
+```
+
+- **Shape (deterministic):** 1–4 **top-level, non-empty** `-`/`*` bullets in the first `## Quad Concepts`
+  section. `pain → fix` phrasing is the convention (nudged by the LLM readiness rubric), not a hard regex.
+- **Scope:** `PROJECT/2-WORKING`, `PROJECT/1-INBOX/GH-*.md`, and `PROJECT/3-COMPLETED` (the last keeps a
+  glanceable summary for cold-start recall). `PROJECT/4-MISC` is out.
+- **Enable:** set `.pdda-quad` to `on` (or `PDDA_QUAD=1`). The enforcement mode still governs whether a
+  missing/malformed section merely reports or blocks. **Opt a doc out** with `quad_exempt: true`.
+- Enforced by `pdda.sh quad-concepts` (deterministic, structure-only) plus a warn-only readiness rubric.
+
 ## Triage ratings for medium-large work
 
 So automation can pick *which* task to pursue without re-reading every plan, every newly recorded
@@ -297,6 +321,21 @@ Minimum behavior:
 - fail if the `## Status` section is missing
 - fail if the table headers are not exactly `What was just completed` and `What's next`
 - fail if either first-row cell is blank
+
+#### B2. `pdda.sh quad-concepts` (opt-in)
+
+Purpose:
+- when the `.pdda-quad` / `PDDA_QUAD` lever is on, verify each in-scope plan doc carries a
+  `## Quad Concepts` section of 1–4 bullets (see [Quad Concepts (opt-in)](#quad-concepts-opt-in))
+
+Minimum behavior:
+- scope: `PROJECT/2-WORKING` + `PROJECT/1-INBOX/GH-*.md` + `PROJECT/3-COMPLETED`; skip `quad_exempt: true`
+- parse the first `## Quad Concepts` section; count top-level, non-empty `-`/`*` bullets (skip fenced
+  code, indented/nested and empty bullets; stop on the next h1/h2 or a blank line after a bullet)
+- fail if the section is missing, has 0 bullets, or has more than 4
+- **structure-only** — bullet *quality* (are they real `pain → fix` concepts?) is a warn-only job for
+  the LLM readiness rubric, not this deterministic check
+- runs standalone always; joins `pdda.sh run` only when the lever is enabled (orthogonal to the mode)
 
 #### C. `pdda.sh frontmatter`
 
