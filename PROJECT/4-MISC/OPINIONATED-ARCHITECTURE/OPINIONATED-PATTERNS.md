@@ -2,7 +2,7 @@
 title: Opinionated architectural philosophy — the major camps
 status: Active (operational — governs agent behavior; source for AGENTS.md extraction)
 created: 2026-07-03
-updated: 2026-07-03
+updated: 2026-07-07
 owner: noel
 doc_type: guiding-principles
 goal: >
@@ -34,8 +34,44 @@ directions, resolve top-down:
 Simplicity is the default and governs unless a principle higher in this stack has a specific reason to
 override it. This stack is the only precedence; extract it alongside whichever camps you pull.
 
+## Non-negotiable quality goals — apply regardless of camp
+
+These five qualities aren't a camp; they're the floor every camp stands on. No camp rejects any of
+them outright, but each camp weights them differently — and the six camps above already resolve four
+of the five for free. Extract this section into `AGENTS.md` **every time**, regardless of which
+camp(s) you also pull.
+
+- **Maintainable** — the blend's center of gravity. Deep modules, one owner per decision, and
+  diff-scoping all serve this directly, and every camp's default posture points the same way. Zero
+  tension.
+- **Durable** — served by "prefer reversible" and "a deferred decision names its trigger" (nothing
+  rots silently), plus contract-honesty at trust boundaries. Compatible with every camp above.
+- **Secure** — protected by construction: trust boundaries are essential complexity, not an optional
+  check, and seams belong at trust boundaries first. Compatible by design with every camp.
+- **Performant** — conditionally compatible. Default posture is deferred-with-trigger ("no profiler →
+  name the assumption, not a guarantee" — see Camp 3), which is fine for ordinary workloads but the
+  wrong default for hard-real-time or latency-SLA domains, where performance is a day-one requirement,
+  not a mechanism to defer.
+- **Portable** — the one real tension. "Reach for the native platform feature" (Camp 5) and "call the
+  concrete thing directly" actively trade portability away for simplicity, and that's often the right
+  trade. Portability isn't free; it's an abstraction, and abstractions need a second real customer.
+  Resolve it with the same test Precedence rung 3 already uses: introduce the portable seam only when
+  a second platform or backend is a real, contracted case — not a speculative "we might migrate
+  someday" (name it and its trigger if you're deferring it; that's YAGNI, not neglect).
+
+**Use this as your GUIDING-PRINCIPLES (always include, every camp):**
+Every project is built to be Maintainable, Durable, Secure, Performant, and Portable — but not all
+five are free. Maintainable, Durable, and Secure are the default posture of every camp above; hold the
+line on them regardless of which camp you extract. Performant is deferred-with-trigger by default
+(measure before you claim fast or slow) unless the domain has a hard real-time or latency-SLA
+requirement, in which case it's a day-one constraint, not something you defer. Portable is the one
+goal that must be earned, not assumed: build the concrete, native, single-platform thing by default,
+and only pay for a portable seam when a second real platform or backend is an actual contracted case —
+never on "we might need it someday."
+
 ## Table of contents
 
+- [Non-negotiable quality goals — apply regardless of camp](#non-negotiable-quality-goals--apply-regardless-of-camp)
 1. [The Structuralists (SOLID / Clean Architecture)](#1-the-structuralists-the-solid--clean-architecture-camp)
 2. [The Functional Purists (Data Transformation)](#2-the-functional-purists-the-data-transformation-camp)
 3. [The Data-Oriented Designers (Hardware First)](#3-the-data-oriented-designers-the-hardware-first-camp)
@@ -62,6 +98,22 @@ perfectly and remain completely independent of frameworks, databases, or UI.
 **Use this as your GUIDING-PRINCIPLES:**
 Keep boundaries where change happens (Structure). Core business logic must not import frameworks, HTTP, or SQL — those are details that depend on the domain, never the reverse. Introduce an abstraction only at a seam that has actually moved twice or is contractually likely to; a boundary with one implementation is speculation, not architecture. When a module crosses ~4 states, model it as an explicit FSM rather than scattered booleans. Let structure grow into the codebase as it earns its keep, not up front.
 
+### Daily playbook
+
+Do
+- **Draw the dependency arrow domain-inward.** Core imports nothing from framework, HTTP, or SQL — always the reverse.
+- **Abstract at seams that moved twice,** not once, not zero. Two real implementations, then the interface.
+- **Model >4 states as an explicit FSM,** not scattered booleans that drift out of sync.
+- **Name modules after the domain,** not the pattern — `Invoicing`, not `InvoiceServiceFactoryImpl`.
+- **Let structure accrete.** Add the boundary when a change crosses it painfully, not up front.
+
+Don't
+- **Build hexagonal ceremony for a CRUD app** — ports and adapters for one adapter is Architecture Astronautics.
+- **Wrap every library "in case we swap it."** You won't, and the wrapper leaks the library anyway.
+- **Inherit three levels deep.** Composition debugs; deep hierarchies just relocate the mess.
+- **DDD a domain you don't understand yet.** Ubiquitous language before the language exists is fiction.
+- **Mistake folder structure for architecture.** Clean directories over tangled dependencies is a painted-over crack.
+
 ## 2. The Functional Purists (The "Data Transformation" Camp)
 
 This camp believes that the root of all software evil is *mutable state*. They view software not as
@@ -80,6 +132,22 @@ data transformations.
 **Use this as your GUIDING-PRINCIPLES:**
 Discipline state, don't scatter it (Functional). Push mutable state to the edges — the database, the UI, the boundary — and keep the core a set of transformations that give the same output for the same input. Maintain a single write path per piece of state; concurrent writers through one door, never many. Prefer append-only event logs over in-place mutation wherever the history has value or the audit matters. Immutability is a tool for predictability here, not a religion — mutate freely inside a function whose outputs are pure.
 
+### Daily playbook
+
+Do
+- **Push state to the edges** — DB, UI, boundary. Keep the core same-input-same-output.
+- **One write path per piece of state.** Concurrent writers through one door, never many.
+- **Prefer append-only logs** wherever history or audit has value.
+- **Return new values; don't mutate arguments.** A function that edits its input is a landmine for the next caller.
+- **Isolate side effects at the end of the pipe,** so the transforms stay testable in memory.
+
+Don't
+- **Immutability as religion.** Mutate freely inside a function whose outputs are pure — copying 100k rows to feel principled is waste.
+- **Rebuild CRUD as event sourcing** because it's elegant. Most forms are a row update, not a ledger.
+- **Thread state through 12 params** to avoid a struct. Purity isn't parameter soup.
+- **Hide I/O in a "pure" function.** A logger or clock call means it lies about being pure.
+- **Copy a 16GB dump to stay immutable.** Stream it; principle doesn't override the profiler.
+
 ## 3. The Data-Oriented Designers (The "Hardware First" Camp)
 
 Originating largely from the video game industry but spreading to high-performance computing, this
@@ -97,6 +165,22 @@ hardware (CPUs and memory) actually works.
 
 **Use this as your GUIDING-PRINCIPLES:**
 Measure before you optimize for hardware (Data-Oriented). Do not assert "fast enough" or "too slow" without a profiler; name the assumption and its trigger to revisit instead (assumes <1k rows, revisit if the table grows). Default to the readable data shape and bounded queries; reach for cache-friendly layouts, batching, or SoA only on a path proven hot by measurement. Ninety-five percent of the time the bottleneck is a query or the network, not a cache miss — fix that first. When you do optimize the hot path, leave the ceiling and the upgrade path in a comment.
+
+### Daily playbook
+
+Do
+- **Profile before you claim slow or fast.** Name the assumption and its revisit trigger: `assumes <1k rows`.
+- **Default to the readable shape** and bounded queries; optimize layout only on a proven-hot path.
+- **Fix the query and the network first** — that's the bottleneck 95% of the time, not cache misses.
+- **Batch the N+1** before reaching for anything exotic. One query beats a thousand.
+- **Leave the ceiling and upgrade path in a comment** when you do optimize the hot path.
+
+Don't
+- **SoA/ECS a business app** where the wait is a DB round-trip, not a CPU cache miss.
+- **Assert "fast enough" blind.** No profiler, no claim.
+- **Micro-optimize the cold path** — hand-tuning code that runs once a day is readability sacrificed for nothing.
+- **Cache to paper over an unbounded query.** Fix the query; a cache on a bug is two bugs.
+- **Chase cache locality before you've measured a cache problem.** SIMD envy isn't a bottleneck.
 
 ## 4. The Reactive Decouplers (The "Async Messaging" Camp)
 
@@ -117,6 +201,22 @@ centers on asynchronous communication and eventual consistency.
 **Use this as your GUIDING-PRINCIPLES:**
 Async only where decoupling earns its cost (Reactive). Prefer a synchronous, in-process call by default — it is trivial to trace, debug, and reason about. Introduce events, queues, or a service boundary only when two parts genuinely must scale, deploy, or fail independently; splitting for its own sake buys a distributed monolith that is a nightmare to debug. When you do go async, make the flow traceable end-to-end and treat eventual consistency as a deliberate cost you are paying, not a side effect. One event-sourced log with a single writer beats five chatty services exchanging state.
 
+### Daily playbook
+
+Do
+- **Default to synchronous, in-process.** Trivial to trace, debug, and reason about.
+- **Split only for independent scale, deploy, or failure** — a real reason, not aesthetics.
+- **Make async flows traceable end-to-end** — correlation IDs before the first event ships.
+- **Treat eventual consistency as a chosen cost,** surfaced in the UX, not an accident.
+- **One event-sourced log with a single writer** beats five chatty services swapping state.
+
+Don't
+- **Split a monolith into a distributed one** — same coupling, now over the network, now undebuggable.
+- **Reach for a queue where a function call works.** Async tax with no async benefit.
+- **Let eventual consistency leak into basic logic** the user experiences as a bug.
+- **Fire an event you can't trace.** Untraceable pub/sub is a 2am mystery generator.
+- **Adopt CQRS for a form.** Separate read/write models where reads and writes are the same thing is ceremony.
+
 ## 5. The Radical Pragmatists (The "Worse is Better / KISS" Camp)
 
 This camp is highly skeptical of grand architectural theories. They believe that premature
@@ -136,22 +236,21 @@ dictate the architecture.
 **Use this as your GUIDING-PRINCIPLES:**
 Simplicity is the default (Pragmatism). Build the simplest thing that satisfies the stated requirement and nothing more — no interface with one implementation, no config for a value that never changes, no scaffolding "for later." Reach for the standard library before custom code and a native platform feature before a dependency. Ship the lazy version and question extra scope in the same breath; do not relitigate an explicit requirement, only the machinery around it. Simplicity governs unless the Precedence stack gives another principle a specific reason to override.
 
-**Daily operating playbook** for the Radical Pragmatists — the working rules a KISS/YAGNI engineer actually runs on, not the philosophy poster.
-Do (constructive patterns)
+### Daily playbook
 
-Ship the vertical slice first. One thin path all the way through — request to DB to response — beats three polished layers with no seam between them. You learn what the product is by using it, not by diagramming it.
-Delete before you add. The default move on any change is "can existing code do this?" A removed branch is a bug that can't happen; the shortest working diff wins.
-Inline until it hurts twice. Write it straight, duplicated, in place. Extract the abstraction only when the third caller shows up and the shape has stopped moving — not on the second, and never on the first.
-Name the shortcut where you take it. A shortcut with a // ponytail: global lock, per-account if throughput matters-style comment is a decision; the same shortcut silent is a landmine. Leave the ceiling and the upgrade trigger, not an apology.
-Reach for stdlib → native → installed dep → custom, in that order. Every rung down the ladder is code you don't own and can't be paged for. Stop at the first rung that holds.
+Do
+- **Ship the vertical slice first** — one thin path end-to-end beats three polished layers with no seam. You learn the product by using it.
+- **Delete before you add.** Default move on any change: can existing code do this? Shortest working diff wins.
+- **Inline until it hurts twice.** Extract the abstraction on the third caller, once the shape stops moving — never the first.
+- **Name the shortcut where you take it,** with its ceiling and upgrade trigger. Commented shortcut = decision; silent one = landmine.
+- **Stdlib → native → installed dep → custom.** Stop at the first rung that holds; every rung down is code you can't be paged for.
 
-**Don't (anti-patterns)**
-
-Building for the scale you don't have. Sharding, queues, and a service mesh for 200 users a day is renting complexity against revenue that doesn't exist. Solve the load you can measure, not the load you imagine.
-The speculative interface. One implementation behind an abstraction isn't flexibility, it's a guess about the future wearing a costume. You'll refactor it anyway when the second implementation actually arrives and it doesn't fit the shape you invented.
-"Worse is Better" as cover for careless. KISS licenses less code, not flimsier code. Skipping input validation at a trust boundary or picking the algorithm that's wrong on edge cases isn't lazy-efficient, it's just wrong — the Correctness override sits above you for exactly this.
-Debt with no ledger. Shortcuts are fine; unnamed, untracked, unbounded shortcuts compound into the Big Ball of Mud the critics warn about. If you never write down what you deferred, "we'll refactor later" is a lie you're telling on purpose.
-Relitigating the requirement to avoid the work. YAGNI cuts machinery, not stated needs. "The user doesn't really need restart" when they asked for restart is cost-shifting dressed as minimalism — shrink how it's built, never wave away that it's built.
+Don't
+- **Build for scale you can't measure** — queues and a service mesh for 200 users/day is complexity rented against revenue that doesn't exist.
+- **Ship the speculative interface** — one implementation behind an abstraction is a guess in a costume. You'll refactor it when the real second caller arrives anyway.
+- **Use "Worse is Better" as cover for careless.** KISS licenses less code, not flimsier code — skipping trust-boundary validation is just wrong.
+- **Take debt with no ledger.** Unnamed shortcuts compound into the Big Ball of Mud; "refactor later" unwritten is a lie on purpose.
+- **Relitigate the requirement to dodge the work.** YAGNI cuts machinery, not stated needs — shrink how restart is built, never wave away that it's built.
 
 ## 6. The Correctness Zealots (The "Make Illegal States Unrepresentable" Camp)
 
@@ -172,6 +271,22 @@ them impossible to construct in the first place.
 
 **Use this as your GUIDING-PRINCIPLES:**
 Make illegal states unrepresentable (Correctness). Prefer designs where the compiler, the type, or a database constraint makes a bad state impossible to construct over runtime code that validates and handles it after the fact. Parse input at the trust boundary into a shape the rest of the system can trust, so downstream code never re-checks. Every non-trivial branch, loop, parser, or money/security path leaves one runnable check behind — the smallest thing that fails if the logic breaks. This overrides simplicity: a check is not optional machinery, and an edge-case-correct solution beats a shorter flimsy one.
+
+### Daily playbook
+
+Do
+- **Make the illegal state unrepresentable** — a type or DB constraint the compiler enforces beats a runtime guard.
+- **Parse at the boundary** into a trusted shape, so downstream never re-checks.
+- **Leave one runnable check** on every non-trivial branch, parser, or money/security path.
+- **Exhaustively match;** let the compiler flag the case you forgot.
+- **Reserve formal methods for the load-bearing invariant** — the concurrency protocol, the money math.
+
+Don't
+- **Play Type Tetris on a throwaway.** Days encoding an invariant a review catches in minutes is misspent.
+- **TLA+ the CRUD.** Formal proof for a settings page never survives the deadline and didn't need to.
+- **Validate the same input five layers deep.** Parse once; trust after.
+- **Let "if it compiles it works" skip the integration test** — types don't catch a wrong API contract.
+- **Gold-plate correctness the requirement doesn't ask for.** A check is not optional; a proof of the obvious is.
 
 ## Honorable mentions
 

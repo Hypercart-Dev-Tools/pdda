@@ -12,7 +12,8 @@ phases: 1
 goal: >
   A new Claude Code skill that interviews a user about their project and produces an AGENTS-TEMP.md
   capturing their preferred architectural style, drawn from the six opinionated camps + honorable
-  mentions in AGENTS-BUILDER.md. It NEVER overwrites or edits an existing AGENTS.md — it only writes a
+  mentions in PROJECT/4-MISC/OPINIONATED-ARCHITECTURE/OPINIONATED-PATTERNS.md. It NEVER overwrites or
+  edits an existing AGENTS.md — it only writes a
   side file the user hand-merges. Design locked with the operator: scenario-inference interview, full
   (directives + Daily playbooks) output, global skill home with the camps content embedded. Every
   generated file also always carries the five non-negotiable quality goals (Maintainable, Durable,
@@ -23,8 +24,9 @@ goal: >
 
 An interactive skill that turns a short interview into a starting-point `AGENTS-TEMP.md` in the user's
 project — a curated extract of the architectural camps in
-[`AGENTS-BUILDER.md`](AGENTS-BUILDER.md), weighted to how they actually build. The user then hand-merges
-it; the skill **never** touches an existing `AGENTS.md`.
+[`OPINIONATED-PATTERNS.md`](../4-MISC/OPINIONATED-ARCHITECTURE/OPINIONATED-PATTERNS.md), weighted to
+how they actually build. The user then hand-merges it; the skill **never** touches an existing
+`AGENTS.md`.
 
 ## Status
 
@@ -44,7 +46,7 @@ it; the skill **never** touches an existing `AGENTS.md`.
 - **Home = global, content embedded.** The skill installs to `~/.claude/skills/agents-builder/` and
   **bundles** the camps taxonomy so it works in any repo (not just this one).
 - **Non-negotiable quality goals are always included.** Every generated `AGENTS-TEMP.md` carries the
-  **Non-negotiable quality goals** block from `AGENTS-BUILDER.md` (Maintainable, Durable, Secure,
+  **Non-negotiable quality goals** block from `OPINIONATED-PATTERNS.md` (Maintainable, Durable, Secure,
   Performant, Portable) unconditionally, right after the Precedence stack. It is not part of the
   interview's camp selection and no camp can opt out of it — even a zero-camp, precedence-only run
   still emits it.
@@ -67,7 +69,7 @@ under `skills/agents-builder/`, then **installed to the global skills dir by a d
 - `skills/agents-builder/SKILL.md` — the scenario interview + the scenario→camps inference heuristic +
   the precedence-ordering rule, ending in a call to the assembler. Frames every question, states the
   never-touch-AGENTS.md contract, and shows the user the selection before writing.
-- `skills/agents-builder/reference/camps.md` — the camps taxonomy **copied from `AGENTS-BUILDER.md`**
+- `skills/agents-builder/reference/camps.md` — the camps taxonomy **copied from `OPINIONATED-PATTERNS.md`**
   (Precedence stack, the **Non-negotiable quality goals** block, the 6 camps each with
   GUIDING-PRINCIPLES + Daily playbook, honorable mentions incl. local-first, the synthesis note). This
   is the embedded content that makes the skill portable.
@@ -98,7 +100,14 @@ follow-up).
 
 ## Open follow-ups (not this phase)
 
-- Whether to also ship a `/agents-builder` reverse mode that critiques an *existing* AGENTS.md against
-  the camps. Parked.
-- `AGENTS-BUILDER.md` itself is a `guiding-principles` doc mis-shelved in `2-WORKING` (fails status-table
-  + roadmap-coverage). Reshelving it is tracked separately in the myriad backlog, not here.
+- **A reverse-mode skill already exists** at `PROJECT/4-MISC/OPINIONATED-ARCHITECTURE/SKILL.md` —
+  built 2026-07-03, it diagnoses an *existing* repo's closest camp (evidenced, non-prescriptive) and
+  appends an "Architectural Baseline" section to that repo's `AGENTS.md`. It reads the same taxonomy
+  file this project consumes. Open question, not decided here: should the forward-interview
+  agents-builder skill (this project) and that existing reverse-diagnosis skill live as one skill with
+  two modes, or stay separate? Surfaced 2026-07-07 during SSOT cleanup; not resolved.
+- ~~`AGENTS-BUILDER.md` mis-shelved in `2-WORKING`~~ — **resolved 2026-07-07.** The taxonomy doc was
+  consolidated into the pre-existing, more complete copy at
+  `PROJECT/4-MISC/OPINIONATED-ARCHITECTURE/OPINIONATED-PATTERNS.md` (the two had drifted apart since
+  2026-07-03; the 2-WORKING copy was the fuller version and is now the sole source). The 2-WORKING
+  duplicate is deleted; this doc and the marathon brief now point at the 4-MISC location.
