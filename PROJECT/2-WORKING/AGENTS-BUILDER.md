@@ -2,7 +2,7 @@
 title: Opinionated architectural philosophy — the major camps
 status: Active (operational — governs agent behavior; source for AGENTS.md extraction)
 created: 2026-07-03
-updated: 2026-07-03
+updated: 2026-07-07
 owner: noel
 doc_type: guiding-principles
 goal: >
@@ -34,8 +34,44 @@ directions, resolve top-down:
 Simplicity is the default and governs unless a principle higher in this stack has a specific reason to
 override it. This stack is the only precedence; extract it alongside whichever camps you pull.
 
+## Non-negotiable quality goals — apply regardless of camp
+
+These five qualities aren't a camp; they're the floor every camp stands on. No camp rejects any of
+them outright, but each camp weights them differently — and the six camps above already resolve four
+of the five for free. Extract this section into `AGENTS.md` **every time**, regardless of which
+camp(s) you also pull.
+
+- **Maintainable** — the blend's center of gravity. Deep modules, one owner per decision, and
+  diff-scoping all serve this directly, and every camp's default posture points the same way. Zero
+  tension.
+- **Durable** — served by "prefer reversible" and "a deferred decision names its trigger" (nothing
+  rots silently), plus contract-honesty at trust boundaries. Compatible with every camp above.
+- **Secure** — protected by construction: trust boundaries are essential complexity, not an optional
+  check, and seams belong at trust boundaries first. Compatible by design with every camp.
+- **Performant** — conditionally compatible. Default posture is deferred-with-trigger ("no profiler →
+  name the assumption, not a guarantee" — see Camp 3), which is fine for ordinary workloads but the
+  wrong default for hard-real-time or latency-SLA domains, where performance is a day-one requirement,
+  not a mechanism to defer.
+- **Portable** — the one real tension. "Reach for the native platform feature" (Camp 5) and "call the
+  concrete thing directly" actively trade portability away for simplicity, and that's often the right
+  trade. Portability isn't free; it's an abstraction, and abstractions need a second real customer.
+  Resolve it with the same test Precedence rung 3 already uses: introduce the portable seam only when
+  a second platform or backend is a real, contracted case — not a speculative "we might migrate
+  someday" (name it and its trigger if you're deferring it; that's YAGNI, not neglect).
+
+**Use this as your GUIDING-PRINCIPLES (always include, every camp):**
+Every project is built to be Maintainable, Durable, Secure, Performant, and Portable — but not all
+five are free. Maintainable, Durable, and Secure are the default posture of every camp above; hold the
+line on them regardless of which camp you extract. Performant is deferred-with-trigger by default
+(measure before you claim fast or slow) unless the domain has a hard real-time or latency-SLA
+requirement, in which case it's a day-one constraint, not something you defer. Portable is the one
+goal that must be earned, not assumed: build the concrete, native, single-platform thing by default,
+and only pay for a portable seam when a second real platform or backend is an actual contracted case —
+never on "we might need it someday."
+
 ## Table of contents
 
+- [Non-negotiable quality goals — apply regardless of camp](#non-negotiable-quality-goals--apply-regardless-of-camp)
 1. [The Structuralists (SOLID / Clean Architecture)](#1-the-structuralists-the-solid--clean-architecture-camp)
 2. [The Functional Purists (Data Transformation)](#2-the-functional-purists-the-data-transformation-camp)
 3. [The Data-Oriented Designers (Hardware First)](#3-the-data-oriented-designers-the-hardware-first-camp)

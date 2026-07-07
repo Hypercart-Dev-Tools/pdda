@@ -2,7 +2,7 @@
 title: agents-builder skill — interview a user's architectural style into an AGENTS-TEMP.md
 status: Active — planned; queued for the 2026-07-07 marathon (phase p2)
 created: 2026-07-06
-updated: 2026-07-06
+updated: 2026-07-07
 owner: noel
 doc_type: project
 effort: 3
@@ -14,7 +14,9 @@ goal: >
   capturing their preferred architectural style, drawn from the six opinionated camps + honorable
   mentions in AGENTS-BUILDER.md. It NEVER overwrites or edits an existing AGENTS.md — it only writes a
   side file the user hand-merges. Design locked with the operator: scenario-inference interview, full
-  (directives + Daily playbooks) output, global skill home with the camps content embedded.
+  (directives + Daily playbooks) output, global skill home with the camps content embedded. Every
+  generated file also always carries the five non-negotiable quality goals (Maintainable, Durable,
+  Secure, Performant, Portable) regardless of which camp(s) the user selects.
 ---
 
 # agents-builder skill
@@ -41,6 +43,11 @@ it; the skill **never** touches an existing `AGENTS.md`.
   to the source doc.
 - **Home = global, content embedded.** The skill installs to `~/.claude/skills/agents-builder/` and
   **bundles** the camps taxonomy so it works in any repo (not just this one).
+- **Non-negotiable quality goals are always included.** Every generated `AGENTS-TEMP.md` carries the
+  **Non-negotiable quality goals** block from `AGENTS-BUILDER.md` (Maintainable, Durable, Secure,
+  Performant, Portable) unconditionally, right after the Precedence stack. It is not part of the
+  interview's camp selection and no camp can opt out of it — even a zero-camp, precedence-only run
+  still emits it.
 
 ## Isolation contract (hard requirement)
 
@@ -61,15 +68,19 @@ under `skills/agents-builder/`, then **installed to the global skills dir by a d
   the precedence-ordering rule, ending in a call to the assembler. Frames every question, states the
   never-touch-AGENTS.md contract, and shows the user the selection before writing.
 - `skills/agents-builder/reference/camps.md` — the camps taxonomy **copied from `AGENTS-BUILDER.md`**
-  (Precedence stack, the 6 camps each with GUIDING-PRINCIPLES + Daily playbook, honorable mentions incl.
-  local-first, the synthesis note). This is the embedded content that makes the skill portable.
+  (Precedence stack, the **Non-negotiable quality goals** block, the 6 camps each with
+  GUIDING-PRINCIPLES + Daily playbook, honorable mentions incl. local-first, the synthesis note). This
+  is the embedded content that makes the skill portable.
 - `skills/agents-builder/scripts/build_agents_temp.py` — deterministic assembler. Input: selected camp
   ids + precedence order + primary (as JSON/args). Output: `AGENTS-TEMP.md` in the target project =
-  Precedence stack + per selected camp {GUIDING-PRINCIPLES paragraph + Daily playbook}, parsed out of
-  `reference/camps.md`. Refuses to write over `AGENTS.md`; auto-suffixes if `AGENTS-TEMP.md` exists.
+  Precedence stack + **Non-negotiable quality goals (always, unconditionally)** + per selected camp
+  {GUIDING-PRINCIPLES paragraph + Daily playbook}, parsed out of `reference/camps.md`. Refuses to write
+  over `AGENTS.md`; auto-suffixes if `AGENTS-TEMP.md` exists.
 - `test/agents-builder.sh` — asserts: a given selection produces a well-formed `AGENTS-TEMP.md`
-  (Precedence present, each selected camp's directive **and** playbook present, unselected camps absent);
-  an existing `AGENTS.md` is left byte-for-byte untouched; an existing `AGENTS-TEMP.md` is not clobbered.
+  (Precedence present, **Non-negotiable quality goals block present regardless of which camps were
+  selected, including a zero-camp run**, each selected camp's directive **and** playbook present,
+  unselected camps absent); an existing `AGENTS.md` is left byte-for-byte untouched; an existing
+  `AGENTS-TEMP.md` is not clobbered.
 
 ## Phase p2 — build the skill (repo-local) + tests
 
@@ -78,10 +89,12 @@ Deliver the four files above. Manual post-build step (human, out of marathon sco
 throwaway repo.
 
 **QA gate:** `python3 skills/agents-builder/scripts/build_agents_temp.py` given a sample selection emits
-a full `AGENTS-TEMP.md` (Precedence + selected directives + playbooks, unselected camps absent); a
-pre-existing `AGENTS.md` is provably untouched and a pre-existing `AGENTS-TEMP.md` is not clobbered;
-`test/agents-builder.sh` green. Skill body (`SKILL.md`) documents the scenario→camps mapping and the
-install step. Shippable alone (install is the human follow-up).
+a full `AGENTS-TEMP.md` (Precedence + **Non-negotiable quality goals, always present** + selected
+directives + playbooks, unselected camps absent); the same holds for a zero-camp selection (Precedence
++ quality goals only, still emitted); a pre-existing `AGENTS.md` is provably untouched and a
+pre-existing `AGENTS-TEMP.md` is not clobbered; `test/agents-builder.sh` green. Skill body (`SKILL.md`)
+documents the scenario→camps mapping and the install step. Shippable alone (install is the human
+follow-up).
 
 ## Open follow-ups (not this phase)
 
