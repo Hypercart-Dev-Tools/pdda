@@ -186,25 +186,10 @@ check_quad_concepts() {
     # per-doc escape hatch (mirrors roadmap_exempt)
     pdda_frontmatter_true "$file" "quad_exempt" && continue
 
-    # Count the TOP-LEVEL, non-empty bullets of the FIRST "## Quad Concepts" section. Boundaries: from
-    # the header until the next h1/h2 heading, OR the first blank line AFTER a bullet has appeared (blank
-    # lines / HTML comments BEFORE the first bullet are tolerated). Fenced code blocks are data and are
-    # skipped entirely (a doc may show an EXAMPLE section in a ``` block). Indented/nested bullets and
-    # empty bullets ('- ' with no text) do not count; a wrong bullet char is lenient ('-' or '*'). CRLF
-    # is normalized. Only the first section counts, so duplicate sections can't sum. Prints -1 if absent.
-    n="$(awk '
-      { sub(/\r$/, "") }
-      done { next }
-      /^```/ { in_f = !in_f; next }
-      in_f { next }
-      !seen && /^##[ \t]+Quad[ \t]+Concepts[ \t]*$/ { in_q = 1; seen = 1; started = 0; next }
-      in_q && /^#{1,2}[ \t]/            { in_q = 0; done = 1; next }
-      in_q && started && /^[ \t]*$/     { in_q = 0; done = 1; next }
-      in_q && /^[-*][ \t]+[^ \t]/       { count += 1; started = 1; next }
-      END { if (!seen) print -1; else print count + 0 }
-    ' "$file")"
-    # awk always prints a clean integer or -1; guard against an empty capture (unreadable file) so the
-    # numeric comparisons below never see an empty operand.
+    # Bullet count of the first "## Quad Concepts" section via the shared parser (pdda_quad_section:
+    # line 1 is the count, -1 if absent). See pdda-lib.sh for the boundary/fence/CRLF rules.
+    n="$(pdda_quad_section "$file" | sed -n '1p')"
+    # guard against an empty capture (unreadable file) so the numeric comparisons never see an empty operand.
     case "$n" in ''|*[!0-9-]*) n="-1" ;; esac
 
     if [ "$n" = "-1" ]; then
@@ -865,6 +850,38 @@ pdda-check-quad-concepts:check_quad_concepts"
 }
 
 # ------------------------------------------------------------------------------------------------
+# glance — a read-only portfolio roll-up: title + Quad Concepts for each active plan doc, so the whole
+# 2-WORKING surface's pain coverage is visible on one screen. Not gated by the lever (a manual read).
+# ------------------------------------------------------------------------------------------------
+cmd_glance() {
+  local file rel title sec n any=0
+  printf '%s\n' "PDDA glance — Quad Concepts across PROJECT/2-WORKING"
+  while IFS= read -r file; do
+    any=1
+    rel="$(pdda_relpath "$file")"
+    title="$(pdda_trim "$(pdda_frontmatter_value "$file" "title")")"
+    # strip one layer of surrounding YAML quotes for a clean line (title: "X" / 'X'). A block-scalar
+    # title (title: > / |) would show only its indicator — titles are single-line by convention.
+    case "$title" in
+      \"*\") title="${title#\"}"; title="${title%\"}" ;;
+      \'*\') title="${title#\'}"; title="${title%\'}" ;;
+    esac
+    sec="$(pdda_quad_section "$file")"
+    n="${sec%%$'\n'*}"
+    printf '\n• %s — %s\n' "$rel" "${title:-(untitled)}"
+    if [ "$n" = "-1" ]; then
+      printf '    (no ## Quad Concepts)\n'
+    elif [ "$n" = "0" ]; then
+      printf '    (## Quad Concepts present but empty)\n'
+    else
+      printf '%s\n' "$sec" | sed -n '2,$p' | while IFS= read -r b; do printf '    - %s\n' "$b"; done
+    fi
+  done < <(pdda_list_working_docs)
+  [ "$any" -eq 1 ] || printf '\n(no active docs in PROJECT/2-WORKING)\n'
+  return 0
+}
+
+# ------------------------------------------------------------------------------------------------
 # dispatcher
 # ------------------------------------------------------------------------------------------------
 pdda_usage() {
@@ -878,6 +895,7 @@ Commands:
   frontmatter        active-doc frontmatter contract
   status-table       exact two-column "## Status" table
   quad-concepts      opt-in: a "## Quad Concepts" section of 1-4 bullets (lever: .pdda-quad / PDDA_QUAD)
+  glance             read-only roll-up: title + Quad Concepts for each PROJECT/2-WORKING doc
   hardcoded-paths    no machine-specific absolute paths in working docs
   roadmap            no execution detail leaks INTO ROADMAP.md
   roadmap-coverage   nothing active goes MISSING from ROADMAP.md
@@ -902,6 +920,7 @@ case "$cmd" in
   frontmatter)      check_frontmatter; exit "$?" ;;
   status-table)     check_status_table; exit "$?" ;;
   quad-concepts)    check_quad_concepts; exit "$?" ;;
+  glance)           cmd_glance; exit "$?" ;;
   hardcoded-paths)  check_hardcoded_paths; exit "$?" ;;
   roadmap)          check_roadmap; exit "$?" ;;
   roadmap-coverage) check_roadmap_coverage; exit "$?" ;;

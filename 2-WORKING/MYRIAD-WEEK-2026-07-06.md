@@ -18,3 +18,7 @@ roadmap_exempt: true
 - [ ] Tokenize the diff artifact path temp/sentinel-diff-<sha>.diff so same-sha concurrent apply runs cannot clobber each other.
 - [ ] Add TOCTOU revalidation of the allowlist in sentinel/apply.sh — it is validated once, then the target is read/written later without a recheck.
 - [ ] Clean up pre-existing working-doc hygiene errors flagged by pdda: BLANK.md (missing frontmatter/status) and AGENTS-BUILDER.md (missing status table + ROADMAP pointer).
+
+### 2026-07-07
+- [ ] Harden pdda-doc-ready.sh against prompt injection by wrapping the injected doc body in delimiters (e.g. <document_content>...) — pre-existing, general (not Quad-specific); flagged by the GH-12 P3+P4 consult.
+- [ ] Latent trailing-slash ($TMPDIR) portability nit in test/pdda-publish-projection.sh — passes 17/17 in-repo; only the consult's throwaway-worktree env tripped the double-slash. Normalize SBOX via pwd if it ever bites CI.

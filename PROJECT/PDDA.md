@@ -99,6 +99,8 @@ conventionally right after `## Status`:
 - **Enable:** set `.pdda-quad` to `on` (or `PDDA_QUAD=1`). The enforcement mode still governs whether a
   missing/malformed section merely reports or blocks. **Opt a doc out** with `quad_exempt: true`.
 - Enforced by `pdda.sh quad-concepts` (deterministic, structure-only) plus a warn-only readiness rubric.
+- `pdda.sh glance` (read-only, always available) rolls up `title + Quad Concepts` across `2-WORKING` for
+  a one-screen view of what the active portfolio is addressing.
 
 ## Triage ratings for medium-large work
 

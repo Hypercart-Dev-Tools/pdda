@@ -56,8 +56,8 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   `## Quad Concepts` section of 1–4 `pain → fix` bullets after `## Status`, so a cold-start reader gets
   5-second orientation and an operator can see if a plan covers the real pains. Orthogonal opt-in lever
   (`.pdda-quad`, off by default), structure-only deterministic check + warn-only LLM rubric. Synthesizes
-  a GLM 5.2 pass + a Codex/agy consult. **Phase 1 & 2 shipped** (check+lever 34/34; contract/install/docs);
-  Phase 3 (LLM rubric) next. Issue
+  a GLM 5.2 pass + two Codex/agy consults. **All 4 phases shipped + consult-passed** (check+lever, LLM
+  quality rubric, `pdda.sh glance` roll-up; 42/42 + 6/6). Ready to close to `3-COMPLETED`. Issue
   [#12](https://github.com/Hypercart-Dev-Tools/pdda/issues/12). -> [PROJECT/2-WORKING/GH-12-QUAD-CONCEPTS-MODE.md](PROJECT/2-WORKING/GH-12-QUAD-CONCEPTS-MODE.md)
 - **GH-10 — Sentinel: repo-driven doc-governance automation** (2026-07-04) - the act-on-it layer for
   PDDA: on merge to `main`, build context from the diff, ask the model (via `PDDA_LLM_BIN`) whether

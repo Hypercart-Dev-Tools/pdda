@@ -53,6 +53,7 @@ After install, everything runs through one dispatcher:
 ./utils/pdda/pdda.sh run                # all deterministic checks, then the LLM readiness review
 ./utils/pdda/pdda.sh frontmatter        # one check on its own
 ./utils/pdda/pdda.sh roadmap-coverage
+./utils/pdda/pdda.sh glance             # roll up title + Quad Concepts across 2-WORKING
 ./utils/pdda/pdda.sh help               # list every command
 ```
 

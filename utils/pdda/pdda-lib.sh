@@ -228,6 +228,25 @@ quad_is_enabled() {
   esac
 }
 
+# Shared Quad Concepts section parser (used by `pdda.sh quad-concepts` AND `pdda.sh glance` — one parser,
+# no drift). Emits the bullet COUNT on line 1 (-1 if the section is absent), then each top-level,
+# non-empty bullet's TEXT (marker stripped) on its own line. Boundaries: the FIRST "## Quad Concepts"
+# header until the next h1/h2 heading or the first blank line AFTER a bullet; fenced code is skipped;
+# CRLF is normalized; indented/nested and empty bullets do not count; only the first section is read.
+pdda_quad_section() {  # <file>
+  awk '
+    { sub(/\r$/, "") }
+    done { next }
+    /^```/ { in_f = !in_f; next }
+    in_f { next }
+    !seen && /^##[ \t]+Quad[ \t]+Concepts[ \t]*$/ { in_q = 1; seen = 1; started = 0; next }
+    in_q && /^#{1,2}[ \t]/            { in_q = 0; done = 1; next }
+    in_q && started && /^[ \t]*$/     { in_q = 0; done = 1; next }
+    in_q && /^[-*][ \t]+[^ \t]/       { b = $0; sub(/^[-*][ \t]+/, "", b); bl[++n] = b; started = 1; next }
+    END { if (!seen) print -1; else print n + 0; for (i = 1; i <= n; i++) print bl[i] }
+  ' "$1"
+}
+
 pdda_frontmatter_lines() {
   awk '
     NR == 1 { sub(/^\357\273\277/, "") }                 # strip a UTF-8 BOM if present

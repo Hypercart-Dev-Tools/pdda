@@ -266,5 +266,41 @@ assert_eq "$(quad_rc PROJECT/2-WORKING/good.md full)" "0" "S19c: full passes a v
 seed_doc PROJECT/2-WORKING/blank.md ''
 assert_eq "$(quad_errors PROJECT/2-WORKING/blank.md)" "0" "S20: blank.md scaffold not flagged"
 
+# --- S21: `pdda.sh glance` rolls up title + Quad Concepts across 2-WORKING ---
+new_sandbox
+seed_doc PROJECT/2-WORKING/withquad.md '## Quad Concepts
+- pain one → fix one
+- pain two → fix two
+'
+seed_doc PROJECT/2-WORKING/noquad.md ''
+raw_doc PROJECT/2-WORKING/emptyquad.md '## Quad Concepts
+
+## Next
+- x
+'
+G="$(env PDDA_REPO_ROOT="$SBOX" PDDA_ACTIVITY_LOG="$ACT" bash "$PDDA" glance 2>&1)"
+assert_contains "$G" "withquad.md" "S21a: glance lists a doc with a section"
+assert_contains "$G" "- pain one → fix one" "S21b: glance prints bullets, marker stripped"
+assert_contains "$G" "(no ## Quad Concepts)" "S21c: glance marks a doc with no section"
+assert_contains "$G" "present but empty" "S21d: glance marks an empty section"
+
+# --- S22: glance robustness (from the consult) — metachar/quoted titles, empty 2-WORKING ---
+new_sandbox
+# a title with shell/format metacharacters MUST print literally (no expansion, no printf format abuse)
+{
+  printf -- '---\ntitle: "100%% $(whoami) `id` done"\n---\n'
+  printf -- '## Quad Concepts\n- a → b\n'
+} > "$SBOX/PROJECT/2-WORKING/meta.md"
+G="$(env PDDA_REPO_ROOT="$SBOX" PDDA_ACTIVITY_LOG="$ACT" bash "$PDDA" glance 2>&1)"
+assert_contains "$G" '100% $(whoami) `id` done' "S22a: metachar title printed literally, quotes stripped"
+assert_contains "$G" "- a → b" "S22b: glance still prints bullets alongside a metachar title"
+
+# empty PROJECT/2-WORKING → graceful message, exit 0
+new_sandbox
+G="$(env PDDA_REPO_ROOT="$SBOX" PDDA_ACTIVITY_LOG="$ACT" bash "$PDDA" glance 2>&1)"; RC=$?
+assert_contains "$G" "no active docs" "S22c: glance on empty 2-WORKING says so"
+assert_rc() { [ "$1" -eq "$2" ] && pass "$3" || fail "$3 (exit $1, want $2)"; }
+assert_rc "$RC" 0 "S22d: glance exits 0 on empty 2-WORKING"
+
 printf '\n=== pdda-quad-concepts: %d passed, %d failed ===\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
