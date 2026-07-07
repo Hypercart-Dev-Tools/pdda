@@ -1,0 +1,39 @@
+# MARATHON-2026-07-07.yaml — two independent, repo-general build phases (NOT sentinel work).
+#
+#   p1  myriad-review reader  -> PROJECT/2-WORKING/GH-11-MYRIAD-REVIEW-READER.md  (issue #11)
+#   p2  agents-builder skill  -> PROJECT/2-WORKING/AGENTS-BUILDER-SKILL.md
+#
+# No depends_on — the two phases are independent and may run in either order.
+#
+# Run (proven combo: agy builder + codex reviewer, via the vendored .xyz/ against this repo). NOTE:
+# driving vendored-.xyz-against-parent-repo trips the harness CROSS-REPO containment guard (see the
+# 4-attempt dogfood in PROJECT/2-WORKING/GH-10-SENTINEL.md) — expect the same friction. `marathon-yaml`
+# + `--dry-run` validate the plan cleanly.
+#
+#   RELAY_TURN_TIMEOUT_S=1200 \
+#   MARATHON_ROOT="$PWD" \
+#   MARATHON_YAML_BIN="$PWD/.xyz/bin/marathon-yaml" \
+#   TICK_BIN="$PWD/.xyz/bin/tick" \
+#   MARATHON_DRIVE="$PWD/.xyz/relay-automation/marathon-drive.sh" \
+#   bash .xyz/relay-automation/marathon.sh --plan marathon/MARATHON-2026-07-07.yaml \
+#        --builder agy [--dry-run]
+#
+# Both briefs bake in strict write-lanes and the load-bearing guardrails:
+#   p1 — read-only reader (never writes the parking lot); pdda.sh edit is ONE pointer call; fail-open.
+#   p2 — the skill NEVER modifies AGENTS.md (only ever AGENTS-TEMP.md); repo-local build, global install
+#        is a human follow-up.
+
+name: builders-2026-07-07
+phases:
+  - id: p1
+    name: myriad-review reader (read-only) + pdda.sh run pointer
+    reviewer: codex
+    brief: marathon/briefs/p1-myriad-review-reader.md
+    artifact: utils/pdda/pdda-myriad.sh,test/pdda-myriad.sh,utils/pdda/pdda.sh
+    max_review_rounds: 2
+  - id: p2
+    name: agents-builder skill (repo-local build; global install is human follow-up)
+    reviewer: codex
+    brief: marathon/briefs/p2-agents-builder-skill.md
+    artifact: skills/agents-builder/SKILL.md,skills/agents-builder/reference/camps.md,skills/agents-builder/scripts/build_agents_temp.py,test/agents-builder.sh
+    max_review_rounds: 2

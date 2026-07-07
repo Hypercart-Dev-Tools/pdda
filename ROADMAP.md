@@ -2,7 +2,7 @@
 title: PDDA Standalone Roadmap
 status: Active
 created: 2026-06-24
-updated: 2026-06-30
+updated: 2026-07-06
 branch: main
 goal: >
   Canonical pointer ledger for the standalone PDDA installer repo. This file tracks the repo's
@@ -34,6 +34,16 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Queue / parked intake
 
+- **GH-11 — myriad-review reader** (2026-07-06) - give the `/myriad` parking lot a read path: a tiny
+  read-only `utils/pdda/pdda-myriad.sh review [--weeks N]` that prints open items grouped by week, plus a
+  one-line pointer from `pdda.sh run` so `/pdda` surfaces the backlog transitively. Queued as phase `p1`
+  of the [2026-07-07 marathon](marathon/MARATHON-2026-07-07.yaml). Issue
+  [#11](https://github.com/Hypercart-Dev-Tools/pdda/issues/11). -> [PROJECT/2-WORKING/GH-11-MYRIAD-REVIEW-READER.md](PROJECT/2-WORKING/GH-11-MYRIAD-REVIEW-READER.md)
+- **agents-builder skill** (2026-07-06) - a Claude Code skill that interviews a user (scenario → infer
+  camps) and writes an `AGENTS-TEMP.md` from the architectural camps in `AGENTS-BUILDER.md`; never
+  touches an existing `AGENTS.md`. Global skill, content embedded; built repo-local then hand-installed.
+  Queued as phase `p2` of the [2026-07-07 marathon](marathon/MARATHON-2026-07-07.yaml). ->
+  [PROJECT/2-WORKING/AGENTS-BUILDER-SKILL.md](PROJECT/2-WORKING/AGENTS-BUILDER-SKILL.md)
 - **GH-9 — weekly progress counter (open GH issues + closed tasks this week)** (2026-07-03) - new
   deterministic `pdda.sh progress` subcommand for maintainer visibility; builds on the existing
   gh-state cache + `3-COMPLETED/` doc lifecycle. "Closed Marathons" (a `tick`/xyz-3-agents-swarm
