@@ -14,6 +14,18 @@ landing nothing, and emit a per-category scored table. Canonical contract:
 - The harness must be **idempotent and headless** (no prompts), and must never write to the primary
   tree (same isolation guarantees as `sentinel/apply.sh`).
 
+## Your write lane (STRICT — containment-enforced)
+
+You may edit **only** these three files. Editing anything else fails the turn (containment violation):
+
+- `sentinel/replay.sh` — the replay harness entrypoint.
+- `sentinel/replay-lib.sh` — put ALL shared helpers here (your only extra slot).
+- `test/sentinel-replay.sh` — the test suite.
+
+**Reuse `sentinel/apply.sh` by calling it** (invoke it as a subprocess for the worktree apply+gate);
+do NOT edit it, `sentinel/run.sh`, `sentinel/apply-lib.sh`, `utils/pdda/*`, or the plan doc — read them
+for reference only. The harness commits for you; do not run git.
+
 ## Guardrails
 
 - Dry-run only; lands nothing. Reuses `sentinel/apply.sh`'s worktree isolation — do not reimplement it.
@@ -26,5 +38,6 @@ landing nothing, and emit a per-category scored table. Canonical contract:
   produces the per-category table, and touches no primary-tree file.
 - Running `sentinel/replay.sh` over recent real commits produces a readable per-category summary.
 - `utils/pdda/pdda.sh run` still green.
-- No file outside `sentinel/replay.sh` + `test/sentinel-replay.sh` is modified. (Writing the empirical
-  findings back into the plan doc is a follow-up HUMAN step, not part of this artifact.)
+- No file outside your write lane (`sentinel/replay.sh`, `sentinel/replay-lib.sh`,
+  `test/sentinel-replay.sh`) is modified. (Writing the empirical findings back into the plan doc is a
+  follow-up HUMAN step, not part of this artifact.)

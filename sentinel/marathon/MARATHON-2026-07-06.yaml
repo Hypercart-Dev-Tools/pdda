@@ -1,0 +1,29 @@
+# MARATHON-2026-07-06.yaml — Sentinel Phase 3 (replay/eval harness), standalone.
+#
+# Phase 2b (sentinel/apply.sh) is already built, so Phase 3 has no depends_on here — it runs alone.
+#
+# Run (proven combo from the 2b build: agy builder + codex reviewer; operating on the pdda repo via
+# the vendored .xyz/ binaries). NOTE: driving in this vendored-.xyz-against-parent-repo setup trips
+# the harness's CROSS-REPO containment guard (see the 4-attempt dogfood in the plan doc) — expect the
+# same friction. The plan file itself is valid; `marathon-yaml` + `--dry-run` validate cleanly.
+#
+#   RELAY_TURN_TIMEOUT_S=1200 \
+#   MARATHON_ROOT="$PWD" \
+#   MARATHON_YAML_BIN="$PWD/.xyz/bin/marathon-yaml" \
+#   TICK_BIN="$PWD/.xyz/bin/tick" \
+#   MARATHON_DRIVE="$PWD/.xyz/relay-automation/marathon-drive.sh" \
+#   bash .xyz/relay-automation/marathon.sh --plan sentinel/marathon/MARATHON-2026-07-06.yaml \
+#        --builder agy [--dry-run]
+#
+# Lane guardrails (baked into the brief): dry-run/local only (lands nothing), reuses sentinel/apply.sh's
+# worktree isolation (does NOT reimplement it), and the empirical go/no-go on mapping quality is a
+# HUMAN checkpoint — the harness produces numbers, it does not decide.
+
+name: sentinel-phase3-replay
+phases:
+  - id: p3
+    name: Replay/eval harness (build + run; human scores)
+    reviewer: codex
+    brief: sentinel/marathon/briefs/p3-replay-harness.md
+    artifact: sentinel/replay.sh,sentinel/replay-lib.sh,test/sentinel-replay.sh
+    max_review_rounds: 2
