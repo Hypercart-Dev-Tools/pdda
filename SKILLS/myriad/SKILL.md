@@ -121,7 +121,9 @@ printf '%s\n' "item 1" "item 2" | python3 "<skill-dir>/scripts/log_myriad.py" --
 ```
 The script resolves the week file (Monday-of-week, so the whole week shares one file),
 fuzzy-dedups against everything already logged that week, appends under today's
-`### <date>` section without touching any existing line, then **reads the file back to
+`### <date>` section without touching any existing line, seeds a PDDA-style
+frontmatter block at the top when the weekly file is first created (and upgrades a
+legacy frontmatter-less week file on the next write), then **reads the file back to
 confirm every item is on disk.**
 
 **4d. Report the receipt honestly.** Relay the script's `message` verbatim, e.g.
@@ -162,6 +164,22 @@ Untracked: SKILLS/PDDA-EOD/myriad/
 ---
 
 **Myriad Items (to be logged)** — append to `2-WORKING/MYRIAD-WEEK-2026-07-06.md`:
+
+```markdown
+---
+title: Myriad — Week of 2026-07-06
+status: Active (weekly myriad parking lot)
+created: 2026-07-08
+updated: 2026-07-08
+owner: noelsaw
+goal: >-
+  Park non-critical follow-up items from end-of-day agent triage in one
+  durable weekly backlog.
+doc_type: backlog
+roadmap_exempt: true
+---
+
+```
 
 ```markdown
 ### 2026-07-08

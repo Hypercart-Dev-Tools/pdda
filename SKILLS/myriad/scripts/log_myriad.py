@@ -43,6 +43,37 @@ def monday_of(d):
     return d - datetime.timedelta(days=d.weekday())
 
 
+def default_owner():
+    for key in ('MYRIAD_OWNER', 'USER', 'USERNAME'):
+        value = os.environ.get(key, '').strip()
+        if value:
+            return value
+    return 'unknown'
+
+
+def render_frontmatter(mon, today, owner):
+    return (
+        '---\n'
+        f'title: Myriad — Week of {mon.isoformat()}\n'
+        'status: Active (weekly myriad parking lot)\n'
+        f'created: {today.isoformat()}\n'
+        f'updated: {today.isoformat()}\n'
+        f'owner: {owner}\n'
+        'goal: >-\n'
+        '  Park non-critical follow-up items from end-of-day agent triage in one\n'
+        '  durable weekly backlog.\n'
+        'doc_type: backlog\n'
+        'roadmap_exempt: true\n'
+        '---\n\n'
+    )
+
+
+def ensure_frontmatter(text, mon, today, owner):
+    if text.lstrip().startswith('---'):
+        return text
+    return render_frontmatter(mon, today, owner) + text.lstrip('\n')
+
+
 def existing_norms(text):
     out = []
     for line in text.splitlines():
@@ -107,6 +138,7 @@ def main():
     today = datetime.date.fromisoformat(args.date) if args.date else datetime.date.today()
     mon = monday_of(today)
     date_str = today.isoformat()
+    owner = default_owner()
 
     raw = list(args.item)
     if not raw and not sys.stdin.isatty():
@@ -125,6 +157,7 @@ def main():
             text = f.read()
     else:
         text = f'# Myriad — Week of {mon.isoformat()}\n'
+    text = ensure_frontmatter(text, mon, today, owner)
 
     norms = existing_norms(text)
     new_items, dupes = [], []
