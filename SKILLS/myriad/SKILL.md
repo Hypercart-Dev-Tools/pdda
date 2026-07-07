@@ -94,6 +94,11 @@ mechanical guarantees — week-file resolution, fuzzy dedup, atomic write, and r
 verification — live in a helper script and must not be skipped or hand-rolled.
 **Do not hand-edit the weekly file.** Let the script own the write.
 
+**Resolve two paths first.** `<skill-dir>` = the absolute directory this SKILL.md was loaded
+from (the helper is at `<skill-dir>/scripts/log_myriad.py`). `<2-working>` = the `2-WORKING/`
+directory in the current project root; the script creates it if missing, so pass the intended
+absolute path even when it doesn't exist yet.
+
 **4a. Your job first (the semantic part).** For each myriad item, write ONE clean,
 actionable sentence. Strip preamble and keep only the action — e.g.
 *"I left this as a plan only — nothing built. Want me to file a GH issue?"* becomes
@@ -101,14 +106,14 @@ actionable sentence. Strip preamble and keep only the action — e.g.
 decision prompt is **Awaiting Your Call**, not myriad — see step 2. Only the deferrable
 nice-to-have goes here.)
 
-**4b. Preview first — always dry-run before writing.** The helper ships beside this
-SKILL.md at `scripts/log_myriad.py`. Resolve `<2-working>` to the project's `2-WORKING`
-directory (absolute path). Pipe one clean item per line:
+**4b. Preview first — always dry-run before writing.** Pipe one clean item per line:
 ```bash
 printf '%s\n' "item 1" "item 2" | python3 "<skill-dir>/scripts/log_myriad.py" --dir "<2-working>" --dry-run
 ```
 The JSON receipt shows the target file, what would be logged, and what it would skip as a
-duplicate. Show that to the user and ask `y/n`.
+duplicate. Show the user the target file and the proposed items, then ask **"Append now? (y/n)"**.
+**Stop here — do not run 4c until the user replies yes.** The dry-run writes nothing, so it is
+safe to pause indefinitely.
 
 **4c. On yes — write + verify.** Same command without `--dry-run`:
 ```bash
@@ -123,8 +128,10 @@ confirm every item is on disk.**
 *"Logged 2 new item(s), skipped 1 duplicate(s), all verified on disk."*
 - If `verified` is `false` or the script exits non-zero (code 3), the write did **not**
   verify — tell the user it FAILED and do not claim anything was logged.
-- If Python is unavailable, fall back to a manual `cat >>` append but state plainly the
-  item is **not yet verified on disk**.
+- If neither `python3` nor `python` (3.6+) is available, **do not hand-write to the weekly
+  file** — a manual append would miss Monday-of-week resolution and dedup and could corrupt
+  the parking lot. Instead show the user the clean items and the intended file path, and say
+  plainly the logging script couldn't run so the items are **not logged yet**.
 
 ### 5. Final output
 Your response contains, in order:
@@ -160,6 +167,9 @@ Untracked: SKILLS/PDDA-EOD/myriad/
 ### 2026-07-08
 - [ ] Offer a per-lane code-diff drill-down (Zapier ingest, Focus5Float) instead of commit-level view
 ```
+
+*(The filename is keyed to **Monday 2026-07-06** — the week — while `### 2026-07-08` is the
+actual day. Every day that week appends to this same file. Intended, not a mismatch.)*
 
 Append now? (y/n) → on yes the helper runs and returns:
 `Logged 1 new item(s), skipped 0 duplicate(s), all verified on disk.`
