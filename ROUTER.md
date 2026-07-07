@@ -84,4 +84,10 @@ utils/pdda/pdda-sync.sh status                          # read-only drift report
 - If the task is about document quality, active-doc lifecycle, roadmap sprawl, or automation policy, start in `PROJECT/PDDA.md`.
 - If the task is about repo-local maintenance state, start in `ROADMAP.md`.
 - If the task is about the changelog, provenance, or end-of-iteration logging, the governance is in `PROJECT/PDDA.md` (the "CHANGELOG.md — end-of-iteration record" contract).
+- If the task involves a Marathon or the wider XYZ harness (Consult/Relay/Swarm/Marathon), do not
+  re-derive the format here — it's owned upstream, not by PDDA. Vendored copy: `.xyz/` (see
+  `.xyz/utils/marathon-plan.sh --help`, which generates `PROJECT/2-WORKING/MARATHON-PLAN-<date>.md`
+  from `ROADMAP.md`; `.xyz/utils/hq/` reads `PROJECT/2-WORKING/MARATHON-*.md` for cross-repo status).
+  Canonical docs live in the [xyz-3-agents-swarm](https://github.com/Claude-AI-Tools-Ventura-County/xyz-3-agents-swarm)
+  README's "Marathon" section — PDDA only supplies the `PROJECT/2-WORKING` doc conventions XYZ reads.
 - To re-run this startup sequence mid-session (task switch, resume, post-compact, context drift), invoke the `/pdda` skill (`.claude/skills/pdda/SKILL.md`) instead of re-reading by hand.

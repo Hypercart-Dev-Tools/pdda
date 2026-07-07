@@ -34,14 +34,20 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Queue / parked intake
 
+- **Marathon Plan (2026-07-07)** (2026-07-07) - the canonical XYZ-format marathon plan doc
+  (hand-authored per `.xyz/README.md`'s Option B — the ROADMAP auto-generator, Option A, currently
+  reports 0 active lanes) for the two build phases below, distinct from the machine-executable
+  `marathon/MARATHON-2026-07-07.yaml`. ->
+  [PROJECT/2-WORKING/MARATHON-PLAN-2026-07-07.md](PROJECT/2-WORKING/MARATHON-PLAN-2026-07-07.md)
 - **GH-11 — myriad-review reader** (2026-07-06) - give the `/myriad` parking lot a read path: a tiny
   read-only `utils/pdda/pdda-myriad.sh review [--weeks N]` that prints open items grouped by week, plus a
   one-line pointer from `pdda.sh run` so `/pdda` surfaces the backlog transitively. Queued as phase `p1`
   of the [2026-07-07 marathon](marathon/MARATHON-2026-07-07.yaml). Issue
   [#11](https://github.com/Hypercart-Dev-Tools/pdda/issues/11). -> [PROJECT/2-WORKING/GH-11-MYRIAD-REVIEW-READER.md](PROJECT/2-WORKING/GH-11-MYRIAD-REVIEW-READER.md)
 - **agents-builder skill** (2026-07-06) - a Claude Code skill that interviews a user (scenario → infer
-  camps) and writes an `AGENTS-TEMP.md` from the architectural camps in `AGENTS-BUILDER.md`; never
-  touches an existing `AGENTS.md`. Global skill, content embedded; built repo-local then hand-installed.
+  camps) and writes an `AGENTS-TEMP.md` from the architectural camps in
+  `PROJECT/4-MISC/OPINIONATED-ARCHITECTURE/OPINIONATED-PATTERNS.md`; never touches an existing
+  `AGENTS.md`. Global skill, content embedded; built repo-local then hand-installed.
   Queued as phase `p2` of the [2026-07-07 marathon](marathon/MARATHON-2026-07-07.yaml). ->
   [PROJECT/2-WORKING/AGENTS-BUILDER-SKILL.md](PROJECT/2-WORKING/AGENTS-BUILDER-SKILL.md)
 - **GH-9 — weekly progress counter (open GH issues + closed tasks this week)** (2026-07-03) - new
