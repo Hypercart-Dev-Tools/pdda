@@ -34,6 +34,17 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Queue / parked intake
 
+- **GH-17 — PROJECT/PDDA.md dead-references RECAP.md/REAL-AGENT-OBSERVATIONS.md** (2026-07-08) - two
+  claims in `PROJECT/PDDA.md`'s CHANGELOG section don't match reality (neither file exists anywhere in
+  the repo); found during GH-15 remediation, deliberately left flagged rather than exempted since it's a
+  different root cause. Needs a human decision on `REAL-AGENT-OBSERVATIONS.md`'s intended fate before a
+  ~2-4 line prose fix. Issue [#17](https://github.com/Hypercart-Dev-Tools/pdda/issues/17). ->
+  [PROJECT/1-INBOX/GH-17-RECAP-STALE-REFS.md](PROJECT/1-INBOX/GH-17-RECAP-STALE-REFS.md)
+- **GH-18 — ROUTER.md missing glance/quad-concepts subcommand docs** (2026-07-08) - `pdda-check-governance`'s
+  subcommand-drift check currently errors on HQ (`glance`, `quad-concepts` from GH-12 never got added to
+  `ROUTER.md`'s Command rails list); found during GH-15 Phase 3 verification. Trivial ≤2-3 line doc fix.
+  Issue [#18](https://github.com/Hypercart-Dev-Tools/pdda/issues/18). ->
+  [PROJECT/1-INBOX/GH-18-ROUTER-SUBCOMMAND-DRIFT.md](PROJECT/1-INBOX/GH-18-ROUTER-SUBCOMMAND-DRIFT.md)
 - **Marathon Plan (2026-07-07)** (2026-07-07) - the canonical XYZ-format marathon plan doc
   (hand-authored per `.xyz/README.md`'s Option B — the ROADMAP auto-generator, Option A, currently
   reports 0 active lanes) for the two build phases below, distinct from the machine-executable
