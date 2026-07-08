@@ -28,12 +28,23 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| Triaged GH-14 (governance fd exhaustion + BUG-001b) and GH-15 (fresh-install governance noise) into `2-WORKING` remediation plans; a Codex consult reviewed both and its findings (soft-degrade vs. hard-crash distinction, an incomplete exemption list, missing lockstep-doc QA gates) were adjudicated against `GUIDING-PRINCIPLES.md` and folded back in. No execution yet. | Start GH-14 Phase 1 (the verified one-line fd fix) and GH-15 Phase 1 (confirm the Option 3 exemption-by-manifest default). GH-10 Sentinel remains the other active build (Phase 2b executor). |
+| GH-15 closed: exemption-manifest fix for fresh-install governance noise shipped, verified (35→4 warns), and moved to `3-COMPLETED`; issue #15 closed. | Optionally spin the RECAP.md/REAL-AGENT-OBSERVATIONS.md drift and HQ's own `ROUTER.md` subcommand-drift errors (both found along the way, both out of GH-15's scope) into small follow-ups. GH-14 Phase 1 (verified one-line fd fix) still queued to start. GH-10 Sentinel remains the other active build (Phase 2b executor). |
 
 ## Ledger
 
 ### Queue / parked intake
 
+- **GH-17 — PROJECT/PDDA.md dead-references RECAP.md/REAL-AGENT-OBSERVATIONS.md** (2026-07-08) - two
+  claims in `PROJECT/PDDA.md`'s CHANGELOG section don't match reality (neither file exists anywhere in
+  the repo); found during GH-15 remediation, deliberately left flagged rather than exempted since it's a
+  different root cause. Needs a human decision on `REAL-AGENT-OBSERVATIONS.md`'s intended fate before a
+  ~2-4 line prose fix. Issue [#17](https://github.com/Hypercart-Dev-Tools/pdda/issues/17). ->
+  [PROJECT/1-INBOX/GH-17-RECAP-STALE-REFS.md](PROJECT/1-INBOX/GH-17-RECAP-STALE-REFS.md)
+- **GH-18 — ROUTER.md missing glance/quad-concepts subcommand docs** (2026-07-08) - `pdda-check-governance`'s
+  subcommand-drift check currently errors on HQ (`glance`, `quad-concepts` from GH-12 never got added to
+  `ROUTER.md`'s Command rails list); found during GH-15 Phase 3 verification. Trivial ≤2-3 line doc fix.
+  Issue [#18](https://github.com/Hypercart-Dev-Tools/pdda/issues/18). ->
+  [PROJECT/1-INBOX/GH-18-ROUTER-SUBCOMMAND-DRIFT.md](PROJECT/1-INBOX/GH-18-ROUTER-SUBCOMMAND-DRIFT.md)
 - **Marathon Plan (2026-07-07)** (2026-07-07) - the canonical XYZ-format marathon plan doc
   (hand-authored per `.xyz/README.md`'s Option B — the ROADMAP auto-generator, Option A, currently
   reports 0 active lanes) for the two build phases below, distinct from the machine-executable
@@ -66,13 +77,6 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   repo's own bash 3.2.57. Phase 2 (BUG-001b summary field) next. Issue
   [#14](https://github.com/Hypercart-Dev-Tools/pdda/issues/14). ->
   [PROJECT/2-WORKING/GH-14-GOVERNANCE-FD-EXHAUSTION.md](PROJECT/2-WORKING/GH-14-GOVERNANCE-FD-EXHAUSTION.md)
-- **GH-15 — fresh installs self-inflict ~30 governance warns** (2026-07-08) - `PDDA-INSTALL.md` and
-  `PROJECT/PDDA.md`, both shipped by the installer, dead-reference files the installer deliberately
-  omits (`ROUTER.md`, `AGENTS.md`, `GUIDING-PRINCIPLES.md`, `CLAUDE.md`, skill paths) plus 3 phantom
-  env-var warns, muddying first-run observe-mode signal for new adopters. 3 phases: choose fix approach
-  (default: exempt shipped-runtime docs by manifest), implement, verify. Issue
-  [#15](https://github.com/Hypercart-Dev-Tools/pdda/issues/15). ->
-  [PROJECT/2-WORKING/GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md](PROJECT/2-WORKING/GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md)
 - **GH-12 — Quad Concepts mode** (2026-07-07) - opt-in glance layer: tracked plan docs carry a
   `## Quad Concepts` section of 1–4 `pain → fix` bullets after `## Status`, so a cold-start reader gets
   5-second orientation and an operator can see if a plan covers the real pains. Orthogonal opt-in lever
@@ -93,6 +97,17 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Completed
 
+- **GH-15 — fresh installs self-inflict ~30 governance warns** (2026-07-08) - `PDDA-INSTALL.md` and
+  `PROJECT/PDDA.md`, both shipped by the installer, dead-referenced files the installer deliberately
+  omits (`ROUTER.md`, `AGENTS.md`, `GUIDING-PRINCIPLES.md`, `CLAUDE.md`, skill paths) plus 3 phantom
+  env-var warns, muddying first-run observe-mode signal for new adopters. Fixed via an exemption
+  manifest in `pdda-check-governance`, built from an actual fresh-install scan rather than the issue's
+  illustrative list (added `CLAUDE.md` + a legacy path the list missed; deliberately excluded two
+  lookalike warns — `RECAP.md`/`REAL-AGENT-OBSERVATIONS.md` — that turned out to be a separate,
+  pre-existing doc-accuracy drift in `PROJECT/PDDA.md`, flagged as a follow-up rather than exempted).
+  Verified: 35→4 warns on a fresh target, negative control confirmed no over-suppression. Issue
+  [#15](https://github.com/Hypercart-Dev-Tools/pdda/issues/15) (closed). ->
+  [PROJECT/3-COMPLETED/GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md](PROJECT/3-COMPLETED/GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md)
 - **Spike: XYZ harness -> Aider -> OpenRouter -> GLM 5.2** (2026-07-08) - tested whether the vendored
   `.xyz/relay-automation/aider-turn.sh` shim could drive GLM 5.2 (via OpenRouter) to autonomously execute
   GH-14 Phase 1. Pipeline wiring confirmed end-to-end (found + fixed 2 real integration bugs: Aider drops

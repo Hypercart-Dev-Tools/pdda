@@ -596,6 +596,19 @@ check_issue_doc_sync() {
 PDDA_GOVERNANCE_DOCS_DEFAULT="ROUTER.md AGENTS.md GUIDING-PRINCIPLES.md README.md CLAUDE.md PROJECT/PDDA.md utils/pdda/PDDA-INSTALL.md"
 PDDA_GOVERNANCE_INDEX_DEFAULT="ROUTER.md"
 
+# GH-15: two of the docs above (utils/pdda/PDDA-INSTALL.md, PROJECT/PDDA.md) are themselves shipped to
+# every target install, but legitimately reference files install.sh deliberately does NOT copy there —
+# the target's own repo-authored startup docs, HQ-only skill/companion-doc paths, and the pre-utils/pdda/
+# legacy layout path. A fresh `install.sh . --mode observe` self-inflicted ~30 dead-reference/env-var
+# warns from this exact mismatch on first run, drowning the target's own drift signal in PDDA-on-PDDA
+# noise. This manifest was built from an actual dead-reference scan of a bare `install.sh` target
+# (not retyped from the issue's illustrative list), so it matches real warns, not guesses. Scoped ONLY
+# to the shipped docs named below — a repo-authored governance doc (this HQ repo's own ROUTER.md,
+# AGENTS.md, ...) referencing one of these is still a real dead-reference bug and stays flagged.
+PDDA_GOV_SHIPPED_DOCS_DEFAULT="utils/pdda/PDDA-INSTALL.md PROJECT/PDDA.md"
+PDDA_GOV_SHIPPED_DOC_REF_EXEMPTIONS_DEFAULT="ROUTER.md AGENTS.md GUIDING-PRINCIPLES.md README.md CLAUDE.md .claude/skills/pdda/SKILL.md .claude/skills/governance-audit/SKILL.md PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md utils/PDDA-INSTALL.md"
+PDDA_GOV_SHIPPED_DOC_ENVVAR_EXEMPTIONS_DEFAULT="PDDA_REGISTRY PDDA_GITPULSE_DIR PDDA_SYNC_MAX_SHRINK"
+
 # Print "<line>\t<text>" for lines outside an exempt fence/blockquote — same carve-out convention as
 # check_hardcoded_paths (fenced console/text/transcript blocks and blockquotes are not scanned).
 _pdda_gov_scannable_lines() {
@@ -663,8 +676,11 @@ check_governance() {
   local CHECK_NAME="pdda-check-governance" rc=0
   local docs="${PDDA_GOVERNANCE_DOCS:-$PDDA_GOVERNANCE_DOCS_DEFAULT}"
   local index_doc="${PDDA_GOVERNANCE_INDEX:-$PDDA_GOVERNANCE_INDEX_DEFAULT}"
+  local shipped_docs="${PDDA_GOV_SHIPPED_DOCS:-$PDDA_GOV_SHIPPED_DOCS_DEFAULT}"
+  local ref_exempt="${PDDA_GOV_SHIPPED_DOC_REF_EXEMPTIONS:-$PDDA_GOV_SHIPPED_DOC_REF_EXEMPTIONS_DEFAULT}"
+  local envvar_exempt="${PDDA_GOV_SHIPPED_DOC_ENVVAR_EXEMPTIONS:-$PDDA_GOV_SHIPPED_DOC_ENVVAR_EXEMPTIONS_DEFAULT}"
   local doc file abs_file from_dir line_no text ref resolved base var line
-  local present_docs="" index_abs
+  local present_docs="" index_abs is_shipped_doc ref_path
 
   for doc in $docs; do
     [ -f "$PDDA_REPO_ROOT/$doc" ] && present_docs="$present_docs $doc"
@@ -684,10 +700,25 @@ check_governance() {
   for doc in $present_docs; do
     abs_file="$PDDA_REPO_ROOT/$doc"
     from_dir="$(dirname "$abs_file")"
+    is_shipped_doc=0
+    case " $shipped_docs " in *" $doc "*) is_shipped_doc=1 ;; esac
     while IFS=$'\t' read -r line_no text; do
       [ -n "$line_no" ] || continue
       while IFS= read -r ref; do
         [ -n "$ref" ] || continue
+        if [ "$is_shipped_doc" -eq 1 ]; then
+          # normalize away leading ./ or ../ so a relative mention (e.g. "../../PROJECT/3-COMPLETED/
+          # PDDA-SYNC-TO-OTHER-REPOS.md") matches the same manifest entry as its repo-relative form
+          ref_path="${ref%%#*}"
+          while :; do
+            case "$ref_path" in
+              ../*) ref_path="${ref_path#../}" ;;
+              ./*) ref_path="${ref_path#./}" ;;
+              *) break ;;
+            esac
+          done
+          case " $ref_exempt " in *" $ref_path "*) continue ;; esac
+        fi
         resolved="$(_pdda_gov_resolve_ref "$ref" "$from_dir")" || continue
         [ -f "$resolved" ] && continue
         pdda_record_finding warn "$CHECK_NAME" "$abs_file" "$line_no" \
@@ -750,8 +781,13 @@ check_governance() {
   shipped_vars="$(grep -ohE 'PDDA_[A-Z0-9_]+' "$HERE"/*.sh "$install_sh" 2>/dev/null | LC_ALL=C sort -u)"
   for doc in $present_docs; do
     abs_file="$PDDA_REPO_ROOT/$doc"
+    is_shipped_doc=0
+    case " $shipped_docs " in *" $doc "*) is_shipped_doc=1 ;; esac
     doc_vars="$(grep -ohE 'PDDA_[A-Z0-9_]+' "$abs_file" | LC_ALL=C sort -u)"
     for var in $doc_vars; do
+      if [ "$is_shipped_doc" -eq 1 ]; then
+        case " $envvar_exempt " in *" $var "*) continue ;; esac
+      fi
       if ! printf '%s\n' "$shipped_vars" | grep -Fxq "$var"; then
         line="$(grep -nF "$var" "$abs_file" | head -1 | cut -d: -f1)"
         pdda_record_finding warn "$CHECK_NAME" "$abs_file" "${line:-1}" \
