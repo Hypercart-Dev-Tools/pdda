@@ -161,6 +161,9 @@ PDDA_ROADMAP_MAX_LINES
 PDDA_ROADMAP_MAX_HEADINGS
 PDDA_GOVERNANCE_DOCS
 PDDA_GOVERNANCE_INDEX
+PDDA_GOV_SHIPPED_DOCS
+PDDA_GOV_SHIPPED_DOC_REF_EXEMPTIONS
+PDDA_GOV_SHIPPED_DOC_ENVVAR_EXEMPTIONS
 PDDA_LLM_BIN
 PDDA_LLM_ARGS
 PDDA_LLM_MODEL
@@ -171,10 +174,19 @@ flag), `PDDA_GH_STATE_CACHE` (the cached GitHub issue-state file used when `gh` 
 `pdda-gh-refresh.sh`), and `PDDA_ISSUE_SYNC_SOURCE` = `auto` (default: live `gh`, else cache) | `gh` |
 `cache` (the Stop doc-health hook forces `cache` to stay fast and offline-tolerant).
 
-`governance` adds two: `PDDA_GOVERNANCE_DOCS` (space-separated, repo-relative — the curated governance
+`governance` adds five: `PDDA_GOVERNANCE_DOCS` (space-separated, repo-relative — the curated governance
 doc set it scans; default `ROUTER.md AGENTS.md GUIDING-PRINCIPLES.md README.md CLAUDE.md PROJECT/PDDA.md
-utils/pdda/PDDA-INSTALL.md`) and `PDDA_GOVERNANCE_INDEX` (the doc every other governance doc must be
-reachable from; default `ROUTER.md`).
+utils/pdda/PDDA-INSTALL.md`), `PDDA_GOVERNANCE_INDEX` (the doc every other governance doc must be
+reachable from; default `ROUTER.md`), and three GH-15 exemption-manifest overrides scoped to the docs
+that ship to every target install (`PDDA-INSTALL.md`, `PROJECT/PDDA.md`) so a fresh install's first
+`pdda.sh run` doesn't self-inflict dead-reference/env-var noise from files `install.sh` deliberately
+never copies: `PDDA_GOV_SHIPPED_DOCS` (which shipped docs the exemptions apply to; default
+`utils/pdda/PDDA-INSTALL.md PROJECT/PDDA.md`), `PDDA_GOV_SHIPPED_DOC_REF_EXEMPTIONS` (basenames/paths
+those docs may dead-reference without a warn — the target's own startup docs, HQ-only skill and
+companion-doc paths, and the pre-`utils/pdda/` legacy install path), and
+`PDDA_GOV_SHIPPED_DOC_ENVVAR_EXEMPTIONS` (HQ-only-tool env vars those docs may mention without a warn).
+A repo-authored governance doc outside `PDDA_GOV_SHIPPED_DOCS` (e.g. this repo's own `ROUTER.md`) is
+never exempted — a dead reference there stays a real drift signal.
 
 ## Minimal target-repo expectations
 

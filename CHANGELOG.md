@@ -2,6 +2,33 @@
 
 ## 2026-07-08
 
+### GH-15 Phases 1–3 shipped: exemption-manifest fix for fresh-install governance noise
+
+Implemented the Option-3 fix (exempt-by-manifest, confirmed in the prior Codex-consult entry below) in
+`utils/pdda/pdda.sh`'s `check_governance`: three new manifest constants
+(`PDDA_GOV_SHIPPED_DOCS_DEFAULT`, `PDDA_GOV_SHIPPED_DOC_REF_EXEMPTIONS_DEFAULT`,
+`PDDA_GOV_SHIPPED_DOC_ENVVAR_EXEMPTIONS_DEFAULT`, each with a `PDDA_GOV_*` env override), scoped strictly
+to `utils/pdda/PDDA-INSTALL.md` and `PROJECT/PDDA.md` — the two docs `install.sh` ships to every target.
+Built from an **actual dead-reference scan** of a bare `install.sh` target (not the issue's illustrative
+list): the real scan found two entries the candidate list missed (`CLAUDE.md`, and the legacy
+pre-`utils/pdda/` path `utils/PDDA-INSTALL.md` named only in migration-note prose) and — importantly —
+excluded `RECAP.md`/`REAL-AGENT-OBSERVATIONS.md`, which don't exist even in HQ and are therefore a
+separate, pre-existing doc-accuracy drift, not this issue's install-omission pattern; left flagged rather
+than silently swept into the manifest. `utils/pdda/PDDA-INSTALL.md` and `PROJECT/PDDA.md` updated in the
+same change to document the new overrides (AGENTS.md #5).
+
+**Verification:** fresh `install.sh . --mode observe` into a clean scratch target, `pdda.sh governance`
+warns dropped **35 → 4** (the remaining 4 are the out-of-scope RECAP.md/REAL-AGENT-OBSERVATIONS.md
+mentions). Negative control: a throwaway repo-authored `ROUTER.md` added to the same target with a
+genuinely broken reference plus a reference to an exempted name — both still fired as `warn`, confirming
+the exemption didn't over-suppress. Re-ran on HQ itself too: warns 7 → 4 (same 4 remaining), errors
+unchanged at 2 (pre-existing `glance`/`quad-concepts` subcommand-drift in `ROUTER.md`, unrelated to
+GH-15, noted as a separate follow-up in the working doc). Full `pdda.sh run` exits 0 in both repos.
+
+Two follow-ups noted in the working doc, deliberately left out of this diff: the RECAP.md/
+REAL-AGENT-OBSERVATIONS.md prose-accuracy drift in `PROJECT/PDDA.md` (needs a human call on those files'
+fate), and HQ's own `ROUTER.md` subcommand-drift errors (trivial, unrelated fix).
+
 ### GH-14 + GH-15 triaged into remediation plans, reviewed by a Codex consult
 
 Two GitHub issues from an external beta test (`EOS-daily-skill` install exercise) triaged straight into
