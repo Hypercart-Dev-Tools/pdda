@@ -28,7 +28,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| Completed the **Defacto Project Memory Layer** reframing — `ROUTER.md` retrieval step, `PROJECT/PDDA.md` Memory Injection + Lessons Learned + `context_tags`, and two warn-only memory nudges in `pdda-doc-ready.sh`; CHANGELOG logged, README "The project memory layer" section added, doc archived to `PROJECT/3-COMPLETED/`. | GH-10 Sentinel is the active build (Phase 2b executor next). Operator opt-in still open: `register` real secondary repos for live sync propagation. |
+| Triaged GH-14 (governance fd exhaustion + BUG-001b) and GH-15 (fresh-install governance noise) into `2-WORKING` remediation plans; a Codex consult reviewed both and its findings (soft-degrade vs. hard-crash distinction, an incomplete exemption list, missing lockstep-doc QA gates) were adjudicated against `GUIDING-PRINCIPLES.md` and folded back in. No execution yet. | Start GH-14 Phase 1 (the verified one-line fd fix) and GH-15 Phase 1 (confirm the Option 3 exemption-by-manifest default). GH-10 Sentinel remains the other active build (Phase 2b executor). |
 
 ## Ledger
 
@@ -58,6 +58,20 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
+- **GH-14 — governance fd exhaustion on stock macOS bash 3.2** (2026-07-08) - dead-reference scan in
+  `pdda-check-governance` (`utils/pdda/pdda.sh:695`) exhausts file descriptors under bash 3.2.57 (stock
+  macOS, no Homebrew bash); worse, a crashed check still lets `pdda.sh run` report "all checks passed"
+  (BUG-001b). Reporter supplied a verified one-line fix + a 5-environment matrix. 3 phases: fix, surface
+  check-runtime failures in the run summary, verify. Issue
+  [#14](https://github.com/Hypercart-Dev-Tools/pdda/issues/14). ->
+  [PROJECT/2-WORKING/GH-14-GOVERNANCE-FD-EXHAUSTION.md](PROJECT/2-WORKING/GH-14-GOVERNANCE-FD-EXHAUSTION.md)
+- **GH-15 — fresh installs self-inflict ~30 governance warns** (2026-07-08) - `PDDA-INSTALL.md` and
+  `PROJECT/PDDA.md`, both shipped by the installer, dead-reference files the installer deliberately
+  omits (`ROUTER.md`, `AGENTS.md`, `GUIDING-PRINCIPLES.md`, `CLAUDE.md`, skill paths) plus 3 phantom
+  env-var warns, muddying first-run observe-mode signal for new adopters. 3 phases: choose fix approach
+  (default: exempt shipped-runtime docs by manifest), implement, verify. Issue
+  [#15](https://github.com/Hypercart-Dev-Tools/pdda/issues/15). ->
+  [PROJECT/2-WORKING/GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md](PROJECT/2-WORKING/GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md)
 - **GH-12 — Quad Concepts mode** (2026-07-07) - opt-in glance layer: tracked plan docs carry a
   `## Quad Concepts` section of 1–4 `pain → fix` bullets after `## Status`, so a cold-start reader gets
   5-second orientation and an operator can see if a plan covers the real pains. Orthogonal opt-in lever

@@ -1,5 +1,36 @@
 # CHANGELOG.md
 
+## 2026-07-08
+
+### GH-14 + GH-15 triaged into remediation plans, reviewed by a Codex consult
+
+Two GitHub issues from an external beta test (`EOS-daily-skill` install exercise) triaged straight into
+`PROJECT/2-WORKING/` as PDDA-compliant remediation plans (issue-first SOP, promoted directly since
+execution review starts immediately): [GH-14-GOVERNANCE-FD-EXHAUSTION.md](PROJECT/2-WORKING/GH-14-GOVERNANCE-FD-EXHAUSTION.md)
+(fd exhaustion in `pdda-check-governance`'s dead-reference scan under stock macOS bash 3.2, plus BUG-001b —
+a crashed check silently reporting "all checks passed") and
+[GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md](PROJECT/2-WORKING/GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md) (fresh
+installs self-inflict ~30 governance warns from shipped docs dead-referencing files the installer
+intentionally omits). Ran a one-shot `/relay-xyz` consult (`relay-automation/consult.sh`) with Codex against
+both plans; findings adjudicated against `GUIDING-PRINCIPLES.md` and folded back into both docs:
+
+- **[Confirmed, GH-14]** BUG-001b's `checks-failed-to-run` field only covers a check that *soft-degrades*
+  (swallows an internal error and still returns 0) — a *hard crash* that kills the whole `pdda.sh` process
+  can't self-report, since nothing survives to emit the field. Reproduced live during this triage: `bash
+  utils/pdda/pdda.sh governance` exited 134 (SIGABRT) under a raised `ulimit`, matching the reporter's row-2
+  matrix case exactly, on this very repo's default bash 3.2.57. Phase 2's QA gate tightened to require the
+  check body itself to detect and convert soft-degrade cases, not just format a summary line.
+- **[Confirmed, GH-15]** the exemption-manifest candidate list (Option 3) was missing `README.md` — it's in
+  `pdda-check-governance`'s own default scan set and referenced by the same shipped docs the issue names.
+  Phase 2 now directs building the manifest from an actual dead-reference scan of a bare target install, not
+  by retyping the issue's illustrative file list.
+- **[Confirmed, both]** neither plan had an explicit "update `PROJECT/PDDA.md` in the same change" QA gate
+  for the behavior changes each introduces (new summary field; new exemption manifest) — added per AGENTS.md
+  #5 (keep the installer surface in lockstep).
+
+No code changed yet — both docs are queued for phase-by-phase execution next. `pdda.sh run` clean against
+both new docs (frontmatter/status-table/roadmap-coverage/hardcoded-paths).
+
 ## 2026-07-07
 
 ### `/triage` + `/idea` — two PDDA intake front-door skills, hardened by a Codex + agy consult
