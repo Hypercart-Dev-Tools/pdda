@@ -31,6 +31,31 @@ both plans; findings adjudicated against `GUIDING-PRINCIPLES.md` and folded back
 No code changed yet — both docs are queued for phase-by-phase execution next. `pdda.sh run` clean against
 both new docs (frontmatter/status-table/roadmap-coverage/hardcoded-paths).
 
+### GH-14 Phase 1 shipped; spike closed on XYZ harness -> Aider -> OpenRouter -> GLM 5.2
+
+On `test/aider-openrouter-glm52-gh14-gh15` (off `main`), tested whether the vendored
+`.xyz/relay-automation/aider-turn.sh` shim (built earlier, GH-67/77/119/120-hardened; this was its first
+real exercise in this repo) could drive Aider through OpenRouter to GLM 5.2 to autonomously execute GH-14
+Phase 1 end to end. Full writeup: [AIDER-GLM-XYZ-HARNESS-TEST-2026-07-08.md](PROJECT/3-COMPLETED/AIDER-GLM-XYZ-HARNESS-TEST-2026-07-08.md).
+
+- Pipeline wiring confirmed end-to-end: OpenRouter model resolution (`glm-5.2` -> `z-ai/glm-5.2` via the
+  harness's own alias table), `tick` token coordination, containment, file-scoped commit. Found and fixed
+  2 real integration bugs along the way: Aider silently drops a gitignored `--file` target even with
+  `--no-gitignore` set; the lane-attempt-cap correctly required `--force` to re-fire after the first two
+  no-op attempts.
+- The model did not land the edit across 2 real attempts — it drafted the correct fix once but then
+  spiraled into requesting ~12 unrelated repo files and never finalized it, while the harness reported
+  false success ("committed") because its outcome check only verifies non-empty output, not that the
+  intended file actually changed. A second attempt with a tighter timeout was killed before the model
+  (a heavy "thinking" model) could respond at all — a tuning mistake, not a new finding.
+- **Bet:** the harness's success signal (empty-output guard) is not sufficient proof of task completion;
+  don't trust it for unattended runs without hardening the outcome check to diff the actual target files.
+  Revisit only if this pipeline is deliberately picked up again — see the spike doc's Recommendation.
+- GH-14 Phase 1 (the one-line fd fix) applied directly by hand instead. Verified 5/5 consecutive
+  `utils/pdda/pdda.sh governance` runs clean (exit 0, consistent finding count, no fd/trap crash — this
+  crash had been reproduced live twice earlier the same session on this repo's own stock bash 3.2.57,
+  SIGABRT then SIGSEGV). Full `pdda.sh run` also clean. GH-14 plan doc's Status + Phase 1 QA gate updated.
+
 ## 2026-07-07
 
 ### `/triage` + `/idea` — two PDDA intake front-door skills, hardened by a Codex + agy consult

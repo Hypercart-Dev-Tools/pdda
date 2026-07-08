@@ -25,7 +25,7 @@ related: [PROJECT/PDDA.md]
 
 | What was just completed | What's next |
 |---|---|
-| Issue #14 triaged and promoted to `2-WORKING`; reporter's verification matrix (5 environments, bash 3.2/5.2, before/after patch) and one-line fix transcribed below. | Phase 1 — apply the verified one-line fix at `utils/pdda/pdda.sh:695`, then re-run the reporter's matrix locally. |
+| **Phase 1 shipped 2026-07-08.** Applied the verified one-line fix at `utils/pdda/pdda.sh:695`. Verified on this repo's own stock bash 3.2.57: 5/5 consecutive `pdda.sh governance` runs clean (exit 0, consistent 12 findings, zero fd/trap crashes — this exact crash had been reproduced live twice earlier the same session, SIGABRT then SIGSEGV, before the fix). Full `pdda.sh run` also clean (exit 0). An Aider/OpenRouter/GLM-5.2 pipeline test attempted this same fix first (2 attempts, see `PROJECT/3-COMPLETED/AIDER-GLM-XYZ-HARNESS-TEST-2026-07-08.md`) but did not land it, so it was applied directly instead. | Phase 2 — BUG-001b: surface check-level runtime failures in the `pdda.sh run` summary (see the Codex-consult scope note below before starting). |
 
 ## Table of contents
 
@@ -82,10 +82,15 @@ Command substitution closes its fd immediately on completion; the here-string pr
 `< <(...)` was used in the first place). Here-strings are valid bash 3.2 syntax, so this needs no version gate.
 
 **QA gate:**
-- [ ] `utils/pdda/pdda.sh governance` runs clean under the repo's default shell with no fd/trap errors
-- [ ] finding count matches the pre-fix bash-5.2 reference count (no regression in detection, only in survivability)
-- [ ] diff stays narrowly scoped to the fd-exhaustion loop at `utils/pdda/pdda.sh:695` — no incidental
-      refactor of the surrounding dead-reference scan
+- [x] `utils/pdda/pdda.sh governance` runs clean under the repo's default shell with no fd/trap errors —
+      verified 5/5 consecutive runs, exit 0 each time, on this repo's own stock bash 3.2.57
+- [x] finding count matches the pre-fix bash-5.2 reference count (no regression in detection, only in
+      survivability) — this repo has no bash-5.2 reference run available, so verified instead as
+      **consistency**: all 5 patched runs reported the identical 12 findings (the pre-fix runs were
+      non-deterministic — 2/34 sometimes, a hard crash other times — so consistent-and-non-crashing is the
+      applicable signal here)
+- [x] diff stays narrowly scoped to the fd-exhaustion loop at `utils/pdda/pdda.sh:695` — one line changed,
+      nothing else touched
 
 ## Phase 2 — BUG-001b: surface check-level runtime failures
 

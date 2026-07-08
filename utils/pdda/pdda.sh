@@ -692,7 +692,7 @@ check_governance() {
         [ -f "$resolved" ] && continue
         pdda_record_finding warn "$CHECK_NAME" "$abs_file" "$line_no" \
           "dead reference '$ref' — no file at $(pdda_relpath "$resolved")" "fix-dead-reference"
-      done < <(_pdda_gov_extract_refs "$text")
+      done <<< "$(_pdda_gov_extract_refs "$text")"
     done < <(_pdda_gov_scannable_lines "$abs_file")
   done
 
