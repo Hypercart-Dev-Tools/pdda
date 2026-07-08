@@ -53,6 +53,8 @@ For targeted PDDA debugging, run a single check by name:
 ```bash
 utils/pdda/pdda.sh frontmatter
 utils/pdda/pdda.sh status-table
+utils/pdda/pdda.sh quad-concepts  # opt-in "## Quad Concepts" shape check (lever: .pdda-quad / PDDA_QUAD)
+utils/pdda/pdda.sh glance      # read-only roll-up: title + Quad Concepts across PROJECT/2-WORKING
 utils/pdda/pdda.sh hardcoded-paths
 utils/pdda/pdda.sh roadmap
 utils/pdda/pdda.sh roadmap-coverage

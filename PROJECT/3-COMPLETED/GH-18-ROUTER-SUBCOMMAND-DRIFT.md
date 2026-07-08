@@ -2,7 +2,7 @@
 gh_issue: 18
 source: https://github.com/Hypercart-Dev-Tools/pdda/issues/18
 title: "ROUTER.md doesn't document the glance and quad-concepts pdda.sh subcommands (governance error)"
-status: Proposed (1-INBOX — not yet active)
+status: Fixed (pending PR merge)
 created: 2026-07-08
 doc_type: bugfix
 context_tags: [governance, install, quad-concepts]
@@ -36,3 +36,12 @@ Trivial, doc-only: add `pdda.sh glance` and `pdda.sh quad-concepts` to `ROUTER.m
 subcommand list, matching how every other subcommand is already documented there. ≤2-3 lines — falls
 under the issue-first SOP's trivial-edit floor; tracked here only because it surfaced mid-way through
 unrelated GH-15 work and shouldn't get lost.
+
+## Resolution (2026-07-08)
+
+Added both subcommands to `ROUTER.md`'s "Command rails" list, in the same order `pdda.sh help` already
+lists them (`quad-concepts` after `status-table`, `glance` right after that) — matching the fact that
+`README.md` already documented both correctly, so `ROUTER.md` was the only doc actually out of lockstep.
+
+**Verified:** `pdda.sh governance` now reports `errors=0 warns=0` (previously `errors=2`). Full `pdda.sh
+run` clean. Shipped together with GH-17 on branch `fix/GH-17-GH-18`; PR open, not yet merged.

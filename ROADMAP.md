@@ -28,23 +28,12 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| GH-15 closed: exemption-manifest fix for fresh-install governance noise shipped, verified (35→4 warns), and moved to `3-COMPLETED`; issue #15 closed. | Optionally spin the RECAP.md/REAL-AGENT-OBSERVATIONS.md drift and HQ's own `ROUTER.md` subcommand-drift errors (both found along the way, both out of GH-15's scope) into small follow-ups. GH-14 Phase 1 (verified one-line fd fix) still queued to start. GH-10 Sentinel remains the other active build (Phase 2b executor). |
+| GH-17 + GH-18 fixed on branch `fix/GH-17-GH-18` (PR open, not yet merged): `PROJECT/PDDA.md`'s stale RECAP.md/REAL-AGENT-OBSERVATIONS.md references genericized (turned out to be copy-paste leftovers from the origin repo, not this repo's own files), `ROUTER.md` now documents `glance`/`quad-concepts`. `pdda.sh governance` errors=0 warns=0 on the branch. | Merge the PR once reviewed. GH-14 Phase 1 (verified one-line fd fix) still queued to start. GH-10 Sentinel remains the other active build (Phase 2b executor). |
 
 ## Ledger
 
 ### Queue / parked intake
 
-- **GH-17 — PROJECT/PDDA.md dead-references RECAP.md/REAL-AGENT-OBSERVATIONS.md** (2026-07-08) - two
-  claims in `PROJECT/PDDA.md`'s CHANGELOG section don't match reality (neither file exists anywhere in
-  the repo); found during GH-15 remediation, deliberately left flagged rather than exempted since it's a
-  different root cause. Needs a human decision on `REAL-AGENT-OBSERVATIONS.md`'s intended fate before a
-  ~2-4 line prose fix. Issue [#17](https://github.com/Hypercart-Dev-Tools/pdda/issues/17). ->
-  [PROJECT/1-INBOX/GH-17-RECAP-STALE-REFS.md](PROJECT/1-INBOX/GH-17-RECAP-STALE-REFS.md)
-- **GH-18 — ROUTER.md missing glance/quad-concepts subcommand docs** (2026-07-08) - `pdda-check-governance`'s
-  subcommand-drift check currently errors on HQ (`glance`, `quad-concepts` from GH-12 never got added to
-  `ROUTER.md`'s Command rails list); found during GH-15 Phase 3 verification. Trivial ≤2-3 line doc fix.
-  Issue [#18](https://github.com/Hypercart-Dev-Tools/pdda/issues/18). ->
-  [PROJECT/1-INBOX/GH-18-ROUTER-SUBCOMMAND-DRIFT.md](PROJECT/1-INBOX/GH-18-ROUTER-SUBCOMMAND-DRIFT.md)
 - **Marathon Plan (2026-07-07)** (2026-07-07) - the canonical XYZ-format marathon plan doc
   (hand-authored per `.xyz/README.md`'s Option B — the ROADMAP auto-generator, Option A, currently
   reports 0 active lanes) for the two build phases below, distinct from the machine-executable
@@ -97,6 +86,23 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Completed
 
+- **GH-17 — PROJECT/PDDA.md dead-references RECAP.md/REAL-AGENT-OBSERVATIONS.md** (2026-07-08) - two
+  claims in `PROJECT/PDDA.md`'s CHANGELOG section didn't match reality. Root cause found: both filenames
+  are real artifacts in the sibling `xyz-3-agents-swarm` repo this standalone repo's docs were extracted
+  from — Trinity-spike-specific files, never real here. Present since this repo's first commit
+  (confirmed via `git log -S`), a copy-paste leftover rather than an intentional claim. Fixed by
+  genericizing the three affected passages to describe the concept (a superseded narrative log; an
+  optional local compliance-observations doc) without naming specific filenames. `pdda.sh governance`
+  dead-reference warns for this doc: 4→0. Shipped with GH-18 on branch `fix/GH-17-GH-18` (PR open, not
+  yet merged). Issue [#17](https://github.com/Hypercart-Dev-Tools/pdda/issues/17). ->
+  [PROJECT/3-COMPLETED/GH-17-RECAP-STALE-REFS.md](PROJECT/3-COMPLETED/GH-17-RECAP-STALE-REFS.md)
+- **GH-18 — ROUTER.md missing glance/quad-concepts subcommand docs** (2026-07-08) - `pdda-check-governance`'s
+  subcommand-drift check errored on HQ (`glance`, `quad-concepts` from GH-12 never got added to
+  `ROUTER.md`'s Command rails list, though `README.md` already had them). Fixed: both added to
+  `ROUTER.md` in `pdda.sh help`'s own subcommand order. `pdda.sh governance` errors: 2→0. Shipped with
+  GH-17 on branch `fix/GH-17-GH-18` (PR open, not yet merged). Issue
+  [#18](https://github.com/Hypercart-Dev-Tools/pdda/issues/18). ->
+  [PROJECT/3-COMPLETED/GH-18-ROUTER-SUBCOMMAND-DRIFT.md](PROJECT/3-COMPLETED/GH-18-ROUTER-SUBCOMMAND-DRIFT.md)
 - **GH-15 — fresh installs self-inflict ~30 governance warns** (2026-07-08) - `PDDA-INSTALL.md` and
   `PROJECT/PDDA.md`, both shipped by the installer, dead-referenced files the installer deliberately
   omits (`ROUTER.md`, `AGENTS.md`, `GUIDING-PRINCIPLES.md`, `CLAUDE.md`, skill paths) plus 3 phantom

@@ -488,11 +488,12 @@ Minimum behavior (four checks, one shared `pdda-check-governance` id):
     referencing one of these is still a real dead-reference bug and is never exempted. The manifest was
     built from an actual dead-reference scan of a bare `install.sh` target, not retyped from an issue's
     illustrative list — re-run that scan if the shipped-doc set or its prose changes materially.
-    **Known separate issue, not covered by this manifest:** this file's own CHANGELOG section
-    dead-references the retired RECAP note-file and the REAL-AGENT-OBSERVATIONS compliance-findings
-    file (see the "CHANGELOG.md" section below), neither of which exist anywhere in this repo, not
-    even HQ — a pre-existing doc-accuracy drift unrelated to the install-omission pattern above; left
-    flagged rather than silently exempted pending a human decision on those files' fate.
+    **GH-17 (resolved separately from this manifest):** this file's own "CHANGELOG.md" section used to
+    dead-reference two specific filenames (a retired recap note, a compliance-observations file) that
+    turned out to be artifacts of the repo this contract doc was originally adapted from, never real
+    files in this standalone PDDA repo. Naming them here was a copy-paste leftover, not a real PDDA
+    requirement — genericized below rather than exempted, since a name that's dead *everywhere* is a
+    real accuracy bug (Principle #4), not an install-boundary false positive like the manifest above.
 - **orphan governance docs** (`warn`) — a present governance doc whose filename never appears anywhere
   in the index doc (`ROUTER.md` by default) — a doc a cold agent's startup sequence would never surface.
 - **subcommand drift** (`error`) — every subcommand in `utils/pdda/pdda.sh`'s dispatcher `case` block
@@ -666,9 +667,10 @@ How this is enforced (so it cannot quietly rot in either direction):
 ## CHANGELOG.md — end-of-iteration record (first-class)
 
 `CHANGELOG.md` is a first-class PDDA artifact: the canonical, newest-first running log of what changed,
-updated **at the end of each iteration**. It replaces `RECAP.md` (retired → `PROJECT/4-MISC/`) as the
-running provenance/narrative log. `REAL-AGENT-OBSERVATIONS.md` still holds run-specific compliance
-findings, and durable Costly / one-way-door bets still earn a `decisions/` record.
+updated **at the end of each iteration**. It is the one narrative/provenance log this contract
+prescribes — if an adopting repo kept its own ad hoc recap or run-observation notes before adopting
+PDDA, `CHANGELOG.md` supersedes them; PDDA does not require or name any such file itself (Principle #4 —
+one canonical place per fact). Durable Costly / one-way-door bets still earn a `decisions/` record.
 
 It should contain:
 
@@ -685,16 +687,18 @@ Maintained append-only:
 
 - add a new dated entry per iteration; **never rewrite a past entry's numbers, claims, or
   recommendation** — *especially* not when it turned out wrong. Correct a past entry by appending a
-  dated correction, not by editing history. This is the provenance guarantee `RECAP.md` used to carry.
+  dated correction, not by editing history. This append-only guarantee is the whole point of having one
+  canonical narrative log instead of scattered ad hoc notes.
 
 Recording a bet (when a change is consequential):
 
 - when a decision is Costly, a one-way door, or rides on an assumption that could be wrong, the entry
   records the call, the bet/assumption, the expected signal with a by-when, the reversibility read, a
   revisit trigger, and a graduate / iterate / abandon recommendation. Below that threshold a plain
-  entry suffices. Durable bets also earn a `decisions/` record; run-specific compliance findings go in
-  `REAL-AGENT-OBSERVATIONS.md`. (`AGENTS.md` principle #7 supplies the behavioral trigger — *record the
-  bet*; this contract owns the *where and how*, so governance is not fragmented across the two files.)
+  entry suffices. Durable bets also earn a `decisions/` record. An adopting repo is free to keep its own
+  separate run-specific compliance-observations doc if that's useful to it, but that's a local
+  convention this contract neither requires nor names. (`AGENTS.md` principle #7 supplies the
+  behavioral trigger — *record the bet*; this contract owns the *where and how*.)
 
 How this is enforced (a nudge, not a gate):
 - **deterministic** — `pdda.sh changelog` **warns** (never `error`, so it never blocks —

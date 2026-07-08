@@ -2,6 +2,30 @@
 
 ## 2026-07-08
 
+### GH-17 + GH-18 fixed: the two follow-ups GH-15 surfaced, resolved in one pass
+
+Both were filed as separate GitHub issues after GH-15 verification surfaced them as side effects (see
+below), then fixed together on branch `fix/GH-17-GH-18` (PR open, not yet merged at time of writing).
+
+- **GH-17 — `PROJECT/PDDA.md` dead-referenced `RECAP.md`/`REAL-AGENT-OBSERVATIONS.md`.** Root cause
+  found: checked the sibling `xyz-3-agents-swarm` repo — this standalone `pdda` repo's runtime and
+  contract docs were originally extracted from it, and both files genuinely exist there as
+  Trinity-spike-specific artifacts (a session recap, a real-agent hand-test log). `git log -S"RECAP.md"
+  -- PROJECT/PDDA.md` confirms both mentions have been present since this repo's first commit — never
+  real files here, a copy-paste leftover from the origin repo's context rather than an intentional
+  claim about this repo. Resolved (not just exempted, per Guiding Principles #4) by genericizing the
+  three affected passages in the "CHANGELOG.md — end-of-iteration record" section to describe the
+  *concept* (a superseded narrative log; an optional local compliance-observations doc an adopting repo
+  may keep) without naming specific filenames PDDA itself doesn't require.
+- **GH-18 — `ROUTER.md` didn't document the `glance`/`quad-concepts` subcommands**, tripping
+  `pdda-check-governance`'s error-level subcommand-drift check on HQ. Both were added to `pdda.sh`'s
+  dispatcher in GH-12 but never made it into `ROUTER.md`'s Command rails list (`README.md` already had
+  them correctly). Fixed: added both to `ROUTER.md`, in `pdda.sh help`'s own subcommand order.
+
+**Verification:** `pdda.sh governance` on this branch: `errors=0 warns=0` (previously `errors=2 warns=4`
+on `main`). Full `pdda.sh run` clean. Both `PROJECT/1-INBOX/GH-17-*.md` / `GH-18-*.md` captures updated
+with resolution notes and moved to `PROJECT/3-COMPLETED/`.
+
 ### GH-15 Phases 1–3 shipped: exemption-manifest fix for fresh-install governance noise
 
 Implemented the Option-3 fix (exempt-by-manifest, confirmed in the prior Codex-consult entry below) in
