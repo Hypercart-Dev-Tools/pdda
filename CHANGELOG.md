@@ -2,6 +2,41 @@
 
 ## 2026-07-07
 
+### `/triage` + `/idea` — two PDDA intake front-door skills, hardened by a Codex + agy consult
+
+Two sibling Claude Code skills that turn work intake into a PDDA-compliant capture, then a two-pass
+cross-model consult (Codex `gpt-5.4` + agy, independent) that found real drift in both. Both advisors
+said keep them; the fixes below are their reconciled findings, each verified against the shipped checks.
+
+- **`.claude/skills/triage/SKILL.md`** — incoming external report (URL) → `PROJECT/1-INBOX/GH-<n>-*.md`
+  remediation capture: distilled problem summary, a **light first-pass validation** table
+  (`Confirmed / Plausible / Unclear / Not-yet-verified`), and checklist phases with a dedicated
+  deeper-exploration spike. Resolves or opens the tracking issue; parks a `ROADMAP.md` queue pointer.
+- **`.claude/skills/idea/SKILL.md`** — net-new operator idea → the same capture shape, with a fixed
+  4-question intake and an LLM **synthesis** step (Why, Key Concepts, `non_goals`, provisional ratings)
+  that a static template structurally can't produce. Built from xyz-3-agents-swarm GH-164's deferred
+  `/idea` sketch, but made **self-sufficient** (direct PDDA write) since PDDA's vendored `hq` lacks the
+  `HQ_PARK_*` synthesis interface; `hq park --create` stays an optional accelerator.
+- **Consult fixes (both skills):** the advertised `pdda.sh frontmatter` verify was a **false green** —
+  `check_frontmatter` iterates `pdda_list_working_docs` (`2-WORKING` only), so it never validated the
+  1-INBOX capture it had just written. Verification now names the check that actually covers the path:
+  `roadmap-coverage` for a capture, `frontmatter`+`status-table`+`roadmap-coverage` for `--working`,
+  plus `quad-concepts` when the lever is on. Also: conditional `## Quad Concepts` block (1-INBOX/GH-* is
+  in quad scope), `owner` derived from `git config user.name` instead of hardcoded, `gh` unsandboxed-retry
+  preflight, and a one-doc-per-issue guard.
+- **`/triage` only:** `--working` now emits a real active doc (populated `## Status` table, `updated` +
+  `goal`, TOC/QA gates when multi-phase) and parks its pointer in the **active ledger**, not the queue
+  section; origin-vs-foreign detection normalizes SSH/HTTPS/`.git` to `host/owner/repo` before comparing.
+- **`/idea` only:** `--queue` **removed** — a 1-INBOX capture has no write-set and is un-promoted, so it
+  cannot be a runnable marathon lane; queuing is now an explicit post-promotion step. Collapsed to one
+  preview → one confirmation (resolving the GH-number-before-filename ordering), `doc_type` mapped
+  deterministically from the rough shape, and `non_goals` de-duplicated to frontmatter only.
+- **`PROJECT/PDDA.md`** — the reference selection rule is now
+  `eligible = risk <= 2 AND not ratings_provisional`. `ratings_provisional: true` is an **eligibility
+  gate, not just metadata**: auto-drafted intake ships best-guess ratings, and a rough `risk: 2` on a
+  large effort must not become auto-selectable on the strength of that guess. Same "route to a human"
+  posture as `risk >= 4`. (agy's finding; Codex had read provisional ratings as inert metadata.)
+
 ### Quad Concepts — an opt-in ≤4 pain→fix glance layer for plan docs (GH-12)
 
 A new **opt-in** convention (off by default): when the `.pdda-quad` / `PDDA_QUAD` lever is on, tracked

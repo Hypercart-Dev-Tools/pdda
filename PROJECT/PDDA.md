@@ -146,10 +146,16 @@ selection signal **live, at selection time**, from the raw fields:
 Reference selection rule (tune the thresholds per repo):
 
 ```text
-eligible      = risk <= 2                 # hard safety gate; risk >= 4 => route to a human
+eligible      = risk <= 2 AND not ratings_provisional   # safety gate; risk >= 4 => route to a human
 ease          = effort + complexity       # 2..10, lower = easier
 pick          = among eligible, lowest ease, then fewest phases as the tiebreak
 ```
+
+`ratings_provisional: true` is an **eligibility gate, not just metadata.** Auto-drafted intake (e.g.
+the `/idea` skill) ships best-guess ratings marked provisional; a rough `risk: 2` guess on a large
+effort must **not** become auto-selectable on the strength of that guess. So a provisional doc is held
+out of auto-selection until a human confirms the ratings and clears the flag — the same "route to a
+human" posture as `risk >= 4`.
 
 This keeps the raw ratings canonical and queryable while letting the "what's the easiest *safe* thing
 to grab" logic live in one place that can evolve. (See the resolved `priority` note under
