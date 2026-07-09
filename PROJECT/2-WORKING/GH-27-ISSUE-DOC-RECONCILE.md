@@ -2,7 +2,7 @@
 gh_issue: 27
 source: https://github.com/Hypercart-Dev-Tools/pdda/issues/27
 title: "issue-doc-sync misses both completion leaks: the check stops watching a doc at the moment it completes"
-status: Proposed (1-INBOX — not yet active)
+status: Active — P1, P2, P3 all shipped and verified; awaiting operator wrap of #12 and #15
 created: 2026-07-09
 updated: 2026-07-09
 owner: noel
@@ -10,7 +10,7 @@ doc_type: bugfix
 effort: 2
 complexity: 2
 risk: 1
-phases: 2
+phases: 3
 context_tags: [governance, issue-doc-sync, doc-lifecycle, staleness]
 related: [utils/pdda/pdda.sh, PROJECT/PDDA.md, GH-14-GOVERNANCE-FD-EXHAUSTION.md, GH-23-AGENT-ONRAMP.md]
 goal: >
@@ -28,7 +28,7 @@ Full write-up lives on the issue; this is the in-repo back-reference.
 
 | What was just completed | What's next |
 |---|---|
-| Diagnosed the staleness complaint. **PDDA is not missing a loop** — `pdda.sh issue-doc-sync` already checks both directions, is warn-only, prints exact remediation, and degrades offline. It reports `warns=0` on two live leaks in this repo. Root cause identified and two leaks verified against live GitHub state. | Promote to `2-WORKING` and build P1 (scope + honesty) then P2 (cache + untracked docs). Both warn-only. |
+| **P1, P2, P3 all shipped.** The check now scans `3-COMPLETED`, detects the hand-off phrase that defeated the lead-word heuristic, warns (not `info`) when it cannot evaluate, persists the gh-state cache on every live lookup, and the `Stop` hook now names `/pdda-eod` when reconciliation drift appears. Both live leaks surface: `pdda.sh run` went `warns=0` → `warns=2` on real drift, and the Stop hook went "all clear" → two findings plus a wrap prompt. Suite: 14 → 33 tests. | Operator wrap: close #15, and `git mv` GH-12's doc to `3-COMPLETED` then close #12. Both are **human judgments**, so the tooling recommends and stops. Optionally add the untracked-plan lever (see "Cut from scope"). |
 
 ## The finding
 
@@ -89,18 +89,67 @@ Direction (b) tries to infer doneness by parsing English from a `status:` field.
 **is** the assertion "this is done" — made by an operator, recorded in a path, verifiable with `test -f`.
 Key off the bucket and the fragile heuristic becomes unnecessary rather than merely improved.
 
+### Correction — the bucket does not subsume leak 2
+
+The original write-up of this issue claimed: *"change 1 also subsumes leak 2: once `3-COMPLETED` is
+scanned, GH-12's fate is decided by where the file sits."* **That is wrong**, and it was caught while
+implementing, not while planning.
+
+GH-12's doc sits in `2-WORKING`. Scanning `3-COMPLETED` cannot see it. Leak 2 is a doc whose *prose*
+claims done while its *bucket* says active — the bucket fix is structurally incapable of catching it.
+The two leaks are independent and need independent signals:
+
+| Leak | Bucket | Prose | Signal that catches it |
+|---|---|---|---|
+| 1 (GH-15) | `3-COMPLETED` | — | the bucket (new pass over `3-COMPLETED`) |
+| 2 (GH-12) | `2-WORKING` | "Ready to close" | an explicit hand-off phrase in `status:` |
+
+So leak 2 got its own narrow signal: a short, literal list of operator hand-off phrases
+(`ready to close`, `ready for 3-completed`, `awaiting close`), matched anywhere in the status,
+case-insensitively. Deliberately **not** a general "does this prose mean done?" parse — that is the
+false-positive machine the lead-word anchor was built to avoid. The negative control
+(`Active — Phase 0 complete, Phase 1 in progress`) pins that boundary.
+
 ## Phases
 
-- **P1 — Scope and honesty.** Scan `3-COMPLETED/`: a doc there whose issue is `OPEN` warns with
-  `recommend: gh issue close <n>`. Promote `state unavailable` from `info` to `warn`. Both are small,
-  local changes to `check_issue_doc_sync`. P1 alone catches both live leaks.
-  *Tests first:* land cases 1, 3, 6 red against today's code, then green. Plus negative controls 2, 4, 11.
-- **P2 — Persistence and coverage.** Write `.pdda-gh-state.tsv` on every successful live lookup so an
-  offline run evaluates against last-known state. Warn when a `2-WORKING` doc has neither `gh_issue:` nor
-  an explicit `issue_exempt: true`, mirroring the existing `roadmap_exempt` opt-out.
-  *Tests:* cases 5, 7, 8, 9, 10.
+- **P1 — Scope and honesty. Shipped.** Scan `3-COMPLETED/` (leak 1); detect the hand-off phrase (leak 2);
+  promote `state unavailable` from `info` to `warn`. New `pdda_list_completed_docs()` in `pdda-lib.sh`.
+- **P2 — Persistence. Shipped.** A successful live lookup now writes `.pdda-gh-state.tsv` via a new
+  shared `pdda_write_gh_state_cache()`, extracted from `pdda-gh-refresh.sh` so both writers share one
+  definition of the format and the atomic temp-file+`mv`. This is the change that makes the wrap fire:
+  the `Stop` hook reads that cache and makes no network call.
+- **P3 — The ask. Shipped.** The `Stop` hook, on any `issue-doc-sync` finding, names the wrap:
+  *"a unit of work looks finished but is not wrapped — run `/pdda-eod`."* `SKILLS/PDDA-EOD/SKILL.md`
+  retargeted from the clock to the unit of work, and its step 7 now takes close-candidates directly from
+  the check's findings instead of re-deriving them.
 
-Each phase lands green on `utils/pdda/pdda.sh run` **and** on `bash test/pdda-issue-doc-sync.sh`.
+Every phase landed green on `bash test/pdda-issue-doc-sync.sh`, `bash test/pdda-doc-health-hooks.sh`, and
+`utils/pdda/pdda.sh run` (`errors=0`; the two remaining `warn`s are the check correctly reporting real
+drift — see below).
+
+## Cut from scope, deliberately
+
+The plan proposed warning on a `2-WORKING` doc carrying neither `gh_issue:` nor `issue_exempt: true`.
+**Cut.** The existing suite asserted `(non-GH) untracked doc produces no findings`, and breaking that
+would have fired a warn on every untracked plan doc in every installed target on its first run — the
+precise self-inflicted-noise failure GH-15 was filed to fix. Making untracked plans declare themselves
+is worth doing behind an opt-in lever (like `.pdda-quad`), not by default. Left as a follow-up.
+
+That test's existence is the useful part: it encoded a deliberate decision, and it stopped a change that
+looked obviously good on paper.
+
+## Result
+
+| | Before | After |
+|---|---|---|
+| `pdda.sh run` on this repo | `warns=0` (over two real leaks) | `warns=2`, each naming its remediation |
+| `Stop` hook | `all clear` | two findings + *"run `/pdda-eod`"* |
+| `.pdda-gh-state.tsv` | never existed | written on every online run (17 states) |
+| `test/pdda-issue-doc-sync.sh` | 14 tests | 33 tests |
+
+Twelve of the new assertions **fail against the pre-fix code** — verified by running the new suite against
+`main`'s `pdda.sh` — which is what proves they reproduce the leaks rather than restate the fix. The four
+negative controls **pass against pre-fix code too**, which is what proves they are guards.
 
 ## Acceptance criteria
 

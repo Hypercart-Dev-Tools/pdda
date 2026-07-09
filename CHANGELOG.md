@@ -2,6 +2,69 @@
 
 ## 2026-07-09
 
+### GH-27 P1–P3 shipped: the wrap loop now fires, and it asks
+
+Before: `pdda.sh run` reported `warns=0` and the `Stop` hook printed **"all clear"** while two issues sat
+done-but-open. After: both surface, and the hook names the wrap that asks.
+
+**P1 — scope and honesty.** The check scanned `PROJECT/2-WORKING` only. Direction (a) recommends
+`git mv … 3-COMPLETED/`; the moment the operator complies the doc leaves scope and its open issue is
+orphaned. The remediation the check recommends was what blinded it. It now scans `3-COMPLETED` too
+(`pdda_list_completed_docs()`, new in `pdda-lib.sh`): doc there + issue OPEN → `warn`, `recommend: gh
+issue close <n>`. Doc there + issue CLOSED is the reconciled end state → silent. And
+`state unavailable` is now a **`warn`, not `info`** — a check that could not run is not a check that
+passed.
+
+**Correction to the issue's own analysis.** It claimed the `3-COMPLETED` scan would "subsume leak 2."
+It does not, and the error only surfaced during implementation. GH-12's doc is in `2-WORKING`; scanning
+`3-COMPLETED` structurally cannot see it. Leak 2 is *prose says done, bucket says active*, and it needed
+its own signal: a short literal list of operator hand-off phrases (`ready to close`,
+`ready for 3-completed`, `awaiting close`) matched anywhere in `status:`. Deliberately not a general
+"does this prose mean done?" parse — that is the false-positive machine the lead-word anchor exists to
+avoid. A negative control (`Active — Phase 0 complete, Phase 1 in progress`) pins the boundary.
+
+**P2 — persistence, and the reason the loop never fired.** The `Stop` hook reads the gh-state cache with
+`PDDA_ISSUE_SYNC_SOURCE=cache` and makes no network call — correct design. But `.pdda-gh-state.tsv` never
+existed: `run` fetched live state on every invocation and **threw it away**, and the only writer was a
+manual `gh-refresh` nobody ran. A successful live lookup now writes the cache through a new shared
+`pdda_write_gh_state_cache()`, extracted from `pdda-gh-refresh.sh` so both writers share one definition
+of the format and the atomic temp-file + `mv`. One missing file had broken all three layers of a
+correctly-built system.
+
+**P3 — the ask.** A script can detect that a unit of work finished. It must never close the issue; that
+is a human judgment, and the house style is *recommend, never act*. So the hook does the one thing a
+script legitimately can — it names the wrap: *"a unit of work looks finished but is not wrapped — run
+`/pdda-eod`."* `SKILLS/PDDA-EOD/SKILL.md` is retargeted from the clock to the unit of work: the trigger
+is **completion, not the end of day**, which is the only moment "should this issue be closed?" is
+answerable. Its step 7 now takes close-candidates straight from the check's findings rather than
+re-deriving them, including the row for "the check could not run — do not read this as nothing to do."
+
+No new subsystem, no new vocabulary. `PROJECT/PDDA.md` already names the unit: `CHANGELOG.md` is updated
+*"at the end of each iteration."* Adding `wrap`/`postflight` on top would be two words for one concept.
+
+**Cut from scope, deliberately.** The plan proposed warning on `2-WORKING` docs carrying no `gh_issue:`.
+The existing suite asserted `(non-GH) untracked doc produces no findings`, and honoring the plan would
+have fired a warn on every untracked plan doc in every installed target on first run — the exact
+self-inflicted-noise failure GH-15 was filed to fix. Cut, and left as an opt-in lever. That test's
+existence is the point: it encoded a deliberate decision and stopped a change that looked obviously good
+on paper.
+
+Also fixed a latent bug in the test harness: `printf '----\n…'` makes bash read the leading `--` as an
+end-of-options marker, so the diagnostic dump only ever failed on the failure path — where it was needed.
+
+Lockstep per AGENTS.md #5: `issue-doc-sync`'s behavior changed, so `PROJECT/PDDA.md` §H and
+`utils/pdda/PDDA-INSTALL.md` changed in the same commit.
+
+Verification: `test/pdda-issue-doc-sync.sh` **14 → 33 tests, all green**. The twelve new assertions were
+run against `main`'s pre-fix `pdda.sh` and **all twelve fail there** — that is what proves they reproduce
+the leaks rather than restate the fix. The four negative controls **pass against pre-fix code too**,
+which is what proves they are guards. `test/pdda-doc-health-hooks.sh` 18 → 22. Every other suite green
+(governance 13, changelog 7, publish 17, quad 6, install-startup-docs 16, sentinel-run 26).
+
+`utils/pdda/pdda.sh run` → `errors=0 warns=2`. **Those two warns are the feature, not a regression:** the
+check correctly reporting that GH-12 and GH-15 finished and were never wrapped. Clearing them means
+closing #12 and #15 — a human judgment, so the tooling stops here and asks.
+
 ### GH-27 captured: the doc/issue reconciliation loop exists, and stops watching at completion
 
 Intake only — no fix in this iteration. Filed

@@ -34,13 +34,6 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Queue / parked intake
 
-- **GH-27 — issue-doc-sync stops watching a doc at the moment it completes** (2026-07-09) - the
-  reconciliation loop is **not missing**: `pdda.sh issue-doc-sync` reports `warns=0` on two live leaks
-  here (GH-15's doc is in `3-COMPLETED` with issue #15 OPEN; GH-12's `status: Active — …Ready to close`
-  defeats the lead-word heuristic with #12 OPEN). It scans `2-WORKING` only, so following its own
-  `git mv` recommendation blinds it. 2 warn-only phases, no new subsystem. Issue
-  [#27](https://github.com/Hypercart-Dev-Tools/pdda/issues/27). ->
-  [PROJECT/1-INBOX/GH-27-ISSUE-DOC-RECONCILE.md](PROJECT/1-INBOX/GH-27-ISSUE-DOC-RECONCILE.md)
 - **GH-21 — SKILLS/PDDA-hook opt-in SessionStart doc-governance reminder** (2026-07-08) - new bundled
   skill that installs a `SessionStart` hook re-anchoring `ROUTER.md`/`AGENTS.md`/`PROJECT/PDDA.md` at
   every context boundary (startup/resume/clear/compact), auto-scoped via `PROJECT/PDDA.md` detection,
@@ -71,6 +64,14 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
+- **GH-27 — issue-doc-sync stopped watching a doc at the moment it completed** (2026-07-09) - **P1-P3
+  shipped.** The loop was never missing; it reported `warns=0` over two live leaks and the `Stop` hook
+  printed "all clear", because it scanned `2-WORKING` only and the gh-state cache was never written. Now
+  scans both buckets, warns when it *cannot* evaluate, persists the cache on every live lookup, and points
+  the operator at `/pdda-eod` — retargeted from the clock to completion. Warn-only, recommend-never-act.
+  Suite 14 → 33. Remaining: the operator wrap of #12 and #15. Issue
+  [#27](https://github.com/Hypercart-Dev-Tools/pdda/issues/27). ->
+  [PROJECT/2-WORKING/GH-27-ISSUE-DOC-RECONCILE.md](PROJECT/2-WORKING/GH-27-ISSUE-DOC-RECONCILE.md)
 - **GH-23 — agent on-ramp is wrong, expensive, and unenforced** (2026-07-09) - **active; promoted to
   `2-WORKING` 2026-07-09, built on branch `gh-23-agent-onramp`.** `--with-startup-docs` advertises an
   "adapted" `ROUTER.md` but `copy_runtime` copies it verbatim (`install.sh:65` vs `install.sh:245`), so
