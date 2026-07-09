@@ -60,10 +60,13 @@ Usage:
 
 Options:
   --force                Overwrite existing seed files (ROADMAP.md, CHANGELOG.md, .pdda-mode,
-                         blank.md placeholders). Runtime scripts + PROJECT/PDDA.md are always
-                         refreshed. Never touches your real PROJECT/** docs.
-  --with-startup-docs    Also install adapted ROUTER.md + AGENTS.md + GUIDING-PRINCIPLES.md + the
-                         /pdda re-orient skill (operator read-order scaffold).
+                         blank.md placeholders) and startup-doc scaffolds. Runtime scripts +
+                         PROJECT/PDDA.md are always refreshed. Never touches your real PROJECT/** docs.
+  --with-startup-docs    Also install the operator read-order scaffold: ROUTER.md (written from
+                         templates/ROUTER.target.md — the canonical repo's own ROUTER.md is NOT
+                         copied), AGENTS.md, GUIDING-PRINCIPLES.md, and the /pdda re-orient skill.
+                         The three docs are create-only: an existing file is kept, not overwritten
+                         (use --force). The /pdda skill is runtime and always refreshed.
   --no-migrate           Skip auto-migration of a pre-utils/pdda/ (flat) layout. By default, when the
                          target keeps the runtime flat under utils/, install removes the duplicate
                          PDDA-owned flat files and repoints old-path references to utils/pdda/.
@@ -314,6 +317,23 @@ migrate_flat_layout() {
   say "  migration done — review with: git -C \"$TARGET\" diff"
 }
 
+# Install a startup-doc scaffold: copy <src-relpath> to <dst-relpath>, but only if the destination is
+# absent (or when --force). This is deliberately NOT copy_runtime. copy_runtime's "safe to refresh"
+# premise holds for utils/pdda/** — files PDDA owns and a target never edits. It does not hold for the
+# startup docs, which `--help` itself calls a scaffold: the target owns them after the first install,
+# and refreshing them verbatim silently destroys the operator's work (GH-25).
+seed_from_source() {  # <src-relpath> [<dst-relpath>]
+  local src_rel="$1" dst_rel="${2:-$1}"
+  local src="$SOURCE_DIR/$src_rel" dst="$TARGET/$dst_rel"
+  mkdir -p "$(dirname "$dst")"
+  if [ -e "$dst" ] && [ "$FORCE" -ne 1 ]; then
+    say "  keep      $dst_rel (exists; --force to overwrite)"
+    return
+  fi
+  cp "$src" "$dst"
+  say "  scaffold  $dst_rel"
+}
+
 # Create a seed file only if absent (or when --force). Reads content from stdin.
 seed_file() {  # <relpath>  (content on stdin)
   local rel="$1" dst="$TARGET/$1"
@@ -454,9 +474,16 @@ while IFS= read -r rel; do
 done < <(pdda_manifest_expand "$SOURCE_DIR")
 
 if [ "$WITH_STARTUP_DOCS" -eq 1 ]; then
-  copy_runtime "ROUTER.md"
-  copy_runtime "AGENTS.md"
-  copy_runtime "GUIDING-PRINCIPLES.md"
+  # Three distinct semantics, deliberately not one call. Conflating them is GH-25 (a verbatim refresh
+  # ate a repo-authored AGENTS.md) and GH-23 P1 (the canonical repo's own router shipped into targets,
+  # naming install.sh and pdda-sync.sh — neither of which a target has).
+  #
+  #   templated  ROUTER.md   <- templates/ROUTER.target.md, NOT this repo's ROUTER.md
+  #   scaffold   AGENTS.md, GUIDING-PRINCIPLES.md   create-only; the target owns them after install
+  #   runtime    .claude/skills/pdda/SKILL.md       PDDA owns it; safe to refresh verbatim
+  seed_from_source "templates/ROUTER.target.md" "ROUTER.md"
+  seed_from_source "AGENTS.md"
+  seed_from_source "GUIDING-PRINCIPLES.md"
   copy_runtime ".claude/skills/pdda/SKILL.md"
 fi
 
