@@ -29,7 +29,7 @@ Full write-up lives on the issue; this is the in-repo back-reference.
 
 | What was just completed | What's next |
 |---|---|
-| Promoted `1-INBOX → 2-WORKING` on a `gh-23-agent-onramp` worktree cut from `main` — cut *after* PR #22 merged, so the baseline is genuinely `errors=0` and P1's `ROUTER.md` rewrite has no conflict to fight. All four cited code claims independently re-verified; see "Verification of the brief". | **P1** — stop shipping HQ's router into targets, then make `install.sh --help` stop claiming "adapted". Every phase lands green on `utils/pdda/pdda.sh run`. |
+| Promoted `1-INBOX → 2-WORKING`; branch `gh-23-agent-onramp` rebased onto `main`. All four cited code claims independently re-verified. **Target-side symptom reproduced end-to-end against the live `LTVera-Pandas` install**, captured as a regression fixture at `test/fixtures/gh-23/LTVera-Pandas-ROUTER.md`. One mechanism correction found — see "Reproduction". | **P1** — stop shipping HQ's router into targets, then make `install.sh --help` stop claiming "adapted". Every phase lands green on `utils/pdda/pdda.sh run`. |
 
 ## Verification of the brief
 
@@ -42,6 +42,58 @@ hold exactly as stated:
 | `install.sh:456-461` calls `copy_runtime` for it | Yes — four `copy_runtime` calls, `ROUTER.md` first |
 | `install.sh:244` documents `copy_runtime` as verbatim | Yes — `# Copy a runtime file verbatim, always`; the body is a bare `cp "$src" "$dst"` |
 | `pdda.sh:631-645` matches `.md` refs only | Yes — both `grep -oE` patterns hard-require `\.md`, and the function's own comment states the limit |
+
+## Reproduction (2026-07-09, `LTVera-Pandas`)
+
+Read-only, against the live target at `~/Documents/GitHub-Repos/LTVera-Pandas`. `pdda.sh` was **not**
+executed there (it appends to that repo's `PROJECT/PDDA-ACTIVITY.jsonl`); instead HQ's own
+`_pdda_gov_scannable_lines` and `_pdda_gov_extract_refs` were exercised directly against the target's
+`ROUTER.md`, which is the exact code path `pdda-check-governance` would take.
+
+**The copy is verbatim, and provably so.** The target's `ROUTER.md` is byte-identical (`md5
+3c1722da…`) to HQ's `ROUTER.md` at commit `5e2205b` ("Add Project Memory Layer docs", 2026-07-06). Not
+adapted, not stripped — `cp`.
+
+**Dead refs in the target:**
+
+| Ref | In target | Seen by the check |
+|---|---|---|
+| `install.sh` (L15) | **absent** | no — not `.md` |
+| `utils/pdda/pdda-sync.sh` (L72, L73, L74, L82) | **absent** | no — not `.md` |
+| `PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md` (L83) | **absent** | yes — the one warn |
+| `utils/pdda/pdda.sh` | present | n/a — live, must stay unflagged (negative control) |
+
+The extractor returns **35 refs, all `.md`, zero `.sh`.** Target `.pdda-mode` is `observe`, so the run
+exits 0 regardless; combined with the single warn, the operator sees "all checks passed" over a router
+that names two scripts the repo does not contain.
+
+### Mechanism correction: the fence is not the reason
+
+The intake says the `pdda-sync.sh` invocations at `ROUTER.md:72-74` "sit inside a ``` fence and match
+neither existing regex, so they are invisible twice over." **The fence half is wrong.**
+`_pdda_gov_scannable_lines` (`pdda.sh:614`) exempts only ` ```console `, ` ```text `, and
+` ```transcript ` fences. Lines 72-74 sit in a ` ```bash ` fence, and were confirmed present in the
+scanner's output. They are scanned; they are simply never matched.
+
+So the invisibility has **one** cause, not two — but that cause has two independent parts, and P3 must
+fix both:
+
+1. **The `.md` suffix requirement.** Widening to `.sh` alone would catch L15 (`` `install.sh` ``) and
+   L82 (`` `utils/pdda/pdda-sync.sh` ``), which are backtick-wrapped.
+2. **The ref *shape*.** L72-74 are bare command invocations — no backticks, no markdown link. They
+   match neither existing pattern regardless of suffix. Catching them needs a third pattern for
+   command-position paths inside a scanned fence, which is also where the false-positive risk lives
+   (`pdda.sh run` must not be read as a path).
+
+This makes the P3 negative control load-bearing rather than a formality: the same widening that catches
+`pdda-sync.sh` at L72 is the one that could misread `pdda.sh run` at L48.
+
+### Regression fixture
+
+Today's target `ROUTER.md` captured verbatim at
+[test/fixtures/gh-23/LTVera-Pandas-ROUTER.md](../../test/fixtures/gh-23/LTVera-Pandas-ROUTER.md)
+(87 lines, `md5 3c1722da561073073a1313afa5c1123d`). Satisfies the acceptance criterion. `test/` is the
+repo's existing convention — `test/pdda-governance-check.sh` is the suite P3 extends.
 
 One immaterial correction: the `copy_runtime` comment sits at **`install.sh:245`**, not `:244` — line 244
 is the closing brace of the preceding function. The finding is unaffected.
