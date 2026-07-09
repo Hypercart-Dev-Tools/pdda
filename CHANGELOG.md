@@ -2,6 +2,88 @@
 
 ## 2026-07-08
 
+### HQ governance cleared to zero: GH-17 + GH-18 fixed, three inactive docs archived
+
+`utils/pdda/pdda.sh run` on this repo went from **3 errors + 6 warns → 0 errors + 0 warns**. PDDA had
+been dogfooding itself into a permanently dirty baseline, which made every new finding easy to dismiss
+as "pre-existing." Five distinct fixes:
+
+**GH-17 (4 dead-reference warns).** `PROJECT/PDDA.md`'s CHANGELOG section claimed `RECAP.md` was
+"retired → `PROJECT/4-MISC/`" and that `REAL-AGENT-OBSERVATIONS.md` "still holds run-specific compliance
+findings." Neither file exists, and `git log --all` shows neither ever has — this was aspirational text
+inherited from the upstream repo PDDA was extracted from, not a record of deleted files. Maintainer
+confirmed both conventions retired. Prose reworded to drop the backticked-filename form (the
+dead-reference check is purely lexical and reads any `` `X.md` `` as a live cross-reference regardless of
+surrounding "retired"/"former" prose). The third claim was load-bearing: deleting it outright would have
+left run-specific compliance findings with no destination at all, so that role was explicitly reassigned
+to `CHANGELOG.md` rather than silently dropped.
+
+**GH-18 (2 subcommand-drift errors).** GH-12 shipped `glance` and `quad-concepts` into the `pdda.sh`
+dispatcher *and* into `pdda.sh help`, but never into `ROUTER.md`'s Command rails list — so
+`pdda-check-governance` errored on HQ itself, exactly the AGENTS.md #5 lockstep violation that check
+exists to catch. Both lines added, blurbs lifted verbatim from `pdda.sh help` so the two surfaces can't
+drift on wording. The generalizable lesson: **adding a `pdda.sh` subcommand is a three-file change
+(dispatcher + `help` + `ROUTER.md`), not two.**
+
+**1 roadmap-coverage error + 2 stale-doc warns.** Three docs archived to `PROJECT/4-MISC/` via `git mv`:
+`QUAD-GML52.md` (the raw, unedited GLM 5.2 design pass that seeded GH-12 — a provenance artifact
+mis-filed as active work, still carrying its chatbot preamble), plus `INSTALL-SCRIPT-AND-ONBOARDING.md`
+(10d stale) and `SYNC-LIST-STATUS-RECONCILE.md` (8d stale). Archived, deliberately **not** promoted to
+`3-COMPLETED` — both shipped their stated goal but neither reached a completion anyone declared, and
+`3-COMPLETED` would have claimed one. `ROADMAP.md`'s previously-empty "Deferred" section now records all
+three with why. GH-17 and GH-18's docs were promoted `1-INBOX → 3-COMPLETED`, each with a Resolution and
+a Lessons Learned section.
+
+The bet: a zero-finding baseline is worth more than the three docs' nominal "active" status, because a
+noisy baseline trains operators to ignore the tool. Reversibility: **Easy** — every move is a `git mv`,
+every edit is prose, nothing was deleted.
+
+Verification: `utils/pdda/pdda.sh run` → `errors=0 warns=0` across all nine checks (was `errors=3
+warns=6`). Note the run *already* printed "PDDA run complete: all checks passed" when it had 3 errors,
+because this repo is in `observe` mode and the gate returns exit 0 regardless — that is BUG-001b, tracked
+as GH-14 Phase 2, and this iteration hit it firsthand. **A green summary line from `pdda.sh run` is not
+currently evidence of a clean run; read the per-check `SUMMARY` lines.**
+
+### Registered experimental/PRD-pdda: synthesis of the PRD-Kimi and PRD-Perplexity drafts
+
+New third variant, `experimental/PRD-pdda/` (`SKILL.md` + six `references/` files), synthesizing the two
+competing drafts rather than replacing either — both sibling folders are untouched. Perplexity's
+execution rigor (FR-IDs, P0/P1/P2 with justification, verifiable acceptance criteria, explicit data
+model, NFR table, guardrail metric, agent-executable milestones with scope/dependency/completion-criteria
+/implementation-prompt structure) is preserved but rewritten in Kimi's plain-English, non-jargon voice.
+
+The substantive merge: Kimi's Iron Triangle (Faster/Better/Cheaper) is promoted from a *label* to the
+**governor** of the build plan. Perplexity gave every product the identical fixed 5-milestone ladder
+regardless of tradeoff; here each branch doc carries a "Milestone shape (governs MILESTONES.md)" section
+setting milestone count, pacing, and validation-gate density, and `milestone-template.md` explicitly
+instructs: *"Do not emit the default 5-milestone ladder regardless of the choice."* The branch doc sets
+the plan's shape; the template sets each milestone's format.
+
+Kimi's Cheaper-branch "UX/Dev Ratio Discipline" is carried through with all four guardrails intact — the
+load-bearing insight that Cheaper's failure mode is an *uneven* UX-vs-dev split (dev rabbit-holing while
+messaging gets the remainder), not underspending, and therefore demands *more* operator discipline than
+Faster or Better, not less. Its "good enough" bar now explicitly exempts onboarding and value-prop copy:
+everything else in a Cheaper build may ship rough; the messaging may not.
+
+Also new: a two-mode intake (Mode A quick-fire, one short question at a time; Mode B brain dump with an
+explicit extract → transform → infer pass and `(Inferred)` tagging), both routing through one shared
+target field set and one shared category-based inference library, with propose-a-default
+(Confirm/Adjust/Override) as the *default* behavior rather than a fallback. The whole interview is capped
+at **≤10 questions** across both intake and spec-grounding — one budget, not two — with Q7 firing
+conditionally (Cheaper only), so the realistic count is 9–10 and the ceiling is not a target.
+
+Correcting an assumption worth recording: **`PRD-Kimi/` has no `references/` folder.** It is a single
+511-line design narrative that embeds all six of its proposed reference files inline as fenced code
+blocks. `PRD-Perplexity/` is the only one of the two shaped as a real, installable skill. `PRD-pdda/`
+follows Perplexity's shape.
+
+Still draft-stage: not yet converted into an installed `.claude/skills/product-prd-builder/`. No
+`PROJECT/**` doc or GH issue (exploratory content, outside `pdda.sh roadmap-coverage` scope). Registered
+as a pointer in `ROADMAP.md`'s "In progress" ledger.
+
+Verification: `utils/pdda/pdda.sh run` → `errors=0 warns=0`. All 7 `references/*.md` cross-references in
+`SKILL.md` resolve to real files; `git status` confirms `PRD-Kimi/` and `PRD-Perplexity/` unmodified.
+
 ### Experimental PRD generator skill draft: split into PRD-Kimi and PRD-Perplexity variants
 
 Reorganized `experimental/PRD/` (a single early `SKILL.md` draft for a not-yet-built

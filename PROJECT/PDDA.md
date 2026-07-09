@@ -666,9 +666,10 @@ How this is enforced (so it cannot quietly rot in either direction):
 ## CHANGELOG.md — end-of-iteration record (first-class)
 
 `CHANGELOG.md` is a first-class PDDA artifact: the canonical, newest-first running log of what changed,
-updated **at the end of each iteration**. It replaces `RECAP.md` (retired → `PROJECT/4-MISC/`) as the
-running provenance/narrative log. `REAL-AGENT-OBSERVATIONS.md` still holds run-specific compliance
-findings, and durable Costly / one-way-door bets still earn a `decisions/` record.
+updated **at the end of each iteration**. It supersedes the retired RECAP convention as the running
+provenance/narrative log, and it also absorbs the run-specific compliance findings the retired
+REAL-AGENT-OBSERVATIONS convention used to collect. Durable Costly / one-way-door bets still earn a
+`decisions/` record.
 
 It should contain:
 
@@ -685,7 +686,8 @@ Maintained append-only:
 
 - add a new dated entry per iteration; **never rewrite a past entry's numbers, claims, or
   recommendation** — *especially* not when it turned out wrong. Correct a past entry by appending a
-  dated correction, not by editing history. This is the provenance guarantee `RECAP.md` used to carry.
+  dated correction, not by editing history. This is the provenance guarantee the retired RECAP
+  convention used to carry.
 
 Recording a bet (when a change is consequential):
 
@@ -693,8 +695,9 @@ Recording a bet (when a change is consequential):
   records the call, the bet/assumption, the expected signal with a by-when, the reversibility read, a
   revisit trigger, and a graduate / iterate / abandon recommendation. Below that threshold a plain
   entry suffices. Durable bets also earn a `decisions/` record; run-specific compliance findings go in
-  `REAL-AGENT-OBSERVATIONS.md`. (`AGENTS.md` principle #7 supplies the behavioral trigger — *record the
-  bet*; this contract owns the *where and how*, so governance is not fragmented across the two files.)
+  the iteration's own `CHANGELOG.md` entry. (`AGENTS.md` principle #7 supplies the behavioral trigger —
+  *record the bet*; this contract owns the *where and how*, so governance is not fragmented across the
+  two files.)
 
 How this is enforced (a nudge, not a gate):
 - **deterministic** — `pdda.sh changelog` **warns** (never `error`, so it never blocks —
