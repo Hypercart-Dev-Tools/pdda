@@ -153,5 +153,93 @@ T="$(new_target clean)"
 errs=$( cd "$T" && utils/pdda/pdda.sh run 2>&1 | grep -cE '^ERROR' || true )
 check "$errs" "0" "a fresh --with-startup-docs install reports zero errors in the target"
 
+
+# ===================================================================================================
+# GH-23 P2 — the post-install self-check.
+#
+# One assertion would have caught the whole of GH-23 at install time: a router naming a script the
+# target does not contain. For months --with-startup-docs shipped exactly that, and nothing noticed,
+# because pdda-check-governance only scans .md references.
+#
+# The cases marked NEGATIVE CONTROL are the ones that keep this from becoming a nuisance that gets
+# disabled: it must not police a router the operator wrote, and it must not flag a bare filename that
+# genuinely resolves.
+# ===================================================================================================
+
+# Build a throwaway copy of the canonical repo so a test can poison its template. .git is excluded on
+# purpose — pdda_manifest_expand then takes its non-git `find` fallback, which is itself worth covering.
+make_source_copy() {  # -> prints path
+  local dst="$SBOX/src-$1"
+  mkdir -p "$dst"
+  ( cd "$REPO" && tar -cf - --exclude='./.git' --exclude='./temp' . 2>/dev/null ) | ( cd "$dst" && tar -xf - )
+  printf '%s\n' "$dst"
+}
+
+# --- 8. Happy path: the self-check runs, passes, and says so ---------------------------------------
+T="$(new_target selfcheck-ok)"
+out="$("$REPO/install.sh" "$T" --with-startup-docs --no-register 2>&1)"; rc=$?
+case "$out" in *"self-check  ok"*) ok "self-check runs and passes on the real template" ;;
+               *) bad "self-check did not report ok"; printf '%s\n' "$out" ;; esac
+check "$rc" "0" "a clean install exits 0"
+
+# --- 9. THE POINT: a poisoned template fails the install ------------------------------------------
+# Reproduces GH-23 exactly: a target router naming install.sh and utils/pdda/pdda-sync.sh.
+SRC="$(make_source_copy poison)"
+cat >> "$SRC/templates/ROUTER.target.md" <<'POISON'
+
+## Routing hints (poisoned by the test)
+
+- If the task is about installing PDDA into another repo, run `install.sh <target>`.
+- To distribute this runtime, use `utils/pdda/pdda-sync.sh` — a canonical-only tool.
+POISON
+
+T="$(new_target poisoned)"
+out="$("$SRC/install.sh" "$T" --with-startup-docs --no-register 2>&1)"; rc=$?
+case "$out" in *'names "install.sh"'*)             ok "self-check names the dead bare ref (install.sh)" ;;
+               *) bad "did not flag install.sh"; printf '%s\n' "$out" ;; esac
+case "$out" in *'names "utils/pdda/pdda-sync.sh"'*) ok "self-check names the dead path ref (pdda-sync.sh)" ;;
+               *) bad "did not flag pdda-sync.sh" ;; esac
+case "$out" in *"2 dead script reference(s)"*)      ok "self-check counts the dead refs" ;;
+               *) bad "no dead-ref count" ;; esac
+case "$out" in *"bug in PDDA"*)                     ok "self-check blames the template, not the target repo" ;;
+               *) bad "did not attribute the failure to PDDA" ;; esac
+[ "$rc" -ne 0 ] && ok "a poisoned template makes install.sh exit non-zero" || bad "poisoned install exited 0"
+
+# ...and the install still COMPLETED. The router is misleading; the repo is usable. Aborting mid-install
+# would leave a half-provisioned tree, which is strictly worse.
+[ -f "$T/utils/pdda/pdda.sh" ] && ok "install still completes despite the failed self-check" || bad "install aborted mid-way"
+[ -f "$T/PROJECT/PDDA.md" ]    && ok "the contract still landed" || bad "PROJECT/PDDA.md missing"
+
+# --- 10. NEGATIVE CONTROL: never police a ROUTER.md the operator wrote ------------------------------
+# If --with-startup-docs kept their file, it is theirs. Failing their install over their own scripts
+# would be indefensible — and would make this check the first thing anyone turns off.
+T="$(new_target kept-router)"
+printf '# MY ROUTER\n\nRun `my-private-deploy.sh` before shipping.\n' > "$T/ROUTER.md"
+out="$("$REPO/install.sh" "$T" --with-startup-docs --no-register 2>&1)"; rc=$?
+check "$rc" "0" "an operator's own ROUTER.md never fails the install"
+case "$out" in *"self-check skipped"*) ok "self-check skips a kept router and says why" ;;
+               *) bad "did not skip the self-check for a kept router"; printf '%s\n' "$out" ;; esac
+case "$out" in *"my-private-deploy.sh"*) bad "flagged the operator's own script reference" ;;
+               *) ok "the operator's own dead .sh ref is not flagged" ;; esac
+grep -q 'my-private-deploy.sh' "$T/ROUTER.md" && ok "the operator's router is left untouched" || bad "operator's router was modified"
+
+# --- 11. NEGATIVE CONTROL: a bare filename that genuinely resolves must not flag --------------------
+# A doc may legitimately write `pdda-lib.sh` meaning utils/pdda/pdda-lib.sh. The bare-name fallback
+# mirrors _pdda_gov_resolve_ref. Without this test, tightening the matcher to paths-only looks correct.
+SRC="$(make_source_copy barename)"
+printf '\nSee `pdda-lib.sh` for the shared helpers.\n' >> "$SRC/templates/ROUTER.target.md"
+T="$(new_target barename)"
+out="$("$SRC/install.sh" "$T" --with-startup-docs --no-register 2>&1)"; rc=$?
+check "$rc" "0" "a bare filename that resolves elsewhere in the target does not fail the install"
+case "$out" in *'names "pdda-lib.sh"'*) bad "bare pdda-lib.sh was wrongly flagged as dead" ;;
+               *) ok "bare 'pdda-lib.sh' resolves via the repo-wide fallback" ;; esac
+
+# --- 12. Self-check is skipped entirely without --with-startup-docs ---------------------------------
+T="$(new_target no-startup-docs)"
+out="$("$REPO/install.sh" "$T" --no-register 2>&1)"; rc=$?
+check "$rc" "0" "a plain install exits 0"
+case "$out" in *"self-check"*) bad "self-check ran without --with-startup-docs" ;;
+               *) ok "no --with-startup-docs, no self-check" ;; esac
+
 printf '\n=== pdda-install-startup-docs: %d passed, %d failed ===\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

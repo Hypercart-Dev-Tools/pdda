@@ -2,6 +2,70 @@
 
 ## 2026-07-09
 
+### GH-23 P2: the installer now validates its own output
+
+`install.sh --with-startup-docs` writes a `ROUTER.md` into the target, then asserts that every `*.sh` path
+that router names resolves to a file present in the target. A dead reference prints each offending name and
+exits non-zero.
+
+This is the single assertion that would have caught the whole of GH-23 at install time. For months
+`--with-startup-docs` shipped the canonical repo's own router into every target — telling agents to run
+`install.sh` and `utils/pdda/pdda-sync.sh`, neither of which a target has — and nothing noticed, because
+`pdda-check-governance` only scans `.md` references. (That gap is P3.)
+
+Verified against the original bug. With the GH-23 refs re-injected into the template:
+
+```
+ERROR  ROUTER.md names "install.sh" but no such file exists in <target>
+ERROR  ROUTER.md names "utils/pdda/pdda-sync.sh" but no such file exists in <target>
+2 dead script reference(s) in the ROUTER.md this installer just wrote.
+```
+
+exit `1`. The same scenario against `main`'s pre-P2 `install.sh` exits `0` and ships the router silently.
+
+**Two boundaries, both learned rather than designed.**
+
+*Only validate a router the installer wrote.* If `--with-startup-docs` kept the operator's existing
+`ROUTER.md`, that file is theirs — failing their install over their own scripts would be indefensible, and
+would make this the first check anyone disables. `seed_from_source` now reports whether it wrote or kept,
+and the assertion is skipped for a kept file, with a line saying so.
+
+*Run it against the written artifact, not the source template.* P1's own smoke test is the proof: the first
+draft of `templates/ROUTER.target.md` told targets that a local edit "is overwritten on the next
+`pdda-sync.sh push`" — naming a script targets do not have. The template reintroduced the exact bug it
+exists to fix. Checking the *input* would have passed.
+
+**Severity is deliberately mode-independent.** The doc-hygiene `pdda.sh run` at the end of an install is
+warn-only in `observe`/`light`, correctly — it inspects the target's own docs. The self-check inspects
+**PDDA's own output**, so a dead ref there is a PDDA template bug and always exits non-zero. That exit is
+what stops `pdda-sync.sh register` from propagating a broken router further. The install still completes:
+aborting midway would leave a half-provisioned tree, strictly worse than a usable repo with a misleading
+router and a loud error. Two tests pin that.
+
+Bare filenames fall back to a repo-wide basename search, mirroring `_pdda_gov_resolve_ref` — a doc may
+legitimately write `pdda-lib.sh` meaning `utils/pdda/pdda-lib.sh`.
+
+**Also fixed, found while running the suite for this change.** `test/pdda-publish-projection.sh` failed
+3/17 on a stock macOS shell and passed everywhere else. macOS sets `TMPDIR` with a trailing slash, so
+`mktemp -d "$TMPDIR/x.XXXX"` yields `/…/T//x.abc` — while `install.sh` normalizes its target via
+`cd && pwd` to a single slash. The registry stored the normalized path; every assertion compared it
+against the raw doubled-slash string. Invisible in CI and in any sandbox that sets `TMPDIR` without the
+trailing slash. Now normalized at the sandbox root; verified 17/17 with `TMPDIR` both with and without it.
+
+Pre-existing and unrelated to this phase, but worth fixing on sight: **a test that fails on a correct
+codebase is worse than no test.** It teaches people to ignore the suite — the same disease as a check that
+reports success over a real defect.
+
+Lockstep per AGENTS.md #5: `install.sh` changed, so `--help` and `utils/pdda/PDDA-INSTALL.md` changed in
+the same commit.
+
+Verification: `test/pdda-install-startup-docs.sh` **16 → 33 tests, all green**. `utils/pdda/pdda.sh run`
+→ `errors=0 warns=0`. The four negative controls are the load-bearing ones — an operator's own dead `.sh`
+ref goes unflagged, a bare filename that resolves is not a false positive, a plain install never runs the
+check, and a poisoned template still leaves the contract installed. Without them, a "fix" that fails every
+install, or one that aborts halfway, passes every positive test.
+
+Reversibility: **Easy** — one function, one flag variable, one exit branch.
 ### Wrap: GH-12 and GH-15 reconciled — the first two units of work the new loop caught
 
 The wrap the tooling asked for. Both were flagged by `issue-doc-sync` the moment GH-27 P1–P3 landed, and

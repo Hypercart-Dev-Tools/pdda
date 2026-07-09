@@ -67,6 +67,9 @@ Options:
                          copied), AGENTS.md, GUIDING-PRINCIPLES.md, and the /pdda re-orient skill.
                          The three docs are create-only: an existing file is kept, not overwritten
                          (use --force). The /pdda skill is runtime and always refreshed.
+                         When ROUTER.md is written, a post-install self-check asserts that every
+                         *.sh it names exists in the target; a failure exits non-zero (a PDDA
+                         template bug). A ROUTER.md that was kept is never validated.
   --no-migrate           Skip auto-migration of a pre-utils/pdda/ (flat) layout. By default, when the
                          target keeps the runtime flat under utils/, install removes the duplicate
                          PDDA-owned flat files and repoints old-path references to utils/pdda/.
@@ -322,16 +325,71 @@ migrate_flat_layout() {
 # premise holds for utils/pdda/** — files PDDA owns and a target never edits. It does not hold for the
 # startup docs, which `--help` itself calls a scaffold: the target owns them after the first install,
 # and refreshing them verbatim silently destroys the operator's work (GH-25).
+# Set by seed_from_source: 1 if it wrote the destination, 0 if it kept an existing file. The
+# post-install self-check reads this — it must only validate a file the installer actually WROTE.
+SEEDED_LAST=0
+
 seed_from_source() {  # <src-relpath> [<dst-relpath>]
   local src_rel="$1" dst_rel="${2:-$1}"
   local src="$SOURCE_DIR/$src_rel" dst="$TARGET/$dst_rel"
+  SEEDED_LAST=0
   mkdir -p "$(dirname "$dst")"
   if [ -e "$dst" ] && [ "$FORCE" -ne 1 ]; then
     say "  keep      $dst_rel (exists; --force to overwrite)"
     return
   fi
   cp "$src" "$dst"
+  SEEDED_LAST=1
   say "  scaffold  $dst_rel"
+}
+
+# ------------------------------------------------------------------------------------------------
+# Post-install self-check (GH-23 P2)
+#
+# Assert that every `*.sh` path named in the ROUTER.md we just WROTE resolves to a file that exists in
+# the target. This single assertion would have caught the whole of GH-23 at install time: for months
+# `--with-startup-docs` copied the canonical repo's own router into every target, telling agents to run
+# `install.sh` and `utils/pdda/pdda-sync.sh` — neither of which a target has. No check saw it, because
+# `pdda-check-governance` only scans `.md` references (that gap is GH-23 P3).
+#
+# Two boundaries, both learned the hard way:
+#
+#   1. Only validate a file we WROTE. If --with-startup-docs kept the operator's existing ROUTER.md,
+#      that file is theirs; failing their install over their own scripts would be indefensible.
+#   2. Run it against the written artifact, not the source template. P1's first draft of
+#      templates/ROUTER.target.md reintroduced the exact bug it exists to fix (it told targets a local
+#      edit "is overwritten on the next `pdda-sync.sh push`"), and only an assertion on the OUTPUT
+#      caught it. Checking the input would have passed.
+#
+# Bare filenames (no directory component) fall back to a repo-wide basename search, mirroring
+# `_pdda_gov_resolve_ref` in pdda.sh — a doc may legitimately say `pdda.sh` meaning `utils/pdda/pdda.sh`.
+SELFCHECK_FAILED=0
+
+assert_written_router_refs() {
+  local router="$TARGET/ROUTER.md" ref missing=0
+  [ -f "$router" ] || return 0
+
+  say "  self-check  every *.sh named in the written ROUTER.md exists in the target"
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    case "$ref" in
+      */*) [ -e "$TARGET/$ref" ] && continue ;;
+      *)   [ -n "$(find "$TARGET" -name "$ref" -not -path '*/.git/*' -print -quit 2>/dev/null)" ] && continue ;;
+    esac
+    printf '  ERROR  ROUTER.md names "%s" but no such file exists in %s\n' "$ref" "$TARGET" >&2
+    missing=$((missing + 1))
+  done < <(grep -oE '[A-Za-z0-9_./-]+\.sh' "$router" | LC_ALL=C sort -u)
+
+  if [ "$missing" -gt 0 ]; then
+    {
+      printf '\n  %s dead script reference(s) in the ROUTER.md this installer just wrote.\n' "$missing"
+      printf '  This is a bug in PDDA'"'"'s templates/ROUTER.target.md, not in your repo.\n'
+      printf '  The target is installed and usable; its router is misleading. Please report it.\n\n'
+    } >&2
+    return 1
+  fi
+  say "  self-check  ok"
+  return 0
 }
 
 # Create a seed file only if absent (or when --force). Reads content from stdin.
@@ -482,9 +540,18 @@ if [ "$WITH_STARTUP_DOCS" -eq 1 ]; then
   #   scaffold   AGENTS.md, GUIDING-PRINCIPLES.md   create-only; the target owns them after install
   #   runtime    .claude/skills/pdda/SKILL.md       PDDA owns it; safe to refresh verbatim
   seed_from_source "templates/ROUTER.target.md" "ROUTER.md"
+  router_written="$SEEDED_LAST"
   seed_from_source "AGENTS.md"
   seed_from_source "GUIDING-PRINCIPLES.md"
   copy_runtime ".claude/skills/pdda/SKILL.md"
+
+  # GH-23 P2 — post-install self-check. One assertion would have caught the whole GH-23 bug at install
+  # time: a router that names a script the repo does not contain.
+  if [ "$router_written" -eq 1 ]; then
+    assert_written_router_refs || SELFCHECK_FAILED=1
+  else
+    say "  self-check skipped — ROUTER.md was kept, not written (it is yours, not ours to validate)"
+  fi
 fi
 
 migrate_flat_layout
@@ -602,3 +669,16 @@ else
     full)          say "In full mode errors block (non-zero exit); review the findings and re-run ./utils/pdda/pdda.sh run." ;;
   esac
 fi
+
+# The self-check validates PDDA's OWN output, not the target's content — so unlike the doc-hygiene run
+# above (which is warn-only in observe/light), a failure here is always a hard, mode-independent error.
+# It means PDDA shipped a router naming scripts the target does not have. The install itself completed;
+# exiting non-zero is what stops `pdda-sync.sh register` from propagating a broken router any further.
+if [ "$SELFCHECK_FAILED" -eq 1 ]; then
+  say ""
+  say "FAILED: post-install self-check — the ROUTER.md written into this target names scripts it does not have."
+  say "The target is installed and usable, but its router misdirects agents. This is a PDDA template bug."
+  exit 1
+fi
+
+exit 0

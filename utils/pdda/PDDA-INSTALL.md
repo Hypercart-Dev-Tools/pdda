@@ -71,7 +71,22 @@ the install** rather than copying all four the same way:
 The template exists because this repo's `ROUTER.md` documents things a target does not have: `install.sh`,
 `utils/pdda/pdda-sync.sh`, the runtime-distribution command rails, and the vendored `.xyz/` harness.
 Copying it verbatim pointed every target's agents at scripts absent from their repo (GH-23). The template
-is the canonical router minus those sections; keep the two in step when either changes. `.claude/skills/governance-audit/SKILL.md`
+is the canonical router minus those sections; keep the two in step when either changes.
+
+**Post-install self-check.** When `--with-startup-docs` *writes* `ROUTER.md`, the installer then asserts
+that every `*.sh` path that router names resolves to a file present in the target. A dead reference exits
+non-zero with the offending names. This is the assertion that would have caught GH-23 at install time.
+Two boundaries make it safe to keep enabled:
+
+- It validates only a router the installer **wrote**. If your own `ROUTER.md` was kept (create-only), it
+  is yours and is never checked — the installer will not fail your install over your own scripts.
+- It runs against the **written artifact**, not the source template. During GH-23 P1 the first draft of
+  `templates/ROUTER.target.md` reintroduced the very bug it exists to fix; only an assertion on the
+  *output* caught it. Checking the input would have passed.
+
+A failure here is a bug in PDDA's template, not in your repo. The install still completes — the target is
+usable, its router is misleading — and the non-zero exit is what stops `pdda-sync.sh register` from
+propagating it further. `.claude/skills/governance-audit/SKILL.md`
 (the `pdda.sh governance` companion — see `PROJECT/PDDA.md` § "I. `pdda.sh governance`") is the same
 kind of repo-local, not-installed-by-default skill; copy it manually into a target repo if wanted.
 
