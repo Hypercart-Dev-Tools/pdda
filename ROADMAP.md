@@ -33,6 +33,14 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 ## Ledger
 
 ### Queue / parked intake
+
+- **GH-27 — issue-doc-sync stops watching a doc at the moment it completes** (2026-07-09) - the
+  reconciliation loop is **not missing**: `pdda.sh issue-doc-sync` reports `warns=0` on two live leaks
+  here (GH-15's doc is in `3-COMPLETED` with issue #15 OPEN; GH-12's `status: Active — …Ready to close`
+  defeats the lead-word heuristic with #12 OPEN). It scans `2-WORKING` only, so following its own
+  `git mv` recommendation blinds it. 2 warn-only phases, no new subsystem. Issue
+  [#27](https://github.com/Hypercart-Dev-Tools/pdda/issues/27). ->
+  [PROJECT/1-INBOX/GH-27-ISSUE-DOC-RECONCILE.md](PROJECT/1-INBOX/GH-27-ISSUE-DOC-RECONCILE.md)
 - **GH-21 — SKILLS/PDDA-hook opt-in SessionStart doc-governance reminder** (2026-07-08) - new bundled
   skill that installs a `SessionStart` hook re-anchoring `ROUTER.md`/`AGENTS.md`/`PROJECT/PDDA.md` at
   every context boundary (startup/resume/clear/compact), auto-scoped via `PROJECT/PDDA.md` detection,

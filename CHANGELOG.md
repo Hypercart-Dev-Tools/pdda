@@ -2,6 +2,54 @@
 
 ## 2026-07-09
 
+### GH-27 captured: the doc/issue reconciliation loop exists, and stops watching at completion
+
+Intake only — no fix in this iteration. Filed
+[#27](https://github.com/Hypercart-Dev-Tools/pdda/issues/27), captured
+[PROJECT/1-INBOX/GH-27-ISSUE-DOC-RECONCILE.md](PROJECT/1-INBOX/GH-27-ISSUE-DOC-RECONCILE.md), parked it in
+[ROADMAP.md](ROADMAP.md).
+
+Prompted by the observation that PDDA/XYZ repos accumulate stale plans and issues that are done but never
+closed. The intuitive diagnosis — *a reconciliation loop is missing* — is wrong. `pdda.sh issue-doc-sync`
+already checks both directions, is warn-only, prints the exact `git mv` remediation, and degrades
+gracefully when `gh` is absent. The design is sound. **It reports `warns=0` on two live leaks in this very
+repo.**
+
+**Leak 1: following the check's own advice blinds it.** `check_issue_doc_sync` iterates
+`pdda_list_working_docs` — `PROJECT/2-WORKING` only. Direction (a) tells the operator
+`recommend: git mv … PROJECT/3-COMPLETED/`. The moment they comply, the doc leaves scope and its still-open
+issue is never mentioned again. `PROJECT/3-COMPLETED/GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md` sits there
+today while issue #15 is OPEN.
+
+**Leak 2: the status prose lies and the heuristic believes it.** GH-12's doc reads
+`status: Active — Phases 1–4 complete … Ready to close to 3-COMPLETED.` while issue #12 is OPEN. Direction
+(b) fires only on a terminal *lead word*; the lead word is `Active`. Every human reading that line knows
+the work is finished.
+
+Two further failure modes share the root. With no `gh` and no cache the check emits `info … sync not
+evaluated` — **an unevaluated check scored as a passing one**, which in `observe` mode surfaces as "all
+checks passed." That is the third instance this week of BUG-001b's shape (GH-14 Phase 2 is the first,
+GH-23's `.md`-only dead-ref scan the second). And `.pdda-gh-state.tsv` is never written: `run` uses live
+`gh` and discards what it fetched, so `gh-refresh` remains a manual command nobody runs and every offline
+run is permanently blind.
+
+The insight the fix rests on: **the lifecycle bucket is a deterministic signal; the status prose is not.**
+`3-COMPLETED/` *is* the operator's assertion that the work is done — recorded in a path, verifiable with
+`test -f`. Key off the bucket and the fragile lead-word heuristic becomes unnecessary rather than merely
+improved.
+
+Two warn-only phases, no new subsystem. Deliberately rejected as over-engineering: auto-closing issues
+(closing is a human judgment; PDDA's house style is *recommend, never act*), auto-`git mv`, webhooks, cron,
+bots, an LLM completeness judge, and adding `gh_issue` to `REQUIRED_KEYS` (it would break every non-issue
+doc in every installed target).
+
+`test/pdda-issue-doc-sync.sh` grows from 14 to 25 cases. Worth stating plainly: **that suite passed
+throughout both leaks.** It encoded the check's behavior rather than its purpose. Four of the eleven new
+cases are negative controls — a doc in `3-COMPLETED` whose issue is genuinely closed, a `2-WORKING` doc
+that is genuinely in progress, an explicit `issue_exempt: true`, and an exit-code guard — because without
+them a "fix" that warns on everything, or one that starts blocking builds, would pass every positive test.
+The two cases reproducing the live leaks are to be written first and watched to fail.
+
 ### GH-23 P1: stop shipping the canonical router into targets — and stop eating their AGENTS.md (#25)
 
 `install.sh --with-startup-docs` advertised an *"adapted `ROUTER.md`"* and delivered a `cp`. Every target
