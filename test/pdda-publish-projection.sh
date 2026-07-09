@@ -94,5 +94,65 @@ PROJ4="$GP4/pdda/registry-test-device.tsv"
 [ -f "$PROJ4" ] && pass "projection auto-published to sync_repo_dir from git-pulse config" || fail "autodetected projection missing ($PROJ4)"
 assert_contains "$(cat "$PROJ4" 2>/dev/null)" "fourth-repo" "autodetected projection lists the installed repo"
 
+# --- Case 5-8: GH-28 — warn_stale_projection_destination() -----------------------------------------
+# The projection write above (cases 1-4) can succeed on disk while never reaching origin, if the
+# git-pulse checkout itself isn't being committed/pushed by whatever job owns that. A real device was
+# found with 5 rows sitting uncommitted for over a week because its git-pulse sync job had stalled —
+# and every install reported success throughout. These cases pin the fix: warn, once, best-effort,
+# never blocking, only when the destination is actually dirty or behind its upstream.
+WARN_RE='warn: git-pulse'
+
+# A git-pulse checkout cloned from its own local bare "origin" -> gives it a real upstream so
+# ahead/behind is meaningful, with zero network access.
+gitpulse_with_upstream() {  # <dir-name> -> prints working-checkout path
+  local bare="$SBOX/$1-origin.git" work="$SBOX/$1"
+  git init -q --bare "$bare"
+  git clone -q "$bare" "$work"
+  ( cd "$work" && git config user.email t@e && git config user.name t \
+    && printf 'seed\n' > seed.txt && git add seed.txt && git commit -qm seed && git push -q origin HEAD )
+  printf '%s\n' "$work"
+}
+
+# Case 5: dirty destination (the projection write itself leaves pdda/ uncommitted) -> must warn.
+TARGET5="$SBOX/fifth-repo"; mkdir -p "$TARGET5"; git_init "$TARGET5"
+GP5="$(gitpulse_with_upstream gitpulse5)"
+REG5="$SBOX/registry5.tsv"
+out5="$(PDDA_REGISTRY="$REG5" PDDA_GITPULSE_DIR="$GP5" bash "$INSTALL" --mode observe "$TARGET5" 2>&1)"
+n=$(printf '%s' "$out5" | grep -cE "$WARN_RE.*uncommitted" || true)
+[ "$n" -gt 0 ] && pass "dirty projection destination (uncommitted pdda/) triggers a warning" \
+  || fail "dirty projection destination did not warn as expected"
+
+# Case 6: negative control — commit + push that same write, then re-check with the function directly
+# (not another install.sh run: re-running would re-register with a fresh timestamp and genuinely
+# re-dirty the file, which is a property of registration, not of this warning check).
+( cd "$GP5" && git add pdda && git commit -qm sync && git push -q origin HEAD )
+out6="$(bash -c "$(sed -n '/^warn_stale_projection_destination() {/,/^}/p' "$INSTALL")"'
+  say() { printf "%s\n" "$*"; }
+  warn_stale_projection_destination "$1"
+' _ "$GP5")"
+n=$(printf '%s' "$out6" | grep -cE "$WARN_RE" || true)
+[ "$n" -eq 0 ] && pass "clean, current git-pulse checkout: no stale/dirty warning" \
+  || fail "clean, current git-pulse checkout unexpectedly warned"
+
+# Case 7: behind destination — a second clone pushes ahead, the checkout under test fetches (so it
+# knows, without install.sh itself ever making a network call) that it's behind -> must warn.
+BARE7="$SBOX/gitpulse5-origin.git"  # same origin as case 5/6's checkout
+OTHER7="$SBOX/gitpulse7-other-clone"
+git clone -q "$BARE7" "$OTHER7"
+( cd "$OTHER7" && git config user.email t@e && git config user.name t \
+  && printf 'more\n' > more.txt && git add more.txt && git commit -qm more && git push -q origin HEAD )
+( cd "$GP5" && git fetch -q origin )
+out7="$(bash -c "$(sed -n '/^warn_stale_projection_destination() {/,/^}/p' "$INSTALL")"'
+  say() { printf "%s\n" "$*"; }
+  warn_stale_projection_destination "$1"
+' _ "$GP5")"
+n=$(printf '%s' "$out7" | grep -cE "$WARN_RE.*behind" || true)
+[ "$n" -gt 0 ] && pass "git-pulse checkout behind its upstream triggers a warning" \
+  || fail "git-pulse checkout behind its upstream did not warn"
+
+# Case 8: guardrail — none of the above ever fail the install itself (still installs, runtime present).
+[ -d "$TARGET5/utils/pdda" ] && pass "install still completes despite a dirty/behind git-pulse checkout" \
+  || fail "install did not complete when the git-pulse checkout was dirty/behind"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -33,6 +33,12 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 ## Ledger
 
 ### Queue / parked intake
+- **GH-28 — Audit & fix registry-to-git-pulse-sync projection drift** (2026-07-09) - Phase 0 found
+  `install.sh`'s projection write is actually correct; the real gap is it never warns when the
+  git-pulse checkout it targets is dirty/behind and never reaching origin (confirmed: 650 commits
+  behind, 5 rows stuck uncommitted since 2026-07-02 on this device). Phase 1 adds that warning. Feature,
+  2 phases. Captured via /idea. Issue [#28](https://github.com/Hypercart-Dev-Tools/pdda/issues/28). ->
+  [PROJECT/2-WORKING/GH-28-REGISTRY-PROJECTION-DRIFT.md](PROJECT/2-WORKING/GH-28-REGISTRY-PROJECTION-DRIFT.md)
 - **GH-21 — SKILLS/PDDA-hook opt-in SessionStart doc-governance reminder** (2026-07-08) - new bundled
   skill that installs a `SessionStart` hook re-anchoring `ROUTER.md`/`AGENTS.md`/`PROJECT/PDDA.md` at
   every context boundary (startup/resume/clear/compact), auto-scoped via `PROJECT/PDDA.md` detection,

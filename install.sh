@@ -95,7 +95,9 @@ path-normalized projection of the registry (repo name + date + source commit + m
 paths) into git-pulse's repo under pdda/, and git-pulse's own sync carries that status across your
 devices. Best-effort and fail-open — absent git-pulse it is silently skipped. The git-pulse checkout is
 auto-detected (git-pulse's config.sh sync_repo_dir, then common locations); set PDDA_GITPULSE_DIR to
-override or to a nonexistent path to disable. The local registry remains the source of truth.
+override or to a nonexistent path to disable. The local registry remains the source of truth. If the
+resolved checkout has uncommitted changes under pdda/, or is behind its own upstream as of its last
+fetch, a one-line warning names the path — the write to disk still always succeeds either way.
 
 After install it runs `utils/pdda/pdda.sh run` in the target so you see it working immediately.
 USAGE
@@ -418,7 +420,33 @@ publish_registry_projection() {
   mkdir -p "$gp/pdda" 2>/dev/null || { say "  (git-pulse pdda/ not writable — publish skipped)"; return 0; }
   out="$gp/pdda/registry-$dev.tsv"
   run_with_advisory_lock "$out" "git-pulse projection" write_registry_projection "$out"
+  warn_stale_projection_destination "$gp"
   return 0
+}
+
+# Best-effort: the projection write above can succeed on disk while never reaching origin, if the
+# git-pulse checkout itself isn't being committed/pushed by whatever job owns that (GH-28 — a real
+# device was found with 5 rows sitting uncommitted for over a week because its git-pulse sync job had
+# stalled, and publish_registry_projection reported success the whole time). This never fetches (no
+# network call on every install) — "behind" is only as fresh as the checkout's own last fetch/pull —
+# and never fails the install; it just makes the drift visible instead of silent.
+warn_stale_projection_destination() {
+  local gp="$1" dirty upstream counts behind
+  git -C "$gp" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  dirty="$(git -C "$gp" status --porcelain -- pdda 2>/dev/null || true)"
+  if [ -n "$dirty" ]; then
+    say "  (warn: git-pulse projection at $gp/pdda is uncommitted — it won't reach origin, or your other devices, until something commits + pushes that checkout)"
+  fi
+  upstream="$(git -C "$gp" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)" || return 0
+  [ -n "$upstream" ] || return 0
+  counts="$(git -C "$gp" rev-list --left-right --count "HEAD...$upstream" 2>/dev/null)" || return 0
+  behind="${counts#*$'\t'}"
+  case "$behind" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+  if [ "$behind" -gt 0 ]; then
+    say "  (warn: git-pulse checkout at $gp is $behind commit(s) behind $upstream as of its last fetch — the pdda projection there may be stale until it's pulled/pushed)"
+  fi
 }
 
 write_install_registry_row() {

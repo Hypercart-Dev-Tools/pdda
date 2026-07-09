@@ -2,6 +2,26 @@
 
 ## 2026-07-09
 
+### GH-28: registry-to-git-pulse-sync projection warns on drift it can't fix (#28)
+
+Filed as an audit of why the git-pulse-sync mirror of the per-device PDDA registry looked stale on one
+operator's machine (missing 2 of 5 real rows). The premise didn't survive Phase 0: `install.sh`'s
+`publish_registry_projection()` was writing a fully accurate, complete mirror on every install — the
+write-side logic had no bug. The real defect was a silent one: the git-pulse checkout it correctly
+targeted was **650 commits behind origin**, with the 5 rows PDDA wrote sitting as an uncommitted,
+unpushed local diff for over a week, because whatever job commits/pushes that checkout hadn't run since
+2026-07-02. `publish_registry_projection()` had no way to notice, and reported success throughout.
+
+`warn_stale_projection_destination()` closes that gap: best-effort, no network call (an ahead/behind
+check against the checkout's own last-known upstream, not a live fetch), never blocks the install — it
+just prints a one-line warning naming the path when the projection destination is dirty or behind,
+instead of leaving the drift invisible. Extended the existing `test/pdda-publish-projection.sh` (found
+it already owned this area) rather than adding a parallel test file: 21/21 passing, including 4 new
+cases (dirty warns, clean-after-commit is silent, behind warns, install still completes regardless).
+
+**Explicitly out of scope:** fixing or automating the operator's own stalled git-pulse checkout — that's
+their tooling to unstick, not a PDDA code change.
+
 ### GH-23 P1: stop shipping the canonical router into targets — and stop eating their AGENTS.md (#25)
 
 `install.sh --with-startup-docs` advertised an *"adapted `ROUTER.md`"* and delivered a `cp`. Every target
