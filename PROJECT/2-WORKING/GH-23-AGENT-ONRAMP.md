@@ -102,10 +102,61 @@ is the closing brace of the preceding function. The finding is unaffected.
 
 | Phase | State | Gate |
 |---|---|---|
-| P1 — template the target router; make `--help` true | Not started | `pdda.sh run` green |
+| P1 — template the target router; make `--help` true | **Shipped** — also fixes #25 | `pdda.sh run` green; 16/16 new tests |
 | P2 — post-install self-check on `*.sh` refs | Not started | `pdda.sh run` green |
 | P3 — widen `_pdda_gov_extract_refs` to `.sh` + fenced blocks | Not started | `pdda.sh run` green + negative control |
 | P4 — cheap directive 1; opt-in default-off `PreToolUse` gate | Not started | `pdda.sh run` green |
+
+## P1 — shipped 2026-07-09
+
+`--with-startup-docs` copied four files through one function. It now routes each by **who owns the file
+after the install**, which is the distinction `copy_runtime` was conflating:
+
+| Semantics | Files | Behavior |
+|---|---|---|
+| **Templated** | `ROUTER.md` | written from `templates/ROUTER.target.md`; the canonical `ROUTER.md` is never copied |
+| **Scaffold** | `AGENTS.md`, `GUIDING-PRINCIPLES.md` | create-only; `--force` to overwrite |
+| **Runtime** | `.claude/skills/pdda/SKILL.md` | PDDA owns it; refreshed verbatim |
+
+Result: a fresh target's `ROUTER.md` carries **0 canonical-only refs, down from 9**, and reports
+`errors=0 warns=0` under its own `pdda.sh run`.
+
+### Scope grew, deliberately
+
+P1 was specified as "stop shipping the canonical router." Checking the *other three* files
+`--with-startup-docs` copies surfaced a worse defect in the same four lines: `copy_runtime` has no
+create-only guard, so the flag **silently destroyed a repo-authored `AGENTS.md`** — no `--force`, no
+prompt, no backup. Verified by smoke test. Filed as
+[#25](https://github.com/Hypercart-Dev-Tools/pdda/issues/25) and fixed here, because leaving a data-loss
+bug inside the function P1 was already rewriting could not be justified.
+
+`PDDA-INSTALL.md:27` had disclosed the overwrite in prose. `install.sh --help` had not.
+
+### Corrections to the intake
+
+- **The 60.4KB `AGENTS.md` is `LTVera-Pandas`'s own file, not PDDA's.** PDDA ships a 2,289-byte
+  `AGENTS.md`. So "do not shrink `AGENTS.md`" concerns the target's file, and `--with-startup-docs`
+  would have replaced 60KB of that repo's convention with a 2KB stub.
+- **`pdda-sync.sh push` cannot repair installed targets.** The brief says P1/P2 landing is enough. It
+  is not: the sync manifest ships only `utils/pdda/` and `PROJECT/PDDA.md`, and `PDDA-INSTALL.md:260`
+  states outright that startup docs "are never touched." A stale target router is repaired only by an
+  explicit `install.sh <target> --with-startup-docs --force`. Documented in `PDDA-INSTALL.md`.
+- **`.xyz/` is gitignored and absent from the canonical repo**, yet `ROUTER.md:89-94` references
+  `.xyz/utils/marathon-plan.sh` and `.xyz/utils/hq/`. The canonical router carries the same class of
+  dead reference it was spreading. Stripped from the template; still present (and still invisible)
+  in the canonical router until P3.
+
+### What the smoke test caught
+
+The first draft of `templates/ROUTER.target.md` told targets a local runtime edit "is overwritten on the
+next `pdda-sync.sh push`" — naming a script targets do not have. **The template reintroduced the exact
+bug it exists to fix**, and the install-time assertion caught it before commit. That is the argument for
+P2 in one line: the check has to run on the file the installer *wrote*, not on the file it read.
+
+### Tests
+
+`test/pdda-install-startup-docs.sh` — 16 assertions. Includes the negative control that matters: a test
+proving `--force` *does* overwrite, so the create-only guard cannot pass by being an unconditional skip.
 
 ## Problem
 
