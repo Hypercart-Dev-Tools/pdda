@@ -75,6 +75,17 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
+- **PRD generator skill exploration — PRD-Kimi vs PRD-Perplexity** (2026-07-08) - two competing
+  draft-stage design docs for a not-yet-built `product-prd-builder` skill (structured PRD →
+  Spec/Roadmap interview). `PRD-Perplexity/` is the original draft (renamed, unchanged);
+  `PRD-Kimi/` is a new variant that forks Phase 2 on an Iron Triangle choice
+  (Faster/Better/Cheaper). Cheaper branch since expanded with a "Cheaper isn't the easy corner"
+  framing: its real failure mode is an uneven UX-vs-dev time/budget split (dev work rabbit-holing
+  while UX/messaging get whatever's left), not underspending — so it needs *more* operator
+  discipline than the other two branches, not less. No `PROJECT/**` doc or GH issue yet
+  (exploratory content, outside `pdda.sh roadmap-coverage` scope); not yet converted into an
+  installed skill. -> [experimental/PRD-Kimi/SKILL.md](experimental/PRD-Kimi/SKILL.md),
+  [experimental/PRD-Perplexity/SKILL.md](experimental/PRD-Perplexity/SKILL.md)
 - **GH-14 — governance fd exhaustion on stock macOS bash 3.2** (2026-07-08) - dead-reference scan in
   `pdda-check-governance` (`utils/pdda/pdda.sh:695`) exhausts file descriptors under bash 3.2.57 (stock
   macOS, no Homebrew bash); worse, a crashed check still lets `pdda.sh run` report "all checks passed"

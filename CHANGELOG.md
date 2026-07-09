@@ -2,6 +2,32 @@
 
 ## 2026-07-08
 
+### Experimental PRD generator skill draft: split into PRD-Kimi and PRD-Perplexity variants
+
+Reorganized `experimental/PRD/` (a single early `SKILL.md` draft for a not-yet-built
+`product-prd-builder` skill) into two parallel variants: `experimental/PRD-Perplexity/` (rename of
+the original draft, content unchanged) and a new `experimental/PRD-Kimi/SKILL.md`, which adds Iron
+Triangle branching (Faster/Better/Cheaper) as the primary Phase 2 scoping lever, plus Fast Track,
+table-stakes, and moat-question design decisions.
+
+Followed up by expanding the Cheaper branch (the Q7 interview script, the locked-decisions table,
+and `references/iron-triangle-cheaper.md`) with a "Cheaper isn't the easy corner" framing: Faster
+has a deadline as its forcing function and Better has a quality bar, but Cheaper has neither, so
+effort silently reallocates. Its real failure mode is an uneven UX-vs-dev time/budget split — dev
+work rabbit-holing on the technical problem while UX, copy, and messaging get whatever's left —
+not underspending outright. Added an explicit "UX/Dev Ratio Discipline" section: declare the split
+before Phase 1, time-box dev overruns as a gold-plating checkpoint, treat messaging/onboarding as a
+first-class deliverable every phase, and surface (not silently absorb) a broken ratio mid-build.
+
+Both variants remain draft-stage design docs, not yet converted into an installed
+`.claude/skills/product-prd-builder/` skill; no `PROJECT/**` doc or GH issue filed (exploratory
+content, outside `pdda.sh roadmap-coverage` scope). Registered a pointer in `ROADMAP.md`'s "In
+progress" ledger for visibility on request.
+
+Verification: `utils/pdda/pdda.sh run` — no new findings from this change (pre-existing
+`PROJECT/2-WORKING/QUAD-GML52.md` frontmatter error and `ROUTER.md` `glance`/`quad-concepts`
+subcommand-drift errors are unrelated, already tracked).
+
 ### GH-21 shipped: SKILLS/PDDA-hook opt-in SessionStart doc-governance reminder
 
 New bundled skill, `SKILLS/PDDA-hook/`, so PDDA compliance doesn't depend on the model remembering to
