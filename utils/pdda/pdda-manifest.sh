@@ -33,7 +33,7 @@ pdda_manifest_expand() {
     arg="${arg%/}"                          # normalize trailing slash on dir paths
     case "$kind" in
       dir)
-        # git-tracked files under this dir; fall back to a pruned find for a non-git HQ.
+        # git-tracked files under this dir; fall back to a pruned find for a non-git canonical repo.
         local f
         if git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
           while IFS= read -r f; do includes+=("$f"); done < <(git -C "$root" ls-files -- "$arg")

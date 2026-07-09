@@ -598,12 +598,12 @@ PDDA_GOVERNANCE_INDEX_DEFAULT="ROUTER.md"
 
 # GH-15: two of the docs above (utils/pdda/PDDA-INSTALL.md, PROJECT/PDDA.md) are themselves shipped to
 # every target install, but legitimately reference files install.sh deliberately does NOT copy there —
-# the target's own repo-authored startup docs, HQ-only skill/companion-doc paths, and the pre-utils/pdda/
+# the target's own repo-authored startup docs, canonical-only skill/companion-doc paths, and the pre-utils/pdda/
 # legacy layout path. A fresh `install.sh . --mode observe` self-inflicted ~30 dead-reference/env-var
 # warns from this exact mismatch on first run, drowning the target's own drift signal in PDDA-on-PDDA
 # noise. This manifest was built from an actual dead-reference scan of a bare `install.sh` target
 # (not retyped from the issue's illustrative list), so it matches real warns, not guesses. Scoped ONLY
-# to the shipped docs named below — a repo-authored governance doc (this HQ repo's own ROUTER.md,
+# to the shipped docs named below — a repo-authored governance doc (this canonical repo's own ROUTER.md,
 # AGENTS.md, ...) referencing one of these is still a real dead-reference bug and stays flagged.
 PDDA_GOV_SHIPPED_DOCS_DEFAULT="utils/pdda/PDDA-INSTALL.md PROJECT/PDDA.md"
 PDDA_GOV_SHIPPED_DOC_REF_EXEMPTIONS_DEFAULT="ROUTER.md AGENTS.md GUIDING-PRINCIPLES.md README.md CLAUDE.md .claude/skills/pdda/SKILL.md .claude/skills/governance-audit/SKILL.md PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md utils/PDDA-INSTALL.md"
@@ -772,7 +772,7 @@ check_governance() {
   # --- (4) env-var drift: a PDDA_* var named in a governance doc should exist in a shipped script ---
   # warn-only: PDDA_GOVERNANCE_INDEX_DEFAULT names ONLY the files a target install actually receives
   # (utils/pdda/*.sh + install.sh). PDDA-INSTALL.md itself ships to every target but also documents
-  # utils/pdda/pdda-sync.sh (an HQ-only tool never copied to targets, per its own "Canonical install
+  # utils/pdda/pdda-sync.sh (a canonical-only tool never copied to targets, per its own "Canonical install
   # set" list) — so a var like PDDA_SYNC_BACKUPS legitimately mentioned there will never resolve in a
   # target install. That's expected, not drift, so a false flag must cost one ignorable line, not a
   # blocked build (same calibration as the dead-reference check above).

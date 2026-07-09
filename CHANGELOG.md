@@ -1,5 +1,114 @@
 # CHANGELOG.md
 
+## 2026-07-09
+
+### Renamed the "HQ" role to "canonical repo" to stop colliding with XYZ's own HQ feature
+
+PDDA used **HQ** for the single-source-of-truth clone that distributes the runtime to registered
+targets — defined at `pdda-sync.sh:6`, *"HQ (this clone) is the single source of truth and the only
+writer."* The sibling `xyz-3-agents-swarm` repo has an unrelated **HQ** feature, and `ROUTER.md`'s own
+routing hints already point at `.xyz/utils/hq/`. Two different HQs, one of them in a path this repo
+mentions. Renamed PDDA's to **canonical repo** before the collision cost anyone a debugging session.
+
+Mechanical but not blind. Every occurrence was prose or a comment — **no variables, no paths, no state
+keys, no registry fields** — so nothing in `temp/` or the target registry needed migrating. Two were
+user-visible strings (`pdda-sync.sh`'s dirty-push warning and its `--help` banner); both changed.
+
+Three defects were introduced by the substitution and caught on diff review, worth naming because they
+are exactly what makes a global find-and-replace untrustworthy: `an HQ-only tool` became
+`an canonical-only tool` (twice); `HQ-side deletions` at a sentence start became lowercase
+`canonical-side deletions`; and `from one canonical source ("HQ" = this clone)` collapsed into the
+tautology `from one canonical source ("canonical repo" = this clone)`. All three fixed.
+
+Note the word now does two jobs. `PDDA-INSTALL.md` already used **"Canonical install set"** for the file
+list the installer copies — unrelated to the repo role. Left alone; they read distinctly in context, but
+a future rename should not assume one meaning.
+
+Deliberately **not** renamed, because rewriting them would falsify a record rather than fix a term:
+
+- `CHANGELOG.md` — append-only by contract (`PROJECT/PDDA.md`); past entries are never edited
+- `PROJECT/3-COMPLETED/**` and `PROJECT/4-MISC/**` — historical records of work as it was done
+- `test/fixtures/gh-23/LTVera-Pandas-ROUTER.md` — a verbatim, md5-pinned capture of a live target
+
+Those still say HQ, correctly, as an account of what the term was at the time.
+
+Lockstep per AGENTS.md #5: `pdda-sync.sh`'s help text changed, so `utils/pdda/PDDA-INSTALL.md` and
+`PROJECT/PDDA.md` changed in the same commit.
+
+Verification: `utils/pdda/pdda.sh run` → `errors=0 warns=0`. Full suite: **198 passed, 0 failed** across
+all nine `test/*.sh` files. `pdda-sync.sh status` still enumerates registered targets. `bash -n` clean on
+every touched script.
+
+Reversibility: **Easy** — prose-only, one commit.
+
+### Fixed: HQ tracked `PROJECT/**/BLANK.md`, so every fresh clone failed `pdda.sh run`
+
+Renamed the four lifecycle placeholders from `BLANK.md` to `blank.md` in git. Found while cutting a
+worktree for GH-23: the freshly-checked-out tree reported **3 errors + 3 warns** on a commit where the
+existing clone reported zero.
+
+Every other surface already agrees the name is lowercase. `install.sh:468` seeds
+`PROJECT/$bucket/blank.md`; `install.sh:469`'s own placeholder comment says *"PDDA checks ignore
+blank.md"*; `PROJECT/PDDA.md:42` calls `blank.md` scaffolding; and `pdda-lib.sh` skips it with
+`find … ! -name 'blank.md'` — **case-sensitively**. Only git's index disagreed, and it had since the
+first commit (`d7e6e7e`).
+
+The bug was invisible on the maintainer's clone because `core.ignorecase=true` on macOS: a lowercase
+`blank.md` created at some point never triggered a rename in the index, so the working directory showed
+`blank.md` while git tracked `BLANK.md`. Any `git clone`, any `git worktree add`, and any CI runner on a
+case-sensitive filesystem materializes the tracked uppercase name, at which point the `find` exclusion
+misses it and all four placeholders enter scope as real working docs: missing frontmatter, missing
+`## Status` table, missing ROADMAP pointer, plus three `blank.md` dead-reference warns in
+`PROJECT/PDDA.md`.
+
+Installed targets were never affected — `install.sh` writes the lowercase name — so this was HQ-only.
+
+This is the third instance this week of the same shape, and worth naming: **`pdda.sh run` reporting
+green is a statement about one working directory, not about the commit.** GH-14 Phase 2 (BUG-001b) has
+it reporting success over a real defect because `observe` mode returns exit 0; GH-23 has it reporting
+success over a router that misdirects agents because the dead-ref scan only sees `.md`; this has it
+reporting success over an index that no fresh clone can reproduce.
+
+Reversibility: **Easy** — four `git mv`s, no content touched (each file is a one-line placeholder).
+
+Verification: `utils/pdda/pdda.sh run` in a pristine `git worktree` of this commit → `errors=0 warns=0`
+(was `errors=3 warns=3`).
+
+Not fixed here, noted for follow-up: six `.DS_Store` files are tracked, including
+`PROJECT/2-WORKING/.DS_Store`. They break no check today (the doc scans are `-name '*.md'`) and removing
+tracked files is out of scope for this branch.
+
+### GH-23 captured: targets inherit HQ's `ROUTER.md` verbatim, and no check can see it
+
+Intake only — no fix in this iteration. Filed
+[#23](https://github.com/Hypercart-Dev-Tools/pdda/issues/23), captured
+[PROJECT/1-INBOX/GH-23-AGENT-ONRAMP.md](PROJECT/1-INBOX/GH-23-AGENT-ONRAMP.md), parked it in
+[ROADMAP.md](ROADMAP.md) as queued-for-immediate-work.
+
+Found by dogfooding in the `LTVera-Pandas` target. Three verified findings:
+
+**`--with-startup-docs` does not adapt anything.** `install.sh:65` advertises an "adapted `ROUTER.md` +
+`AGENTS.md` + `GUIDING-PRINCIPLES.md`". The implementation (`install.sh:456-461`) calls `copy_runtime`,
+documented at `install.sh:244` as *"Copy a runtime file verbatim, always."* It is a bare `cp`. The word
+"adapted" is unearned.
+
+**So every target gets HQ's router.** `LTVera-Pandas`'s `ROUTER.md` instructs agents to run `install.sh`
+and `utils/pdda/pdda-sync.sh` — neither present in a target — and carries a "distribute this runtime from
+this clone (HQ)" command-rails block plus install/sync routing hints. Roughly a third of the file an agent
+is told to read *first* cannot apply.
+
+**The deterministic surface cannot see it, by design.** `_pdda_gov_extract_refs`
+(`utils/pdda/pdda.sh:631-645`) matches only refs ending in `.md`; its own comment states the limit. The
+dead refs are `.sh`, so `pdda-check-governance` flagged the single dead `.md` link and stayed silent on
+the rest — `pdda.sh run` reported *"all checks passed"* on a router that actively misdirects agents. This
+rhymes with GH-14 Phase 2 (BUG-001b): both are `run` reporting success over a real defect.
+
+The GH-21 `SessionStart` hook is not implicated — it fired, auto-scoped, and injected exactly as designed.
+The agent then followed the reminder's cheap, checkable directives (run `pdda.sh run`, update
+`CHANGELOG.md`) and silently skipped the expensive, unverifiable one (read `ROUTER.md` + a 60.4KB
+`AGENTS.md`). Compliance with an injected reminder is still voluntary; an agent drops whichever directive
+costs most and is checked least.
+
 ## 2026-07-08
 
 ### HQ governance cleared to zero: GH-17 + GH-18 fixed, three inactive docs archived

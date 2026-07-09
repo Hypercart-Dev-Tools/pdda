@@ -107,7 +107,7 @@ EOF
 out="$(run_check)"
 assert_contains "$out" "PDDA_TOTALLY_MADE_UP_VAR" "a fabricated env var not read by any shipped script is flagged"
 assert_contains "$out" "WARN [pdda-check-governance]" \
-  "env-var drift is severity warn, not error (PDDA-INSTALL.md legitimately documents HQ-only pdda-sync.sh vars that a target install never ships)"
+  "env-var drift is severity warn, not error (PDDA-INSTALL.md legitimately documents canonical-only pdda-sync.sh vars that a target install never ships)"
 
 new_sandbox
 cat > "$SBOX/ROUTER.md" <<'EOF'

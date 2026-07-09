@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# pdda-sync.sh — distribute this HQ clone's PDDA runtime to registered target repos.
+# pdda-sync.sh — distribute this canonical clone's PDDA runtime to registered target repos.
 #
-# HQ (this clone) is the single source of truth and the only writer. `register` enrolls a target and
+# The canonical repo (this clone) is the single source of truth and the only writer. `register` enrolls a target and
 # does the initial install (delegating to install.sh, which is the SOLE registry writer). `push` is the
-# steady-state distributor: it copies files whose content has advanced and mirrors HQ-side deletions —
+# steady-state distributor: it copies files whose content has advanced and mirrors canonical-side deletions —
 # always backing up the target's version first. A launchd job (install-agent) is an OPTIONAL wrapper
 # over `push`.
 #
@@ -15,7 +15,7 @@ set -euo pipefail
 # See PROJECT/2-WORKING/PDDA-SYNC-TO-OTHER-REPOS.md for the full design.
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE_DIR="$(cd "$HERE/../.." && pwd)"   # HQ repo root
+SOURCE_DIR="$(cd "$HERE/../.." && pwd)"   # canonical repo root
 # shellcheck source=utils/pdda/pdda-manifest.sh
 . "$HERE/pdda-manifest.sh"
 
@@ -23,7 +23,7 @@ SOURCE_DIR="$(cd "$HERE/../.." && pwd)"   # HQ repo root
 # and override knob as install.sh so the two agree without coordination.
 PDDA_REGISTRY="${PDDA_REGISTRY:-${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv}"
 
-# Gitignored HQ-side runtime state (created lazily, never tracked).
+# Gitignored canonical-side runtime state (created lazily, never tracked).
 SYNC_TMP="${PDDA_SYNC_TMP:-$SOURCE_DIR/temp}"
 STATE_DIR="$SYNC_TMP/pdda-sync-state"
 MANIFEST_SNAP_DIR="$SYNC_TMP/pdda-sync-manifest"
@@ -232,7 +232,7 @@ acquire_lock() {
 }
 release_lock() { rm -rf "$LOCK_DIR"; }
 
-# Refuse to push from a dirty HQ (any manifest file modified/staged). Returns 1 if dirty.
+# Refuse to push from a dirty canonical repo (any manifest file modified/staged). Returns 1 if dirty.
 dirty_source_check() {  # manifest on stdin
   git -C "$SOURCE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
   local rel dirty=0
@@ -305,7 +305,7 @@ cmd_push() {
   # Dirty-source guard.
   if [ "$ALLOW_DIRTY" -eq 0 ]; then
     if ! printf '%s\n' "$CUR_MANIFEST" | dirty_source_check; then
-      warn "push: HQ has uncommitted changes to manifest files — commit them or pass --allow-dirty"; return 1
+      warn "push: the canonical repo has uncommitted changes to manifest files — commit them or pass --allow-dirty"; return 1
     fi
   fi
 
@@ -436,7 +436,7 @@ EOF
 }
 
 # Content-currency check used by `list`: returns 0 iff every manifest file exists in the target and its
-# content matches HQ (i.e. `status` would report behind=0 diverged=0), else 1. Collapses status's
+# content matches the canonical repo (i.e. `status` would report behind=0 diverged=0), else 1. Collapses status's
 # current/behind/diverged distinction to a single boolean — status stays the authoritative per-file report;
 # this just keeps `list` from implying staleness it never verified. Reads the manifest from $1 to avoid
 # re-expanding per target.
@@ -640,7 +640,7 @@ cmd_uninstall_agent() {
 
 usage() {
   cat <<'USAGE'
-pdda-sync.sh — distribute the PDDA runtime from HQ to registered target repos.
+pdda-sync.sh — distribute the PDDA runtime from the canonical repo to registered target repos.
 
 Usage: pdda-sync.sh <command> [options]
 
