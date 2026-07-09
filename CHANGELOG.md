@@ -2,6 +2,36 @@
 
 ## 2026-07-08
 
+### GH-21 shipped: SKILLS/PDDA-hook opt-in SessionStart doc-governance reminder
+
+New bundled skill, `SKILLS/PDDA-hook/`, so PDDA compliance doesn't depend on the model remembering to
+(re-)read `ROUTER.md`/`AGENTS.md`/`PROJECT/PDDA.md` across a long session, after `/compact`, or after
+`/clear`. Installs a `SessionStart` hook (`scripts/pdda-doc-governance-reminder.sh`, `startup`/`resume`/
+`clear`/`compact` matchers) that re-injects a short doc-governance reminder at every context boundary,
+auto-scoped via a `PROJECT/PDDA.md` runtime check so one registration is safe across both PDDA and
+non-PDDA repos. Personal, propose-then-confirm, and only ever writes to the operator's own
+`~/.claude/settings.json` (global scope) or a repo's `.claude/settings.local.json` (repo-local scope) —
+never a repo's committed `settings.json`.
+
+Global scope is a deliberate, called-out exception to this repo's norm of wiring hooks repo-local
+(`utils/pdda/pdda-edit-doc-hook.sh`, `utils/pdda/pdda-stop-doc-health.sh` both live in the committed
+`.claude/settings.json`): "remember to open ROUTER.md" is a cross-repo operator habit, not a per-repo
+lint rule, so this skill is allowed to write to `~/.claude` where PDDA's other tooling otherwise avoids
+it.
+
+Follow-up hardening after an initial review found two gaps: the globally-deployed script had drifted
+from the skill's canonical source (re-synced, now byte-identical), and the repo-local guardrail claimed
+`.claude/settings.local.json` was "gitignored by convention" without verifying that — it was only
+ignored via the operator's personal global git ignore, not this repo's own `.gitignore`. Fixed both:
+`SKILL.md` now runs `git check-ignore` before a repo-local write and asks before proceeding if nothing
+covers the file, and this repo's `.gitignore` now excludes `.claude/settings.local.json` directly so a
+fresh clone is covered without relying on the operator's machine config.
+
+Verification: `./utils/pdda/pdda.sh run` (pre-existing, unrelated findings only — QUAD-GML52.md
+frontmatter/roadmap-coverage, `ROUTER.md` `glance`/`quad-concepts` subcommand drift); manually diffed
+the reconciled hook script against `SKILLS/PDDA-hook/scripts/pdda-doc-governance-reminder.sh` (now
+identical); confirmed the hook is live and firing via this session's own `SessionStart` reminder.
+
 ### GH-15 Phases 1–3 shipped: exemption-manifest fix for fresh-install governance noise
 
 Implemented the Option-3 fix (exempt-by-manifest, confirmed in the prior Codex-consult entry below) in

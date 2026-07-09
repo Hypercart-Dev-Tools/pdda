@@ -45,6 +45,12 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   `ROUTER.md`'s Command rails list); found during GH-15 Phase 3 verification. Trivial ≤2-3 line doc fix.
   Issue [#18](https://github.com/Hypercart-Dev-Tools/pdda/issues/18). ->
   [PROJECT/1-INBOX/GH-18-ROUTER-SUBCOMMAND-DRIFT.md](PROJECT/1-INBOX/GH-18-ROUTER-SUBCOMMAND-DRIFT.md)
+- **GH-21 — SKILLS/PDDA-hook opt-in SessionStart doc-governance reminder** (2026-07-08) - new bundled
+  skill that installs a `SessionStart` hook re-anchoring `ROUTER.md`/`AGENTS.md`/`PROJECT/PDDA.md` at
+  every context boundary (startup/resume/clear/compact), auto-scoped via `PROJECT/PDDA.md` detection,
+  global- or repo-local-scoped, propose-then-confirm, never touches a repo's committed `settings.json`.
+  Implemented same-session as capture. Issue [#21](https://github.com/Hypercart-Dev-Tools/pdda/issues/21). ->
+  [PROJECT/1-INBOX/GH-21-PDDA-HOOK-SKILL.md](PROJECT/1-INBOX/GH-21-PDDA-HOOK-SKILL.md)
 - **Marathon Plan (2026-07-07)** (2026-07-07) - the canonical XYZ-format marathon plan doc
   (hand-authored per `.xyz/README.md`'s Option B — the ROADMAP auto-generator, Option A, currently
   reports 0 active lanes) for the two build phases below, distinct from the machine-executable

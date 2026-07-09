@@ -146,6 +146,12 @@ This repo ships a couple of Claude Code skills under `SKILLS/` for working the P
 - **`SKILLS/PDDA-EOD/`** — a sequenced end-of-day wrap for this repo: reconciles `PROJECT/**` docs
   with `ROADMAP.md`/`CHANGELOG.md`, checks the git tree is pushed, and offers user-verified closing
   of done GitHub issues. Trigger: `/pdda-eod`.
+- **`SKILLS/PDDA-hook/`** — opt-in installer for a `SessionStart` hook that deterministically
+  re-anchors `ROUTER.md`/`AGENTS.md`/`PROJECT/PDDA.md` doc-governance rules at every context boundary
+  (startup/resume/clear/compact), auto-scoped to repos that carry a `PROJECT/PDDA.md`. Personal,
+  propose-then-confirm, and only ever writes to the operator's own `~/.claude/settings.json` or a
+  repo's gitignored `.claude/settings.local.json` — never a repo's committed settings. Trigger:
+  `/pdda-hook`.
 
 ## Maintaining this repo (contributors)
 

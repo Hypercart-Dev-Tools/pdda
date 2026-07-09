@@ -24,3 +24,5 @@ sentinel/spike/work/
 /phases/
 ESCALATION.md
 .DS_Store
+# Personal Claude Code settings (e.g. SKILLS/PDDA-hook repo-local installs) — never shared/committed
+.claude/settings.local.json
