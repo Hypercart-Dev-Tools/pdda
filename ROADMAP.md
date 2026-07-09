@@ -28,12 +28,11 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| **HQ governance cleared to zero.** GH-17 (retired RECAP / REAL-AGENT-OBSERVATIONS prose drift) and GH-18 (`ROUTER.md` missing `glance`/`quad-concepts`) both fixed and promoted to `3-COMPLETED`; three inactive docs archived to `4-MISC`. `pdda.sh run` on HQ went 3 errors + 6 warns → **0 errors + 0 warns**. The `experimental/PRD-pdda/` synthesis skill is registered below. | Close issues #17 and #18. GH-14 Phase 2 (BUG-001b — `run` prints "all checks passed" in `observe` mode even with `errors>0`) is now the most visible remaining defect, and this iteration hit it firsthand. GH-12 is ready to close to `3-COMPLETED`. GH-10 Sentinel remains the other active build (Phase 2b executor). |
+| **HQ governance cleared to zero.** GH-17 (retired RECAP / REAL-AGENT-OBSERVATIONS prose drift) and GH-18 (`ROUTER.md` missing `glance`/`quad-concepts`) both fixed and promoted to `3-COMPLETED`; three inactive docs archived to `4-MISC`. `pdda.sh run` on HQ went 3 errors + 6 warns → **0 errors + 0 warns**. The `experimental/PRD-pdda/` synthesis skill is registered below. | **GH-23 (agent on-ramp) is queued for immediate work** — targets inherit HQ's `ROUTER.md` verbatim despite the "adapted" claim, and no deterministic check can see it. It rhymes with GH-14 Phase 2 (BUG-001b): both are cases of `pdda.sh run` reporting success over a real defect, so consider landing them together. Then close issues #17 and #18. GH-12 is ready to close to `3-COMPLETED`. GH-10 Sentinel remains the other active build (Phase 2b executor). |
 
 ## Ledger
 
 ### Queue / parked intake
-
 - **GH-21 — SKILLS/PDDA-hook opt-in SessionStart doc-governance reminder** (2026-07-08) - new bundled
   skill that installs a `SessionStart` hook re-anchoring `ROUTER.md`/`AGENTS.md`/`PROJECT/PDDA.md` at
   every context boundary (startup/resume/clear/compact), auto-scoped via `PROJECT/PDDA.md` detection,
@@ -64,6 +63,20 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
+- **GH-23 — agent on-ramp is wrong, expensive, and unenforced** (2026-07-09) - **active; promoted to
+  `2-WORKING` 2026-07-09, built on branch `gh-23-agent-onramp`.** `--with-startup-docs` advertises an
+  "adapted" `ROUTER.md` but `copy_runtime` copies it verbatim (`install.sh:65` vs `install.sh:245`), so
+  every target inherits HQ's router — telling agents to run `install.sh` and `utils/pdda/pdda-sync.sh`,
+  neither of which exists in a target. The deterministic surface can't see it: `_pdda_gov_extract_refs`
+  matches only `.md` refs by design, so `pdda.sh run` reports "all checks passed" on a router that
+  misdirects. Found by dogfooding in `LTVera-Pandas`, where the GH-21 `SessionStart` hook fired correctly
+  and the agent still skipped directive 1 — the one directive that is expensive (66KB of reading) and
+  unverifiable. 4 phases, each gated on a green `pdda.sh run`: template the target router, post-install
+  self-check, widen dead-ref scanning to `.sh`, then make directive 1 cheap (`/pdda`) and optionally
+  gated. Shares a root cause with GH-14 Phase 2 (BUG-001b) — both are `run` reporting success over a real
+  defect — so P3 is a candidate to land alongside it. Issue
+  [#23](https://github.com/Hypercart-Dev-Tools/pdda/issues/23). ->
+  [PROJECT/2-WORKING/GH-23-AGENT-ONRAMP.md](PROJECT/2-WORKING/GH-23-AGENT-ONRAMP.md)
 - **PRD generator skill exploration — PRD-Kimi vs PRD-Perplexity, synthesized into PRD-pdda** (2026-07-08) -
   three draft-stage variants of a not-yet-built `product-prd-builder` skill (structured PRD →
   Spec/Roadmap interview). `PRD-Perplexity/` is the original draft (renamed, unchanged) and is the only
