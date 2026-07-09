@@ -1,7 +1,7 @@
 ---
 gh_issue: 23
 source: https://github.com/Hypercart-Dev-Tools/pdda/issues/23
-title: "Agent on-ramp is wrong, expensive, and unenforced: targets inherit HQ's ROUTER.md verbatim"
+title: "Agent on-ramp is wrong, expensive, and unenforced: targets inherit the canonical repo's ROUTER.md verbatim"
 status: Active — promoted to 2-WORKING 2026-07-09; P1 not yet started
 created: 2026-07-09
 updated: 2026-07-09
@@ -14,7 +14,7 @@ phases: 4
 context_tags: [installer, governance, hooks, router, agent-onboarding]
 related: [install.sh, ROUTER.md, utils/pdda/pdda.sh, SKILLS/PDDA-hook/SKILL.md, PROJECT/1-INBOX/GH-21-PDDA-HOOK-SKILL.md]
 goal: >
-  Make the agent on-ramp into a PDDA target correct, cheap, and enforced: stop shipping HQ's ROUTER.md
+  Make the agent on-ramp into a PDDA target correct, cheap, and enforced: stop shipping the canonical repo's ROUTER.md
   into targets (it names install.sh and pdda-sync.sh, neither of which exists there), catch that class of
   drift at install time and in pdda-check-governance, and replace the one SessionStart directive that is
   both expensive and unverifiable with a single cheap action.
@@ -29,7 +29,7 @@ Full write-up lives on the issue; this is the in-repo back-reference.
 
 | What was just completed | What's next |
 |---|---|
-| Promoted `1-INBOX → 2-WORKING`; branch `gh-23-agent-onramp` rebased onto `main`. All four cited code claims independently re-verified. **Target-side symptom reproduced end-to-end against the live `LTVera-Pandas` install**, captured as a regression fixture at `test/fixtures/gh-23/LTVera-Pandas-ROUTER.md`. One mechanism correction found — see "Reproduction". | **P1** — stop shipping HQ's router into targets, then make `install.sh --help` stop claiming "adapted". Every phase lands green on `utils/pdda/pdda.sh run`. |
+| Promoted `1-INBOX → 2-WORKING`; branch `gh-23-agent-onramp` rebased onto `main`. All four cited code claims independently re-verified. **Target-side symptom reproduced end-to-end against the live `LTVera-Pandas` install**, captured as a regression fixture at `test/fixtures/gh-23/LTVera-Pandas-ROUTER.md`. One mechanism correction found — see "Reproduction". | **P1** — stop shipping the canonical repo's router into targets, then make `install.sh --help` stop claiming "adapted". Every phase lands green on `utils/pdda/pdda.sh run`. |
 
 ## Verification of the brief
 
@@ -46,12 +46,12 @@ hold exactly as stated:
 ## Reproduction (2026-07-09, `LTVera-Pandas`)
 
 Read-only, against the live target at `~/Documents/GitHub-Repos/LTVera-Pandas`. `pdda.sh` was **not**
-executed there (it appends to that repo's `PROJECT/PDDA-ACTIVITY.jsonl`); instead HQ's own
+executed there (it appends to that repo's `PROJECT/PDDA-ACTIVITY.jsonl`); instead the canonical repo's own
 `_pdda_gov_scannable_lines` and `_pdda_gov_extract_refs` were exercised directly against the target's
 `ROUTER.md`, which is the exact code path `pdda-check-governance` would take.
 
 **The copy is verbatim, and provably so.** The target's `ROUTER.md` is byte-identical (`md5
-3c1722da…`) to HQ's `ROUTER.md` at commit `5e2205b` ("Add Project Memory Layer docs", 2026-07-06). Not
+3c1722da…`) to the canonical repo's `ROUTER.md` at commit `5e2205b` ("Add Project Memory Layer docs", 2026-07-06). Not
 adapted, not stripped — `cp`.
 
 **Dead refs in the target:**
@@ -109,7 +109,7 @@ is the closing brace of the preceding function. The finding is unaffected.
 
 ## Problem
 
-An agent arriving in a PDDA **target** repo is pointed at a `ROUTER.md` that describes **HQ**,
+An agent arriving in a PDDA **target** repo is pointed at a `ROUTER.md` that describes the **canonical repo**,
 then asked to read ~66KB across three files before touching anything, and nothing verifies it
 did. Wrong, expensive, unenforced — in that order.
 
@@ -124,10 +124,10 @@ directives 2/3/5 (cheap, checkable), silently skipped directive 1 (expensive, un
    ROUTER.md + AGENTS.md + GUIDING-PRINCIPLES.md". `install.sh:456-461` calls `copy_runtime`,
    documented at `install.sh:244` as *"Copy a runtime file verbatim, always."* It is `cp`.
 
-2. **So targets get HQ's router.** `LTVera-Pandas`'s `ROUTER.md` tells agents to run `install.sh`
+2. **So targets get the canonical repo's router.** `LTVera-Pandas`'s `ROUTER.md` tells agents to run `install.sh`
    and `utils/pdda/pdda-sync.sh` — neither exists there — and carries a "distribute this runtime
-   from this clone (HQ)" command-rails block plus install/sync routing hints. Verified absent in
-   target, present in HQ.
+   from this clone (the canonical repo)" command-rails block plus install/sync routing hints. Verified absent in
+   target, present in the canonical repo.
 
 3. **The deterministic surface cannot see it — by design.** `_pdda_gov_extract_refs`
    (`utils/pdda/pdda.sh:631-645`) matches only refs ending in `.md`; its own comment says so.
@@ -150,8 +150,8 @@ instead of re-reading by hand`). If that is right mid-session, it is right at se
 
 ## Phases
 
-- **P1 — Stop shipping HQ's router into targets.** Split `ROUTER.md` into an HQ router plus a
-  `templates/ROUTER.target.md` the installer writes, or strip HQ-only sections on copy. Make the
+- **P1 — Stop shipping the canonical repo's router into targets.** Split `ROUTER.md` into a canonical router plus a
+  `templates/ROUTER.target.md` the installer writes, or strip canonical-only sections on copy. Make the
   `--help` text true.
 - **P2 — Post-install self-check.** After `--with-startup-docs`, assert no `` `*.sh` `` ref in the
   target's `ROUTER.md` points at a file absent from the target. Catches this at install time.

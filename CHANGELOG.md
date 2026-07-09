@@ -2,6 +2,45 @@
 
 ## 2026-07-09
 
+### Renamed the "HQ" role to "canonical repo" to stop colliding with XYZ's own HQ feature
+
+PDDA used **HQ** for the single-source-of-truth clone that distributes the runtime to registered
+targets — defined at `pdda-sync.sh:6`, *"HQ (this clone) is the single source of truth and the only
+writer."* The sibling `xyz-3-agents-swarm` repo has an unrelated **HQ** feature, and `ROUTER.md`'s own
+routing hints already point at `.xyz/utils/hq/`. Two different HQs, one of them in a path this repo
+mentions. Renamed PDDA's to **canonical repo** before the collision cost anyone a debugging session.
+
+Mechanical but not blind. Every occurrence was prose or a comment — **no variables, no paths, no state
+keys, no registry fields** — so nothing in `temp/` or the target registry needed migrating. Two were
+user-visible strings (`pdda-sync.sh`'s dirty-push warning and its `--help` banner); both changed.
+
+Three defects were introduced by the substitution and caught on diff review, worth naming because they
+are exactly what makes a global find-and-replace untrustworthy: `an HQ-only tool` became
+`an canonical-only tool` (twice); `HQ-side deletions` at a sentence start became lowercase
+`canonical-side deletions`; and `from one canonical source ("HQ" = this clone)` collapsed into the
+tautology `from one canonical source ("canonical repo" = this clone)`. All three fixed.
+
+Note the word now does two jobs. `PDDA-INSTALL.md` already used **"Canonical install set"** for the file
+list the installer copies — unrelated to the repo role. Left alone; they read distinctly in context, but
+a future rename should not assume one meaning.
+
+Deliberately **not** renamed, because rewriting them would falsify a record rather than fix a term:
+
+- `CHANGELOG.md` — append-only by contract (`PROJECT/PDDA.md`); past entries are never edited
+- `PROJECT/3-COMPLETED/**` and `PROJECT/4-MISC/**` — historical records of work as it was done
+- `test/fixtures/gh-23/LTVera-Pandas-ROUTER.md` — a verbatim, md5-pinned capture of a live target
+
+Those still say HQ, correctly, as an account of what the term was at the time.
+
+Lockstep per AGENTS.md #5: `pdda-sync.sh`'s help text changed, so `utils/pdda/PDDA-INSTALL.md` and
+`PROJECT/PDDA.md` changed in the same commit.
+
+Verification: `utils/pdda/pdda.sh run` → `errors=0 warns=0`. Full suite: **198 passed, 0 failed** across
+all nine `test/*.sh` files. `pdda-sync.sh status` still enumerates registered targets. `bash -n` clean on
+every touched script.
+
+Reversibility: **Easy** — prose-only, one commit.
+
 ### Fixed: HQ tracked `PROJECT/**/BLANK.md`, so every fresh clone failed `pdda.sh run`
 
 Renamed the four lifecycle placeholders from `BLANK.md` to `blank.md` in git. Found while cutting a

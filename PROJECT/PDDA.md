@@ -477,21 +477,21 @@ Minimum behavior (four checks, one shared `pdda-check-governance` id):
   - **GH-15 shipped-doc exemption manifest:** `utils/pdda/PDDA-INSTALL.md` and `PROJECT/PDDA.md` ship
     to every target install (`PDDA_GOV_SHIPPED_DOCS_DEFAULT`) but legitimately reference files
     `install.sh` deliberately does not copy there — the target's own repo-authored startup docs
-    (`ROUTER.md`, `AGENTS.md`, `GUIDING-PRINCIPLES.md`, `README.md`, `CLAUDE.md`), HQ-only skill and
+    (`ROUTER.md`, `AGENTS.md`, `GUIDING-PRINCIPLES.md`, `README.md`, `CLAUDE.md`), canonical-only skill and
     companion-doc paths (`.claude/skills/pdda/SKILL.md`, `.claude/skills/governance-audit/SKILL.md`,
     `PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md`), and the pre-`utils/pdda/` legacy layout path
     (`utils/PDDA-INSTALL.md`, named only in migration-note prose). A fresh `install.sh . --mode observe`
     self-inflicted ~30 dead-reference/env-var warns from exactly this mismatch on its very first
     `pdda.sh run`, drowning a new adopter's own repo drift in PDDA-on-PDDA noise. The dead-reference scan
     skips a match against `PDDA_GOV_SHIPPED_DOC_REF_EXEMPTIONS_DEFAULT`, scoped strictly to the docs in
-    `PDDA_GOV_SHIPPED_DOCS_DEFAULT` — a repo-authored governance doc (e.g. this HQ repo's own `ROUTER.md`)
+    `PDDA_GOV_SHIPPED_DOCS_DEFAULT` — a repo-authored governance doc (e.g. this canonical repo's own `ROUTER.md`)
     referencing one of these is still a real dead-reference bug and is never exempted. The manifest was
     built from an actual dead-reference scan of a bare `install.sh` target, not retyped from an issue's
     illustrative list — re-run that scan if the shipped-doc set or its prose changes materially.
     **Known separate issue, not covered by this manifest:** this file's own CHANGELOG section
     dead-references the retired RECAP note-file and the REAL-AGENT-OBSERVATIONS compliance-findings
     file (see the "CHANGELOG.md" section below), neither of which exist anywhere in this repo, not
-    even HQ — a pre-existing doc-accuracy drift unrelated to the install-omission pattern above; left
+    even the canonical repo — a pre-existing doc-accuracy drift unrelated to the install-omission pattern above; left
     flagged rather than silently exempted pending a human decision on those files' fate.
 - **orphan governance docs** (`warn`) — a present governance doc whose filename never appears anywhere
   in the index doc (`ROUTER.md` by default) — a doc a cold agent's startup sequence would never surface.
@@ -502,13 +502,13 @@ Minimum behavior (four checks, one shared `pdda-check-governance` id):
 - **env-var drift** (`warn`) — every `PDDA_*` token mentioned in a governance doc should actually be
   read or set somewhere in a shipped script (`utils/pdda/*.sh` or the repo-root `install.sh`). `warn`,
   not `error`: `utils/pdda/PDDA-INSTALL.md` ships to every target install but also documents
-  `utils/pdda/pdda-sync.sh` — an HQ-only tool never copied to targets (it isn't in the "Canonical
+  `utils/pdda/pdda-sync.sh` — a canonical-only tool never copied to targets (it isn't in the "Canonical
   install set" above) — so a var like `PDDA_SYNC_BACKUPS` legitimately won't resolve in a target
   install's own scripts. That's expected, not drift, confirmed by installing this check into a second
   repo and seeing exactly that false positive fire — same calibration as dead-reference above.
   - **GH-15:** the same exemption mechanism above covers this class of mismatch too —
     `PDDA_GOV_SHIPPED_DOC_ENVVAR_EXEMPTIONS_DEFAULT` (`PDDA_REGISTRY`, `PDDA_GITPULSE_DIR`,
-    `PDDA_SYNC_MAX_SHRINK`) lists HQ-only-tool env vars that `PDDA-INSTALL.md`/`PROJECT/PDDA.md`
+    `PDDA_SYNC_MAX_SHRINK`) lists canonical-only-tool env vars that `PDDA-INSTALL.md`/`PROJECT/PDDA.md`
     legitimately document but no target-installed script reads, scoped to the same `PDDA_GOV_SHIPPED_DOCS`
     set so a repo-authored doc's phantom env var still fires.
 

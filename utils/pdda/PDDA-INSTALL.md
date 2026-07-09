@@ -182,9 +182,9 @@ that ship to every target install (`PDDA-INSTALL.md`, `PROJECT/PDDA.md`) so a fr
 `pdda.sh run` doesn't self-inflict dead-reference/env-var noise from files `install.sh` deliberately
 never copies: `PDDA_GOV_SHIPPED_DOCS` (which shipped docs the exemptions apply to; default
 `utils/pdda/PDDA-INSTALL.md PROJECT/PDDA.md`), `PDDA_GOV_SHIPPED_DOC_REF_EXEMPTIONS` (basenames/paths
-those docs may dead-reference without a warn — the target's own startup docs, HQ-only skill and
+those docs may dead-reference without a warn — the target's own startup docs, canonical-only skill and
 companion-doc paths, and the pre-`utils/pdda/` legacy install path), and
-`PDDA_GOV_SHIPPED_DOC_ENVVAR_EXEMPTIONS` (HQ-only-tool env vars those docs may mention without a warn).
+`PDDA_GOV_SHIPPED_DOC_ENVVAR_EXEMPTIONS` (canonical-only-tool env vars those docs may mention without a warn).
 A repo-authored governance doc outside `PDDA_GOV_SHIPPED_DOCS` (e.g. this repo's own `ROUTER.md`) is
 never exempted — a dead reference there stays a real drift signal.
 
@@ -234,10 +234,10 @@ Expected result:
 - `PROJECT/PDDA-ACTIVITY.jsonl` receives new entries
 - the suite exits `0` even if it reports findings
 
-## Syncing the runtime to other repos (HQ → targets)
+## Syncing the runtime to other repos (canonical → targets)
 
-Once PDDA lives in several repos, keep them current from one canonical source ("HQ" = this clone) with
-`utils/pdda/pdda-sync.sh`. HQ is the only writer; targets opt in via `register`. The synced file set is
+Once PDDA lives in several repos, keep them current from one canonical source (the "canonical repo" = this clone) with
+`utils/pdda/pdda-sync.sh`. The canonical repo is the only writer; targets opt in via `register`. The synced file set is
 the auto-regenerated manifest (`utils/pdda/pdda-sync-manifest.conf`, shared with `install.sh`), so a new
 runtime file under `utils/pdda/` propagates with no list edit. Per-repo adapted startup docs
 (`ROUTER.md`, `AGENTS.md`) are never touched. Full design + rationale:
@@ -251,7 +251,7 @@ utils/pdda/pdda-sync.sh register [--mode observe|light|full] [--with-startup-doc
 # Distribute the current runtime on demand — one target, or all registered if omitted.
 utils/pdda/pdda-sync.sh push [/path/to/repo]
 utils/pdda/pdda-sync.sh push --dry-run        # preview copies AND deletions, write nothing
-utils/pdda/pdda-sync.sh push --no-delete      # copy/update only, skip HQ-side deletions
+utils/pdda/pdda-sync.sh push --no-delete      # copy/update only, skip canonical-side deletions
 
 utils/pdda/pdda-sync.sh list                  # registered targets + mode/source-commit/sync state
 utils/pdda/pdda-sync.sh status [/path/to/repo]# read-only: current/behind/diverged/missing/to-delete
@@ -263,15 +263,15 @@ utils/pdda/pdda-sync.sh install-agent         # opt-in; --no-load writes the pli
 utils/pdda/pdda-sync.sh uninstall-agent
 ```
 
-**Safety:** `push` only overwrites a file when HQ's copy has genuinely advanced (content hash, not
+**Safety:** `push` only overwrites a file when the canonical repo's copy has genuinely advanced (content hash, not
 mtime), so deliberate local edits between releases are preserved; any overwrite of a *diverged* target
-and any HQ-side deletion is backed up first under `temp/pdda-sync-backups/` (kept to the last
-`PDDA_SYNC_BACKUPS`, default 5). A dirty HQ is refused (`--allow-dirty` to override). HQ-side deletions
+and any canonical-side deletion is backed up first under `temp/pdda-sync-backups/` (kept to the last
+`PDDA_SYNC_BACKUPS`, default 5). A dirty canonical repo is refused (`--allow-dirty` to override). Canonical-side deletions
 mirror to targets, but a **manifest-poisoning guard** aborts the delete phase before touching any target
 if a declared source root resolves to zero files, the manifest is empty, or it shrank past
 `PDDA_SYNC_MAX_SHRINK`% (default 25) — override only with `--force-delete`.
 
-State lives under HQ's gitignored `temp/` (state stamps, manifest snapshots, backups, log, lock); the
+State lives under the canonical repo's gitignored `temp/` (state stamps, manifest snapshots, backups, log, lock); the
 target **registry** is machine-local at `${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv` (written by
 `install.sh`, the single registry writer), never committed.
 

@@ -28,7 +28,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| **HQ governance cleared to zero.** GH-17 (retired RECAP / REAL-AGENT-OBSERVATIONS prose drift) and GH-18 (`ROUTER.md` missing `glance`/`quad-concepts`) both fixed and promoted to `3-COMPLETED`; three inactive docs archived to `4-MISC`. `pdda.sh run` on HQ went 3 errors + 6 warns → **0 errors + 0 warns**. The `experimental/PRD-pdda/` synthesis skill is registered below. | **GH-23 (agent on-ramp) is queued for immediate work** — targets inherit HQ's `ROUTER.md` verbatim despite the "adapted" claim, and no deterministic check can see it. It rhymes with GH-14 Phase 2 (BUG-001b): both are cases of `pdda.sh run` reporting success over a real defect, so consider landing them together. Then close issues #17 and #18. GH-12 is ready to close to `3-COMPLETED`. GH-10 Sentinel remains the other active build (Phase 2b executor). |
+| **Canonical-repo governance cleared to zero.** GH-17 (retired RECAP / REAL-AGENT-OBSERVATIONS prose drift) and GH-18 (`ROUTER.md` missing `glance`/`quad-concepts`) both fixed and promoted to `3-COMPLETED`; three inactive docs archived to `4-MISC`. `pdda.sh run` on the canonical repo went 3 errors + 6 warns → **0 errors + 0 warns**. The `experimental/PRD-pdda/` synthesis skill is registered below. | **GH-23 (agent on-ramp) is queued for immediate work** — targets inherit the canonical repo's `ROUTER.md` verbatim despite the "adapted" claim, and no deterministic check can see it. It rhymes with GH-14 Phase 2 (BUG-001b): both are cases of `pdda.sh run` reporting success over a real defect, so consider landing them together. Then close issues #17 and #18. GH-12 is ready to close to `3-COMPLETED`. GH-10 Sentinel remains the other active build (Phase 2b executor). |
 
 ## Ledger
 
@@ -66,7 +66,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 - **GH-23 — agent on-ramp is wrong, expensive, and unenforced** (2026-07-09) - **active; promoted to
   `2-WORKING` 2026-07-09, built on branch `gh-23-agent-onramp`.** `--with-startup-docs` advertises an
   "adapted" `ROUTER.md` but `copy_runtime` copies it verbatim (`install.sh:65` vs `install.sh:245`), so
-  every target inherits HQ's router — telling agents to run `install.sh` and `utils/pdda/pdda-sync.sh`,
+  every target inherits the canonical repo's router — telling agents to run `install.sh` and `utils/pdda/pdda-sync.sh`,
   neither of which exists in a target. The deterministic surface can't see it: `_pdda_gov_extract_refs`
   matches only `.md` refs by design, so `pdda.sh run` reports "all checks passed" on a router that
   misdirects. Found by dogfooding in `LTVera-Pandas`, where the GH-21 `SessionStart` hook fired correctly
@@ -132,7 +132,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   pending close). -> [PROJECT/3-COMPLETED/GH-17-RECAP-STALE-REFS.md](PROJECT/3-COMPLETED/GH-17-RECAP-STALE-REFS.md)
 - **GH-18 — ROUTER.md missing glance/quad-concepts subcommand docs** (2026-07-08) - GH-12 added both
   subcommands to the `pdda.sh` dispatcher and to `pdda.sh help`, but never to `ROUTER.md`'s Command rails
-  list, so `pdda-check-governance`'s subcommand-drift check errored on HQ itself (AGENTS.md #5 lockstep).
+  list, so `pdda-check-governance`'s subcommand-drift check errored on the canonical repo itself (AGENTS.md #5 lockstep).
   Fixed by adding both lines with blurbs lifted verbatim from `pdda.sh help`. Verified: subcommand-drift
   errors 2 → 0. Issue [#18](https://github.com/Hypercart-Dev-Tools/pdda/issues/18) (fixed; pending
   close). -> [PROJECT/3-COMPLETED/GH-18-ROUTER-SUBCOMMAND-DRIFT.md](PROJECT/3-COMPLETED/GH-18-ROUTER-SUBCOMMAND-DRIFT.md)
@@ -160,7 +160,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 - **Issue↔doc sync check + two-tier doc-health hooks** (2026-06-29) - new warn-only `pdda.sh issue-doc-sync` flags 2-WORKING/GH-*.md docs drifted from their GitHub issue state (both directions); `pdda.sh gh-refresh` writes the offline gh-state cache; two-tier PostToolUse (single-file lint) + Stop (consolidated full-scan) doc-health hooks. Deterministic, warn-only, fail-open; 31 tests; all phases shipped, committed + pushed. Issue [#5](https://github.com/Hypercart-Dev-Tools/pdda/issues/5) (closed). -> [PROJECT/3-COMPLETED/GH-5-ISSUE-DOC-SYNC.md](PROJECT/3-COMPLETED/GH-5-ISSUE-DOC-SYNC.md)
 - **PDDA-EOD skill — end-of-day wrap** (2026-06-29) - `/pdda-eod` runs hygiene checks, reconciles docs/ROADMAP/CHANGELOG, helps reach a clean/pushed tree, and closes 100%-done issues (user-verified); delegates deterministic work to `pdda.sh`, all propose-then-confirm. Shipped at `SKILLS/PDDA-EOD/SKILL.md`. Issue [#6](https://github.com/Hypercart-Dev-Tools/pdda/issues/6). -> [PROJECT/3-COMPLETED/GH-6-PDDA-EOD.md](PROJECT/3-COMPLETED/GH-6-PDDA-EOD.md)
-- **Sync the PDDA runtime to other repos** (2026-06-27 → completed 2026-06-29) - `utils/pdda/pdda-sync.sh`: HQ → registered-targets, on-demand `push` (manual primary, launchd optional) over an auto-regenerated manifest shared with `install.sh`; content-hash state-stamp copy, delete-mirror with backup, manifest-poisoning guard. Realigned + Codex relay-approved (4 rounds), built in 5 phases, every QA gate green + end-to-end dogfood. -> [PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md](PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md)
+- **Sync the PDDA runtime to other repos** (2026-06-27 → completed 2026-06-29) - `utils/pdda/pdda-sync.sh`: canonical → registered-targets, on-demand `push` (manual primary, launchd optional) over an auto-regenerated manifest shared with `install.sh`; content-hash state-stamp copy, delete-mirror with backup, manifest-poisoning guard. Realigned + Codex relay-approved (4 rounds), built in 5 phases, every QA gate green + end-to-end dogfood. -> [PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md](PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md)
 - **Standalone baseline established** (2026-06-24) - repo-facing docs now describe `pdda` itself, placeholder scaffolding is normalized, and the install manifest matches the shipped scripts. -> [PROJECT/PDDA.md](PROJECT/PDDA.md) and [utils/pdda/PDDA-INSTALL.md](utils/pdda/PDDA-INSTALL.md)
 - **`utils/` consolidated to 3 files** (2026-06-24) - the 7 per-check scripts + `pdda-run.sh` collapsed into one `pdda.sh` dispatcher (`pdda.sh run` / `pdda.sh <check>`); `pdda-lib.sh` and the opt-in `pdda-doc-ready.sh` stay separate. Breaking change to the install contract; old filenames removed. -> [utils/pdda/PDDA-INSTALL.md](utils/pdda/PDDA-INSTALL.md)
 

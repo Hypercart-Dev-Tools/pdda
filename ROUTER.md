@@ -68,7 +68,7 @@ utils/pdda/pdda.sh catchup     # LLM repo triage and ROUTER.md recommendations �
 utils/pdda/pdda.sh help        # list every command
 ```
 
-To distribute this runtime from this clone (HQ) to other registered repos:
+To distribute this runtime from this clone (the canonical repo) to other registered repos:
 
 ```bash
 utils/pdda/pdda-sync.sh register --yes /path/to/repo   # enroll + initial install
@@ -80,7 +80,7 @@ utils/pdda/pdda-sync.sh status                          # read-only drift report
 
 - If the task is about installing PDDA into another repo, run `install.sh <target>`; for the
   underlying spec or a by-hand/adapted install, start in `utils/pdda/PDDA-INSTALL.md`.
-- If the task is about keeping PDDA current across *several* repos from this one (HQ → targets:
+- If the task is about keeping PDDA current across *several* repos from this one (canonical → targets:
   register / push / status / optional launchd schedule), use `utils/pdda/pdda-sync.sh` — design and
   rationale in `PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md`, usage in `utils/pdda/PDDA-INSTALL.md`.
 - If the task is about document quality, active-doc lifecycle, roadmap sprawl, or automation policy, start in `PROJECT/PDDA.md`.
