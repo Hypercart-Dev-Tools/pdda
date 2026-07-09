@@ -2,6 +2,33 @@
 
 ## 2026-07-09
 
+### Wrap: GH-12 and GH-15 reconciled — the first two units of work the new loop caught
+
+The wrap the tooling asked for. Both were flagged by `issue-doc-sync` the moment GH-27 P1–P3 landed, and
+both were verified against the code before anything was closed — `/pdda-eod`'s rule is *never close an
+issue because a doc looks done*.
+
+**GH-12 (Quad Concepts).** The doc claimed `Phases 1–4 complete … 42/42 + 6/6`. Re-verified: both
+subcommands present in the dispatcher, the `.pdda-quad` lever absent as designed (off by default), the
+LLM rubric wired, both documented in `ROUTER.md`, and the suites re-run — **42/42 and 6/6**. Doc moved
+`2-WORKING → 3-COMPLETED`, issue #12 closed. It had been done-but-open for two days, and it was the live
+evidence for GH-27's leak 2: `status: Active — … Ready to close` defeated the lead-word heuristic. The
+hand-off-phrase signal added in P1 is what now catches this class.
+
+**GH-15 (fresh-install governance noise).** Doc already sat in `3-COMPLETED` with issue #15 open —
+exactly the leak the new `3-COMPLETED` pass exists to catch. Re-verified: the exemption manifests ship,
+`test/pdda-governance-check.sh` is 13/13, and a real fresh install now reports **1** governance warn, not
+the 4 the doc claimed. Better than promised — GH-23 P1 removed the target router's dead refs in the
+interim. Issue #15 closed.
+
+Also corrected: `ROADMAP.md` had labelled issue #15 `(closed)` while GitHub said `OPEN`. That single
+false claim in the ledger is the human-facing symptom of the whole GH-27 bug — a doc asserting a
+reconciliation that never happened, with nothing checking it. The `3-COMPLETED` pass now checks it.
+
+Verification: `utils/pdda/pdda.sh run` → `errors=0 warns=0`, from `warns=2` before the wrap. Those two
+warns were true positives; they are gone because the work behind them got finished properly, not because
+anything was suppressed.
+
 ### GH-27 P1–P3 shipped: the wrap loop now fires, and it asks
 
 Before: `pdda.sh run` reported `warns=0` and the `Stop` hook printed **"all clear"** while two issues sat
