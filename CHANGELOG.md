@@ -2,6 +2,134 @@
 
 ## 2026-07-09
 
+### GH-23 P4: the on-ramp gets cheap, then verifiable
+
+The SessionStart reminder has five directives. Four name a command whose output proves it ran. Directive
+1 asked for a multi-file read and left no trace — the most expensive to obey and the only one nobody
+could check. An agent under context pressure drops exactly that one, which is what GH-23 was.
+
+It now leads with **invoke `/pdda`**: one action, since the skill already encodes the read order, with
+"read `ROUTER.md` and follow the order it gives" as the fallback where the skill is absent. The read
+order is unchanged; obeying it is no longer a reading list.
+
+Enforcement is a separate, **opt-in, default-off** `PreToolUse` gate (matcher `Write|Edit`) that refuses
+an edit to `PROJECT/**`, `ROADMAP.md`, or `CHANGELOG.md` when the session's transcript shows no read of
+`ROUTER.md` and no `/pdda` invocation. Invoking the skill satisfies it — blocking an agent that did
+precisely what directive 1 asked would be perverse.
+
+This is the only component in PDDA that acts rather than recommends, so it is fenced accordingly. Two
+independent switches, both off: registering the hook does nothing without a `.pdda-router-gate` file (or
+`PDDA_ROUTER_GATE=1`), and `PDDA_ROUTER_GATE=0` always wins. A repo without `PROJECT/PDDA.md` is never
+gated. `ROUTER.md` itself is never gated, or the one file that satisfies the gate would be unfixable
+while it is on. And it **fails open** on every path where it cannot establish that the router went unread
+— no `jq`, no readable transcript, an unparseable one, an unrecognized payload — allowing the write and
+saying on stderr that it could not evaluate. It blocks only on positive evidence.
+
+That last property is this repo's own recurring bug turned back on its enforcement layer. A gate that
+blocks on a guess would be the first thing anyone turns off, and they would be right.
+
+Two bugs found by the negative controls, neither visible to the positives:
+
+- The first draft piped `jq` straight into `grep -q`, collapsing "found no read of the router" and "could
+  not parse the transcript" into one exit status. A session truncated mid-write — routine — would have
+  blocked every governed edit for the rest of the day.
+- `git rev-parse` reports a *physical* repo root while the payload's `file_path` is whatever the caller
+  typed. Under macOS's `/tmp` → `/private/tmp` symlink the prefix strip missed, every governed doc looked
+  out of scope, and the gate became a silent no-op that still exited 0. **Every positive test passed** —
+  "allowed the write" is what a working gate and a dead gate both do most of the time. Only the paired
+  "lever on, router unread → blocks" control exposed it.
+
+`SKILLS/PDDA-hook/SKILL.md` previously promised the skill "does not touch `PreToolUse`". That sentence is
+now false, so it was amended in the same commit rather than left to rot — with a note on why, and on the
+fact that an operator who accepts only the default install still gets exactly the behavior it described.
+Every existing guardrail holds: never write a repo's committed `.claude/settings.json`; only the
+operator's own `~/.claude/settings.json` or an ignored `.claude/settings.local.json`.
+
+`test/pdda-router-read-gate.sh` — 47 assertions. A handful cover the enforcement path. The rest cover
+staying out of the way: default-off silence, lever precedence, scope, non-PDDA repos, and the fail-open
+paths. Plus the boundary that keeps fail-open from swallowing the whole gate: an **empty but valid**
+transcript is evidence, not a failure to gather it, and still blocks.
+
+### Adversarial cross-model review, and what it broke
+
+An independent read of the above (Codex, read-only, in a throwaway worktree) found a fail-**closed** path
+in the gate — the one thing it promises never to do:
+
+- **`transcript_path=/dev/stdin` blocked.** The script drains stdin to read its own payload, so the
+  "transcript" was an empty, already-consumed stream. `-r` accepted it, the scan came back empty, and the
+  gate treated *nothing to read* as *evidence of not reading*. Requiring a **regular file** (`-f`) fixes it,
+  and takes a directory and a FIFO — which would have hung `jq` forever — with it.
+- **Scope was decided on the raw string.** `PROJECT/../../etc/passwd` matches the glob `PROJECT/*` while
+  pointing nowhere near the repo. Paths are now resolved and required to be contained in the repo; a
+  relative `file_path` resolves against the payload's `cwd`, not the hook's. (The reported reproduction was
+  wrong — in isolation it already exited 0 — but the defect underneath it was real.)
+- **`foo.shtml` was harvested as `foo.sh`** by the installer's self-check, pre-existing since P2. A target
+  documenting a `.shtml` page would have failed its own install. Fixed with a word boundary.
+- **Command refs terminated by `,` `;` `:` `)` were missed** — a command is rarely the last thing on its
+  line. Terminator class widened. A trailing `.` stays excluded on purpose: it cannot be told apart from a
+  suffix, and `deploy.sh.bak` would be harvested as `deploy.sh`.
+
+Two confirmed gaps were **filed rather than guessed at**: interpreter-wrapped invocations (`bash x.sh`)
+sit in argument position and need an allowlist plus negative controls; and `find -name "$ref"` treats a
+bare name as a glob.
+
+The lesson is the day's lesson again. The gate's founding invariant — *a check that could not run must not
+report a result* — was broken by a single character, `-r` where `-f` was meant. Thirty-eight tests written
+specifically to defend that invariant missed it, because it never occurred to their author to hand the
+thing a file descriptor. Negative controls were the right instinct; the input space was larger than the
+imagination that generated them.
+
+### GH-23 P3 + GH-14 Phase 2: the dead-reference scan learns to read commands, and `run` stops lying
+
+Two defects, one shape: **a check that could not run must not report success.**
+
+`pdda-check-governance` matched `.md` only, so a governance doc could name any script it liked and nothing
+would notice. That is how `--with-startup-docs` shipped a router full of scripts targets never receive.
+The scan now reads `.sh` too — but a suffix widening alone would have caught almost none of the real cases.
+A router's load-bearing references are the **commands** it tells an agent to run, and commands carry
+arguments, so they close neither a markdown link nor a backtick span right after the suffix. A third
+pattern extracts paths in **command position**: the token opening a code span or a scanned fence line.
+
+The negative controls are the substance of the change, not paperwork. The rule that pulls the sync tool's
+name out of a fenced invocation must never pull a subcommand word out of a documented command, never fire
+on a glob, and never mistake a script name mid-sentence for a path. Nine such controls ship with it, each
+verified to pass against the pre-P3 code it guards.
+
+Turning it on indicted this repo before it helped anyone else:
+
+- The canonical router named a script under the gitignored, absent vendored-harness directory. The router
+  that spread dead references was carrying its own.
+- `GUIDING-PRINCIPLES.md` named the installer as a path — and that file is scaffolded into every target,
+  where no installer exists. P1 fixed the router and walked straight past it.
+- The install manifest named the very template **P1 itself added**, dead in every target. The check written
+  in P3 found the debt created in P1.
+- Then it flagged the illustrative placeholders inside P3's own documentation of P3.
+
+A fresh install went to **46 dead-ref warns** before the shipped-doc exemption manifest was rebuilt from a
+real scan (now 0) — GH-15's self-inflicted-noise failure, one regex away from repeating. `.sh` refs are
+exactly the ones that differ between the canonical repo and a target.
+
+The installer's self-check was scoped to the wrong noun. It now asserts over **every** startup doc it
+writes, and still never over one it kept.
+
+**GH-14 Phase 2 (BUG-001b)** landed here because it is the same bug wearing different clothes.
+`pdda_gated_exit` forces each check's exit code to `0` outside `full` mode — correct, since `observe` and
+`light` must never fail a build — but `cmd_run` read success out of that zero. The mode gate exists to stop
+the run from **blocking**, not from **reporting**. A new adopter, who starts in `observe` by design, saw
+"all checks passed" printed over real errors. There are now three outcomes instead of two: passed,
+found-but-not-blocking, failed. Warnings still never move a run out of "passed" — a `warn` is the
+house-style advisory, and collapsing that distinction would make every recommendation read as a failure.
+The LLM readiness review is gated on findings rather than on the gated exit code, so an error-laden repo no
+longer spends an LLM call it was never supposed to spend.
+
+GH-23 was a check that could not **see**. GH-27 was a check that could not **reach** `gh`. BUG-001b was a
+check that could not **block**. All three reported success. That family is now closed.
+
+Suites: governance 14 → 31, install 33 → 38, plus a new run-mode reporting suite at 23. Every positive
+assertion was run against `main` and fails there; every negative control passes there — including
+"observe still exits 0", which proves the mode gate survived being fixed. The captured LTVera-Pandas router
+is now a regression fixture and must never scan clean again.
+
 ### GH-23 P2: the installer now validates its own output
 
 `install.sh --with-startup-docs` writes a `ROUTER.md` into the target, then asserts that every `*.sh` path
