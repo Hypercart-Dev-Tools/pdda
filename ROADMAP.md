@@ -64,14 +64,6 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
-- **GH-27 — issue-doc-sync stopped watching a doc at the moment it completed** (2026-07-09) - **P1-P3
-  shipped.** The loop was never missing; it reported `warns=0` over two live leaks and the `Stop` hook
-  printed "all clear", because it scanned `2-WORKING` only and the gh-state cache was never written. Now
-  scans both buckets, warns when it *cannot* evaluate, persists the cache on every live lookup, and points
-  the operator at `/pdda-eod` — retargeted from the clock to completion. Warn-only, recommend-never-act.
-  Suite 14 → 33. Remaining: the operator wrap of #12 and #15. Issue
-  [#27](https://github.com/Hypercart-Dev-Tools/pdda/issues/27). ->
-  [PROJECT/2-WORKING/GH-27-ISSUE-DOC-RECONCILE.md](PROJECT/2-WORKING/GH-27-ISSUE-DOC-RECONCILE.md)
 - **GH-23 — agent on-ramp is wrong, expensive, and unenforced** (2026-07-09) - **P1 + P2 shipped.**
   `--with-startup-docs` advertised an "adapted" `ROUTER.md` while `copy_runtime` copied it verbatim, so
   every target inherited the canonical repo's router — naming `install.sh` and `utils/pdda/pdda-sync.sh`,
@@ -121,6 +113,13 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Completed
 
+- **GH-27 — issue-doc-sync stopped watching a doc at the moment it completed** (2026-07-09) - the loop
+  was never missing: it reported `warns=0` over two live leaks while the `Stop` hook printed "all clear",
+  because it scanned `2-WORKING` only and the gh-state cache was never written. Now scans both buckets,
+  warns when it *cannot* evaluate, persists the cache on every live lookup, and points the operator at
+  `/pdda-eod` — retargeted from the clock to completion. Warn-only, recommend-never-act. Suite 14 → 33.
+  Wrapped #12 and #15. Issue [#27](https://github.com/Hypercart-Dev-Tools/pdda/issues/27) (closed). ->
+  [PROJECT/3-COMPLETED/GH-27-ISSUE-DOC-RECONCILE.md](PROJECT/3-COMPLETED/GH-27-ISSUE-DOC-RECONCILE.md)
 - **GH-12 — Quad Concepts mode** (2026-07-07 → wrapped 2026-07-09) - opt-in glance layer: a `.pdda-quad`
   lever (off by default), a structure-only check, a warn-only LLM rubric, a `pdda.sh glance` roll-up. All
   4 phases shipped; 42/42 + 6/6 re-verified at wrap. Sat done-but-open for two days — the live evidence
