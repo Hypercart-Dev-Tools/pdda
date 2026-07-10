@@ -103,7 +103,7 @@ is the closing brace of the preceding function. The finding is unaffected.
 | Phase | State | Gate |
 |---|---|---|
 | P1 — template the target router; make `--help` true | **Shipped** — also fixes #25 | `pdda.sh run` green; 16/16 new tests |
-| P2 — post-install self-check on `*.sh` refs | Not started | `pdda.sh run` green |
+| P2 — post-install self-check on `*.sh` refs | **Shipped** | `pdda.sh run` green; suite 16 → 33 |
 | P3 — widen `_pdda_gov_extract_refs` to `.sh` + fenced blocks | Not started | `pdda.sh run` green + negative control |
 | P4 — cheap directive 1; opt-in default-off `PreToolUse` gate | Not started | `pdda.sh run` green |
 
@@ -154,6 +154,60 @@ bug it exists to fix**, and the install-time assertion caught it before commit. 
 P2 in one line: the check has to run on the file the installer *wrote*, not on the file it read.
 
 ### Tests
+&nbsp;
+
+## P2 — shipped 2026-07-09
+
+`install.sh` now validates its own output. When `--with-startup-docs` **writes** `ROUTER.md`, it asserts
+that every `*.sh` path that router names resolves to a file present in the target. A dead reference prints
+each offending name and exits non-zero.
+
+Verified against the original bug: with the GH-23 refs re-injected into the template, the install prints
+
+```
+ERROR  ROUTER.md names "install.sh" but no such file exists in <target>
+ERROR  ROUTER.md names "utils/pdda/pdda-sync.sh" but no such file exists in <target>
+2 dead script reference(s) in the ROUTER.md this installer just wrote.
+```
+
+and exits `1`. The same scenario against `main`'s pre-P2 `install.sh` exits `0` and ships the router
+silently. **That is the whole phase in one comparison.**
+
+### Two boundaries, both learned rather than designed
+
+**Only validate a router the installer wrote.** If `--with-startup-docs` kept the operator's existing
+`ROUTER.md`, that file is theirs. Failing their install over their own scripts would be indefensible and
+would make this the first check anyone disables. `seed_from_source` now reports whether it wrote or kept
+(`SEEDED_LAST`), and the assertion is skipped for a kept file — with a line saying so.
+
+**Run it against the written artifact, not the source template.** P1's own smoke test is the proof: the
+first draft of `templates/ROUTER.target.md` told targets that a local edit "is overwritten on the next
+`pdda-sync.sh push`" — naming a script targets do not have. Checking the *input* would have passed.
+
+### Severity: hard error, mode-independent
+
+Unlike the doc-hygiene `pdda.sh run` at the end of an install (warn-only in `observe`/`light`), this exits
+non-zero regardless of mode. The distinction is *whose artifact is wrong*: the hygiene run inspects the
+target's own docs, where warn-only is correct calibration. The self-check inspects **PDDA's own output**.
+A dead ref there is a PDDA template bug, and the non-zero exit is what stops `pdda-sync.sh register` from
+propagating a broken router any further.
+
+The install still completes. Aborting midway would leave a half-provisioned tree — strictly worse than a
+usable repo with a misleading router and a loud error. Two tests pin that.
+
+### Tests — `test/pdda-install-startup-docs.sh`, 16 → 33
+
+The negative controls are the ones that matter, because they are what keep this check enabled:
+
+| Case | Guards against |
+|---|---|
+| operator's own `ROUTER.md` with a dead `my-private-deploy.sh` → **no finding, exit 0** | the check policing files it does not own |
+| bare `pdda-lib.sh` resolving via the repo-wide fallback → **no finding** | tightening the matcher to paths-only, which looks correct |
+| no `--with-startup-docs` → **self-check never runs** | scope creep into plain installs |
+| poisoned template → **install still completes**, contract still lands | a mid-install abort leaving a half-provisioned tree |
+
+The poisoned-template case builds a throwaway copy of this repo with `.git` excluded, which also exercises
+`pdda_manifest_expand`'s non-git `find` fallback for free.
 
 `test/pdda-install-startup-docs.sh` — 16 assertions. Includes the negative control that matters: a test
 proving `--force` *does* overwrite, so the create-only guard cannot pass by being an unconditional skip.

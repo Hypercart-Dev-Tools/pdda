@@ -2,7 +2,7 @@
 gh_issue: 27
 source: https://github.com/Hypercart-Dev-Tools/pdda/issues/27
 title: "issue-doc-sync misses both completion leaks: the check stops watching a doc at the moment it completes"
-status: Active — P1, P2, P3 all shipped and verified; awaiting operator wrap of #12 and #15
+status: Completed — P1-P3 shipped; #12 and #15 wrapped and closed; issue #27 closed by PR #30
 created: 2026-07-09
 updated: 2026-07-09
 owner: noel
