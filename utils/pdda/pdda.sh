@@ -718,9 +718,19 @@ _pdda_gov_scannable_lines() {
 # root I am standing in", not "relative to the doc that mentions it". Left intact, it would resolve
 # against the referencing doc's directory and report a phantom dead ref for a script that plainly exists.
 #
+# Pattern (c) ends at whitespace, a backtick, end-of-line, or one of `,;:)"'` — the punctuation a command
+# is written against in prose ("run x.sh, then y") or in a fence ("x.sh; y.sh"). A trailing `.` is
+# deliberately NOT a terminator: it cannot be told apart from a suffix, and `deploy.sh.bak` would be
+# extracted as `deploy.sh`. A sentence ending in a bare command name is the rarer case; a false flag on a
+# real backup file is the worse one.
+#
 # Anchor-only links never match (no suffix) — this check validates file existence, not heading anchors.
 # A bare `GH-<n>-*.md` name is filtered out: those are illustrative instances of the issue-doc naming
 # convention (PDDA.md's own examples), not fixed cross-references to a real file.
+#
+# KNOWN GAP: an interpreter-wrapped invocation (`bash utils/x.sh`, `sudo ./x.sh`) still names a real path
+# but the .sh sits in argument position, so (c) skips it. Closing it needs an interpreter allowlist plus
+# negative controls (`bash -c "..."` must not flag); tracked separately rather than guessed at here.
 _pdda_gov_extract_refs() {
   local text="$1"
   { printf '%s\n' "$text" \
@@ -730,8 +740,8 @@ _pdda_gov_extract_refs() {
       | grep -oE '`[A-Za-z0-9_./-]+\.(md|sh)(#[A-Za-z0-9_-]*)?`' \
       | sed -E 's/^`//; s/`$//'
     printf '%s\n' "$text" \
-      | grep -oE '(^|`)[[:space:]]*(\.{1,2}/)?[A-Za-z0-9_.][A-Za-z0-9_./-]*\.sh([[:space:]]|`|$)' \
-      | sed -E 's/^`//; s/^[[:space:]]+//; s/[[:space:]`]+$//; s|^\./||'
+      | grep -oE '(^|`)[[:space:]]*(\.{1,2}/)?[A-Za-z0-9_.][A-Za-z0-9_./-]*\.sh([[:space:]`,;:)"'"'"']|$)' \
+      | sed -E 's/^`//; s/^[[:space:]]+//; s/[[:space:]`,;:)"'"'"']+$//; s|^\./||'
   } | grep -Ev '(^|/)GH-[0-9]+-[^/]*\.md(#.*)?$' | LC_ALL=C sort -u
 }
 

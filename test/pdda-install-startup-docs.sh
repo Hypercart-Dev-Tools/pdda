@@ -226,6 +226,17 @@ case "$out" in *"self-check  every *.sh named in the written ROUTER.md"*)
                  ok "the router is still validated alongside it" ;;
                *) bad "router self-check went missing" ;; esac
 
+# --- 9c. NEGATIVE CONTROL: a longer suffix is not a shell script ------------------------------------
+# `grep -oE '...\.sh'` harvests `foo.sh` out of `foo.shtml` and fails the install over a script nobody
+# named. Found by an adversarial cross-model review; the `\b` anchor is the whole fix.
+SRC="$(make_source_copy shtml)"
+printf '\nLegacy pages live at `docs/legacy.shtml` and are not shipped.\n' >> "$SRC/templates/ROUTER.target.md"
+T="$(new_target shtml)"
+out="$("$SRC/install.sh" "$T" --with-startup-docs --no-register 2>&1)"; rc=$?
+check "$rc" "0" "a .shtml reference does not fail the install"
+case "$out" in *'legacy.sh"'*) bad "harvested 'legacy.sh' out of 'legacy.shtml'" ;;
+               *) ok "a longer suffix (.shtml) is not read as a .sh reference" ;; esac
+
 # --- 10. NEGATIVE CONTROL: never police a ROUTER.md the operator wrote ------------------------------
 # If --with-startup-docs kept their file, it is theirs. Failing their install over their own scripts
 # would be indefensible — and would make this check the first thing anyone turns off.

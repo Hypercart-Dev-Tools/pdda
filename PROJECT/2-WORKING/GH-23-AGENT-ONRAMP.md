@@ -390,6 +390,29 @@ The enforcement path is four lines. The other 34 assertions are about staying ou
 | **fail-open** | missing / absent / unparseable transcript; empty payload; malformed payload; no `jq` |
 | the boundary | an **empty but valid** transcript still blocks — otherwise fail-open swallows the gate |
 
+---
+
+## Adversarial cross-model review (Codex, read-only, isolated worktree)
+
+Run after P4 was committed. It found one genuine fail-**closed** path in the gate — the one thing the gate
+promises never to do — plus two real false-flag classes. All confirmed by reproduction before fixing; the
+one "medium" that did not reproduce in isolation is recorded as such.
+
+| Finding | Verdict | Fix |
+|---|---|---|
+| `transcript_path=/dev/stdin` → **blocks** | **Confirmed, serious.** This script drains stdin to read its own payload, so the "transcript" was an empty, already-consumed stream. `-r` accepted it; the scan came back empty; the gate read that as evidence and denied. | Require a **regular file** (`-f`). Kills `/dev/stdin`, a directory, and a FIFO (which would have hung `jq` forever) in one token. |
+| Scope decided on the raw string: `PROJECT/../../etc/passwd` matches `PROJECT/*` | **Confirmed as a latent defect, but the reported repro was wrong** — in isolation it exits `0`. Codex's `exit 2` came from bundling it with `/dev/stdin`; that finding was doing the blocking. | Scope now resolves the path first and requires containment inside the repo. A relative `file_path` resolves against the payload's `cwd`, not the hook's. |
+| `foo.shtml` harvested as `foo.sh` by the installer self-check | **Confirmed.** Pre-existing since P2; the governance extractor never had it. A target naming a `.shtml` page would fail its own install. | `\b` after the suffix. |
+| Command refs terminated by `,` `;` `:` `)` are missed | **Confirmed.** A command is rarely the last thing on its line. | Terminator class widened. A trailing `.` is *deliberately* excluded: it cannot be distinguished from a suffix, and `deploy.sh.bak` would be harvested as `deploy.sh`. |
+| Transcript spoofing — a forged `transcript_path` satisfies the gate | **Out of threat model, and said so.** The gate defends against forgetfulness, not an adversary; the agent does not choose `transcript_path`. A guardrail that assumed a hostile agent would need to not be a shell script. |
+| `bash utils/x.sh`, `sudo ./x.sh` are missed | **Confirmed, not fixed here.** The `.sh` sits in argument position. Closing it needs an interpreter allowlist plus negative controls (`bash -c "…"` must not flag). Filed rather than guessed at. |
+| `find -name "$ref"` treats `build[1].sh` as a glob | **Confirmed, not fixed here.** Pre-existing in both `install.sh` and `_pdda_gov_resolve_ref`. Exotic; filed. |
+
+The lesson repeats: the gate's own founding invariant — *a check that could not run must not report a
+result* — was violated by a single character (`-r` where `-f` was meant), and none of the 38 tests I wrote
+for it caught that, because I never thought to hand it a file descriptor. The negative controls were the
+right idea; the input space was bigger than my imagination of it.
+
 ## Problem
 
 An agent arriving in a PDDA **target** repo is pointed at a `ROUTER.md` that describes the **canonical repo**,

@@ -385,7 +385,9 @@ assert_written_doc_refs() {  # <dst-relpath>
     esac
     printf '  ERROR  %s names "%s" but no such file exists in %s\n' "$doc_rel" "$ref" "$TARGET" >&2
     missing=$((missing + 1))
-  done < <(grep -oE '[A-Za-z0-9_./-]+\.sh' "$doc" | LC_ALL=C sort -u)
+    # `\b` after the suffix, or `foo.shtml` is harvested as `foo.sh` and the installer fails a target
+    # over a script nobody ever mentioned.
+  done < <(grep -oE '[A-Za-z0-9_./-]+\.sh\b' "$doc" | LC_ALL=C sort -u)
 
   if [ "$missing" -gt 0 ]; then
     {

@@ -301,5 +301,47 @@ out="$(run_check)"
 assert_contains "$out" "dead reference 'install.sh'" \
   "a NON-shipped governance doc naming a missing install.sh is still flagged (exemption does not leak)"
 
+# --- POSITIVE: command-position refs terminated by prose/shell punctuation ------------------------
+# Found by an adversarial cross-model review of P3. A command is rarely the last thing on its line.
+new_sandbox
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+```bash
+alpha.sh; beta.sh
+```
+
+`gamma.sh, then keep going`
+EOF
+out="$(run_check)"
+assert_contains "$out" "dead reference 'alpha.sh'" "a command terminated by ';' is flagged"
+assert_contains "$out" "dead reference 'gamma.sh'" "a command terminated by ',' is flagged"
+assert_absent "$out" "dead reference 'alpha.sh;'" "the terminator is not part of the extracted path"
+
+# --- NEGATIVE CONTROL: a trailing '.' is NOT a terminator ------------------------------------------
+# `deploy.sh.bak` must not be harvested as `deploy.sh`. A sentence ending in a bare command name is the
+# rarer case; a false flag on a real backup file is the worse one. This is a deliberate, documented miss.
+new_sandbox
+: > "$SBOX/deploy.sh.bak"
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+`deploy.sh.bak` is the backup we keep around.
+EOF
+out="$(run_check)"
+assert_absent "$out" "dead reference 'deploy.sh'" "a '.sh.' inside a longer suffix is not extracted"
+
+# --- NEGATIVE CONTROL: .shtml is not .sh ------------------------------------------------------------
+new_sandbox
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+```bash
+legacy.shtml
+```
+EOF
+out="$(run_check)"
+assert_absent "$out" "dead reference" "a longer suffix (.shtml) never matches the .sh pattern"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

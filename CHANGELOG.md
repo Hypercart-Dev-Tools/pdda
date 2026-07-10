@@ -45,10 +45,39 @@ fact that an operator who accepts only the default install still gets exactly th
 Every existing guardrail holds: never write a repo's committed `.claude/settings.json`; only the
 operator's own `~/.claude/settings.json` or an ignored `.claude/settings.local.json`.
 
-`test/pdda-router-read-gate.sh` — 38 assertions. Four cover the enforcement path. The other 34 cover
-staying out of the way: default-off silence, lever precedence, scope, non-PDDA repos, and eight fail-open
+`test/pdda-router-read-gate.sh` — 47 assertions. A handful cover the enforcement path. The rest cover
+staying out of the way: default-off silence, lever precedence, scope, non-PDDA repos, and the fail-open
 paths. Plus the boundary that keeps fail-open from swallowing the whole gate: an **empty but valid**
 transcript is evidence, not a failure to gather it, and still blocks.
+
+### Adversarial cross-model review, and what it broke
+
+An independent read of the above (Codex, read-only, in a throwaway worktree) found a fail-**closed** path
+in the gate — the one thing it promises never to do:
+
+- **`transcript_path=/dev/stdin` blocked.** The script drains stdin to read its own payload, so the
+  "transcript" was an empty, already-consumed stream. `-r` accepted it, the scan came back empty, and the
+  gate treated *nothing to read* as *evidence of not reading*. Requiring a **regular file** (`-f`) fixes it,
+  and takes a directory and a FIFO — which would have hung `jq` forever — with it.
+- **Scope was decided on the raw string.** `PROJECT/../../etc/passwd` matches the glob `PROJECT/*` while
+  pointing nowhere near the repo. Paths are now resolved and required to be contained in the repo; a
+  relative `file_path` resolves against the payload's `cwd`, not the hook's. (The reported reproduction was
+  wrong — in isolation it already exited 0 — but the defect underneath it was real.)
+- **`foo.shtml` was harvested as `foo.sh`** by the installer's self-check, pre-existing since P2. A target
+  documenting a `.shtml` page would have failed its own install. Fixed with a word boundary.
+- **Command refs terminated by `,` `;` `:` `)` were missed** — a command is rarely the last thing on its
+  line. Terminator class widened. A trailing `.` stays excluded on purpose: it cannot be told apart from a
+  suffix, and `deploy.sh.bak` would be harvested as `deploy.sh`.
+
+Two confirmed gaps were **filed rather than guessed at**: interpreter-wrapped invocations (`bash x.sh`)
+sit in argument position and need an allowlist plus negative controls; and `find -name "$ref"` treats a
+bare name as a glob.
+
+The lesson is the day's lesson again. The gate's founding invariant — *a check that could not run must not
+report a result* — was broken by a single character, `-r` where `-f` was meant. Thirty-eight tests written
+specifically to defend that invariant missed it, because it never occurred to their author to hand the
+thing a file descriptor. Negative controls were the right instinct; the input space was larger than the
+imagination that generated them.
 
 ### GH-23 P3 + GH-14 Phase 2: the dead-reference scan learns to read commands, and `run` stops lying
 

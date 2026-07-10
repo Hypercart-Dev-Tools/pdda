@@ -72,14 +72,25 @@ esac
 phys() { ( cd "$1" 2>/dev/null && pwd -P ) || printf '%s' "$1"; }
 
 root_phys="$(phys "$root")"
-file_dir="$(dirname "$file_path")"
-file_abs="$(phys "$file_dir")/$(basename "$file_path")"
 
-rel="$file_abs"
-case "$rel" in
-  "$root_phys"/*) rel="${rel#"$root_phys"/}" ;;
-  *) rel="$file_path"
-     case "$rel" in "$root"/*) rel="${rel#"$root"/}" ;; esac ;;
+# A relative file_path is relative to the session's cwd, not to wherever this hook happens to run.
+case "$file_path" in
+  /*) file_full="$file_path" ;;
+  *)  file_full="${cwd:-$PWD}/$file_path" ;;
+esac
+
+file_dir="$(dirname "$file_full")"
+file_abs="$(phys "$file_dir")/$(basename "$file_full")"
+
+# Scope is decided on the RESOLVED path, never on the raw string. `PROJECT/../../etc/passwd` matches the
+# glob `PROJECT/*` while pointing nowhere near this repo; deciding on the string would let the gate refuse
+# writes to files it does not govern. A path that resolves outside the repo is simply not ours.
+#
+# If the parent directory does not exist yet, phys() cannot resolve it and containment fails, so the gate
+# allows. That is deliberate: an unresolvable path is one we cannot prove we govern. Fail-open, as ever.
+case "$file_abs" in
+  "$root_phys"/*) rel="${file_abs#"$root_phys"/}" ;;
+  *) exit "$ALLOW" ;;
 esac
 
 case "$rel" in
@@ -91,7 +102,16 @@ esac
 case "$rel" in ROUTER.md) exit "$ALLOW" ;; esac
 
 # --- evidence: did anything this session open the router (or run the skill that reads it)? ---------
-[ -n "$transcript" ] && [ -r "$transcript" ] || allow_unevaluated "no readable transcript"
+# A REGULAR file, not merely a readable one. `-r` accepted character devices, FIFOs and directories:
+#   - /dev/stdin is readable, but this script already drained stdin to read its own payload, so jq saw
+#     an empty stream, the scan came back empty, and the gate BLOCKED — fail-closed on a transcript it
+#     never actually read. Exactly the invariant this file claims to hold, broken by one test operator.
+#   - a FIFO with no writer would hang jq forever, wedging the tool call.
+# Only a regular file can be scanned twice and reasoned about. Anything else is no evidence at all.
+# An empty REGULAR file is still evidence, and still blocks — that is the boundary, and it is tested.
+[ -n "$transcript" ] || allow_unevaluated "no transcript path in the payload"
+[ -f "$transcript" ] || allow_unevaluated "transcript is not a regular file"
+[ -r "$transcript" ] || allow_unevaluated "transcript is not readable"
 
 # jq reads a JSONL stream one value at a time — no slurp, so a long session costs no extra memory.
 # Two ways to satisfy directive 1, because blocking someone who did exactly what it asked is perverse:

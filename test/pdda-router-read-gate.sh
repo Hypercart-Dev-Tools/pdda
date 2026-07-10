@@ -211,5 +211,60 @@ printf '{"type":"assistant","message":{"conte' >> "$SBOX/t.jsonl"   # interrupte
 run_gate Edit "PROJECT/2-WORKING/X.md"; rc=$?
 assert_eq "$rc" "$ALLOW" "a truncated transcript never blocks (parse failure OR the Read is found)"
 
+# ==================================================================================================
+# Found by an adversarial cross-model review. Each of these BLOCKED (exit 2) in the first shipped
+# draft — fail-closed on inputs the gate never actually read.
+# ==================================================================================================
+
+# --- /dev/stdin as the transcript --------------------------------------------------------------------
+# The killer. This script drains stdin to read its own payload, so by the time it "reads the transcript"
+# the stream is empty. A readable-but-drained fd looked exactly like a valid transcript with no router
+# read in it, and the gate blocked. `-r` was never the right test; `-f` is.
+new_repo; : > "$SBOX/repo/.pdda-router-gate"
+rc=0
+printf '{"tool_name":"Write","tool_input":{"file_path":"%s/ROADMAP.md"},"transcript_path":"/dev/stdin","cwd":"%s"}' \
+  "$SBOX/repo" "$SBOX/repo" | bash "$GATE" 2>"$SBOX/err" || rc=$?
+assert_eq "$rc" "$ALLOW" "fail-open: /dev/stdin (drained by our own payload read) never blocks"
+assert_contains "$(err)" "not a regular file" "fail-open: names the reason (non-regular transcript)"
+
+# --- a directory as the transcript --------------------------------------------------------------------
+new_repo; : > "$SBOX/repo/.pdda-router-gate"
+run_gate Edit "PROJECT/2-WORKING/X.md" "$SBOX/repo"; rc=$?
+assert_eq "$rc" "$ALLOW" "fail-open: a directory transcript never blocks"
+assert_contains "$(err)" "not a regular file" "fail-open: a directory is not a transcript"
+
+# --- a FIFO as the transcript -------------------------------------------------------------------------
+# With no writer, jq on a FIFO blocks forever and wedges the tool call. `-f` rejects it before jq runs.
+new_repo; : > "$SBOX/repo/.pdda-router-gate"
+if mkfifo "$SBOX/fifo" 2>/dev/null; then
+  run_gate Edit "PROJECT/2-WORKING/X.md" "$SBOX/fifo"; rc=$?
+  assert_eq "$rc" "$ALLOW" "fail-open: a FIFO transcript never blocks (and never hangs)"
+else
+  pass "mkfifo unavailable here; FIFO case skipped"
+fi
+
+# --- scope is decided on the RESOLVED path, not the raw string -----------------------------------------
+# `PROJECT/../../etc/passwd` matches the glob `PROJECT/*` while pointing nowhere near this repo.
+new_repo; : > "$SBOX/repo/.pdda-router-gate"
+run_gate Edit "PROJECT/../../etc/passwd"; rc=$?
+assert_eq "$rc" "$ALLOW" "a path that escapes the repo via .. is not governed, and is not blocked"
+
+new_repo; : > "$SBOX/repo/.pdda-router-gate"
+run_gate Edit "/etc/passwd"; rc=$?
+assert_eq "$rc" "$ALLOW" "an absolute path outside the repo is not governed"
+
+# --- ...but a real governed path still resolves and still blocks ---------------------------------------
+# The containment fix must not become a blanket allow. This is its paired positive control.
+new_repo; : > "$SBOX/repo/.pdda-router-gate"
+run_gate Edit "PROJECT/2-WORKING/../2-WORKING/X.md"; rc=$?
+assert_eq "$rc" "$BLOCK" "a governed path reached via '..' inside the repo still blocks"
+
+# --- a relative file_path resolves against the payload's cwd, not the hook's -----------------------------
+new_repo; : > "$SBOX/repo/.pdda-router-gate"
+rc=0
+printf '{"tool_name":"Edit","tool_input":{"file_path":"ROADMAP.md"},"transcript_path":"%s","cwd":"%s"}' \
+  "$SBOX/t.jsonl" "$SBOX/repo" | bash "$GATE" 2>"$SBOX/err" || rc=$?
+assert_eq "$rc" "$BLOCK" "a relative file_path is resolved against the session cwd and still governed"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
