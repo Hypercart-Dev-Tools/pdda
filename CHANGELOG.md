@@ -1,5 +1,16 @@
 # CHANGELOG.md
 
+## 2026-07-10
+
+### GH-23 closed; doc moved to 3-COMPLETED
+
+PR #32 merged to `main` (fast-forward to `5ef638a`), carrying GH-23 P3+P4 and the pre-merge Codex-consult
+fixes. Issue #23 closed. Its working doc moved `2-WORKING → 3-COMPLETED` (it already carried its `## Lessons
+Learned (For Future Agents)` section), frontmatter `status` set to Completed, and the ROADMAP entry moved
+from **In progress** to **Completed** with its pointer retargeted to the new path. The issue title's stale
+"HQ's ROUTER.md" was corrected to "the canonical ROUTER.md" at close. Follow-ups #33 (interpreter-wrapped
+`.sh` refs missed) and #34 (`find -name` treats a bare ref as a glob) remain open for their own work.
+
 ## 2026-07-09
 
 ### GH-23 P4: the on-ramp gets cheap, then verifiable

@@ -2,9 +2,9 @@
 gh_issue: 23
 source: https://github.com/Hypercart-Dev-Tools/pdda/issues/23
 title: "Agent on-ramp is wrong, expensive, and unenforced: targets inherit the canonical repo's ROUTER.md verbatim"
-status: Active — all four phases shipped; ready to close pending operator verification
+status: Completed — all four phases shipped and merged (PR #32, 5ef638a); issue #23 closed 2026-07-10
 created: 2026-07-09
-updated: 2026-07-09
+updated: 2026-07-10
 owner: noel
 doc_type: bugfix
 effort: 3

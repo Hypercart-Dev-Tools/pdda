@@ -28,7 +28,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| **GH-23 complete (P1–P4), closing the "a check that could not run reports success" family.** Targets no longer inherit the canonical router (#25 fixed alongside); `install.sh` validates every startup doc it writes; the dead-ref scan reads `.sh` including command-position paths; **GH-14 Phase 2 (BUG-001b)** landed with P3 — `run` can no longer report "all checks passed" over errors the mode gate merely stopped from blocking; and P4 made the on-ramp cheap (`/pdda`) then optionally enforceable. Earlier: GH-27 made the wrap loop fire, and GH-12/GH-15 wrapped and closed. | **Verify GH-23, then close #23** and move its doc to `3-COMPLETED` — closing is a human judgment. Then: repair the `LTVera-Pandas` install (needs an explicit `install.sh --with-startup-docs --force`; `pdda-sync.sh push` cannot reach a target's `ROUTER.md`). GH-10 Sentinel is the other active build (Phase 2b executor). |
+| **GH-23 shipped and closed (P1–P4, PR #32 → 5ef638a), closing the "a check that could not run reports success" family.** Targets no longer inherit the canonical router (#25 fixed alongside); `install.sh` validates every startup doc it writes; the dead-ref scan reads `.sh` including command-position paths; **GH-14 Phase 2 (BUG-001b)** landed with P3 — `run` can no longer report "all checks passed" over errors the mode gate merely stopped from blocking; and P4 made the on-ramp cheap (`/pdda`) then optionally enforceable. Doc moved to `3-COMPLETED`. Earlier: GH-27 made the wrap loop fire, and GH-12/GH-15 wrapped and closed. | **Repair the `LTVera-Pandas` install** — it still carries the pre-P1 verbatim router; needs an explicit `install.sh --with-startup-docs --force` (`pdda-sync.sh push` cannot reach a target's `ROUTER.md`), backing up its 60KB `AGENTS.md` first. **GH-10 Sentinel** is the other active build (Phase 2b executor). Smaller: follow-ups #33/#34 (dead-ref scan misses interpreter-wrapped and `find -name` refs). |
 
 ## Ledger
 
@@ -64,17 +64,6 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
-- **GH-23 — agent on-ramp is wrong, expensive, and unenforced** (2026-07-09) - **All four phases shipped;
-  ready to close pending operator verification.** `--with-startup-docs` advertised an "adapted" `ROUTER.md`
-  while `copy_runtime` copied it verbatim, so every target inherited the canonical repo's router — naming
-  `install.sh` and `utils/pdda/pdda-sync.sh`, neither of which exists in a target — and no check could see
-  it. **P1** routes each startup doc by who owns it after install, fixing #25 on the way. **P2** makes
-  `install.sh` validate its own output. **P3** widens the dead-ref scan to `.sh` including command-position
-  paths, and carries **GH-14 Phase 2 / BUG-001b**: `run` no longer prints "all checks passed" over errors
-  the mode gate merely stopped from blocking. **P4** makes reminder directive 1 cheap (`/pdda`) and, via an
-  opt-in default-off `PreToolUse` gate that fails open whenever it cannot prove the router went unread,
-  verifiable. Issue [#23](https://github.com/Hypercart-Dev-Tools/pdda/issues/23). ->
-  [PROJECT/2-WORKING/GH-23-AGENT-ONRAMP.md](PROJECT/2-WORKING/GH-23-AGENT-ONRAMP.md)
 - **PRD generator skill exploration — PRD-Kimi vs PRD-Perplexity, synthesized into PRD-pdda** (2026-07-08) -
   three draft-stage variants of a not-yet-built `product-prd-builder` skill (structured PRD →
   Spec/Roadmap interview). `PRD-Perplexity/` is the original draft (renamed, unchanged) and is the only
@@ -112,6 +101,17 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Completed
 
+- **GH-23 — agent on-ramp is wrong, expensive, and unenforced** (2026-07-09 → closed 2026-07-10) - four
+  phases, all shipped in PR #32. `--with-startup-docs` advertised an "adapted" `ROUTER.md` while
+  `copy_runtime` copied it verbatim, so every target inherited the canonical router — naming `install.sh`
+  and `pdda-sync.sh`, neither of which exists in a target, with no check able to see it. **P1** routes each
+  startup doc by owner (fixing #25); **P2** makes `install.sh` validate its own output; **P3** widens the
+  dead-ref scan to command-position `.sh` and carries **GH-14 Phase 2 / BUG-001b** (`run` no longer reports
+  "all checks passed" over gated errors); **P4** makes reminder directive 1 cheap (`/pdda`) then verifiable
+  via an opt-in default-off `PreToolUse` gate that fails open when it cannot prove the router went unread.
+  Codex consult caught a fail-closed path pre-merge; 273 assertions green; follow-ups #33/#34 filed. Issue
+  [#23](https://github.com/Hypercart-Dev-Tools/pdda/issues/23) (closed). ->
+  [PROJECT/3-COMPLETED/GH-23-AGENT-ONRAMP.md](PROJECT/3-COMPLETED/GH-23-AGENT-ONRAMP.md)
 - **GH-27 — issue-doc-sync stopped watching a doc at the moment it completed** (2026-07-09) - the loop
   was never missing: it reported `warns=0` over two live leaks while the `Stop` hook printed "all clear",
   because it scanned `2-WORKING` only and the gh-state cache was never written. Now scans both buckets,
