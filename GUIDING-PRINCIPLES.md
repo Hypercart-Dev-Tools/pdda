@@ -21,8 +21,8 @@ recover full state from the docs alone, not from memory or chat history.
    logs outcomes. No fact lives in two places where they can drift.
 5. **A clear signal of what is live.** `PROJECT/2-WORKING` holds only truly active work, so "what
    should an agent pick up" is never ambiguous.
-6. **Low-friction and portable.** The contract must be cheap to adopt (`install.sh`) and cheap to
-   obey, or agents will route around it.
+6. **Low-friction and portable.** The contract must be cheap to adopt (a one-command install) and
+   cheap to obey, or agents will route around it.
 
 ## How to apply
 

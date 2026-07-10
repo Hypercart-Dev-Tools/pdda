@@ -55,6 +55,17 @@ ERROR_COUNT=0
 WARN_COUNT=0
 INFO_COUNT=0
 
+# Cross-check totals for one `pdda.sh run`, accumulated by pdda_emit_summary. The per-check counters
+# above are reset by every pdda_reset_counts, and a check's RETURN VALUE is gated to 0 outside full
+# mode — so in observe/light a run of nothing but errors leaves cmd_run's EXIT_CODE at 0. Inferring
+# "all checks passed" from that zero is BUG-001b: the mode gate is supposed to stop the run from
+# BLOCKING, not to stop it from REPORTING. These totals survive the resets and ignore the gate, so the
+# closing line can say what was actually found. Same family as GH-23 and GH-27: a check that could not
+# run, or could not block, must never be scored as a check that passed.
+PDDA_RUN_ERRORS=0
+PDDA_RUN_WARNS=0
+PDDA_RUN_ERROR_CHECKS=""
+
 pdda_now_iso() {
   date -u +"%Y-%m-%dT%H:%M:%SZ"
 }
@@ -156,6 +167,14 @@ pdda_emit_summary() {
   local summary
 
   summary="errors=$ERROR_COUNT warns=$WARN_COUNT info=$INFO_COUNT"
+
+  # Roll this check's findings into the run-level totals before the next pdda_reset_counts wipes them.
+  PDDA_RUN_ERRORS=$((PDDA_RUN_ERRORS + ERROR_COUNT))
+  PDDA_RUN_WARNS=$((PDDA_RUN_WARNS + WARN_COUNT))
+  if [ "$ERROR_COUNT" -gt 0 ]; then
+    PDDA_RUN_ERROR_CHECKS="$PDDA_RUN_ERROR_CHECKS $check"
+  fi
+
   if [ "$PDDA_FORMAT" = "json" ]; then
     pdda_json_line "$( [ "$exit_code" -eq 0 ] && printf 'info' || printf 'error' )" \
       "$check" "$PDDA_REPO_ROOT" 0 "$summary" "summary"

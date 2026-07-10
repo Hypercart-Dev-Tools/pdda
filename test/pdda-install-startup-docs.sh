@@ -210,17 +210,47 @@ case "$out" in *"bug in PDDA"*)                     ok "self-check blames the te
 [ -f "$T/utils/pdda/pdda.sh" ] && ok "install still completes despite the failed self-check" || bad "install aborted mid-way"
 [ -f "$T/PROJECT/PDDA.md" ]    && ok "the contract still landed" || bad "PROJECT/PDDA.md missing"
 
+# --- 9b. GH-23 P3: the self-check covers EVERY doc we write, not just the router --------------------
+# The router was never special. Scoped to ROUTER.md alone, this check sailed past a dead `install.sh`
+# sitting in the GUIDING-PRINCIPLES.md scaffolded into every single target — found only once the
+# governance scan learned to read .sh. Poison a non-router startup doc and the install must still fail.
+SRC="$(make_source_copy poison-gp)"
+printf '\nAdopt it by running `tools/bootstrap-pdda.sh` from the root.\n' >> "$SRC/GUIDING-PRINCIPLES.md"
+T="$(new_target poisoned-gp)"
+out="$("$SRC/install.sh" "$T" --with-startup-docs --no-register 2>&1)"; rc=$?
+case "$out" in *'GUIDING-PRINCIPLES.md names "tools/bootstrap-pdda.sh"'*)
+                 ok "self-check catches a dead ref in a non-router startup doc" ;;
+               *) bad "self-check ignored a poisoned GUIDING-PRINCIPLES.md"; printf '%s\n' "$out" ;; esac
+[ "$rc" -ne 0 ] && ok "a poisoned non-router startup doc makes install.sh exit non-zero" || bad "poisoned GP install exited 0"
+case "$out" in *"self-check  every *.sh named in the written ROUTER.md"*)
+                 ok "the router is still validated alongside it" ;;
+               *) bad "router self-check went missing" ;; esac
+
 # --- 10. NEGATIVE CONTROL: never police a ROUTER.md the operator wrote ------------------------------
 # If --with-startup-docs kept their file, it is theirs. Failing their install over their own scripts
 # would be indefensible — and would make this check the first thing anyone turns off.
+#
+# GH-23 P3 sharpened this case. TWO mechanisms can name the operator's script, and only one of them
+# would be a violation:
+#   - the install SELF-CHECK aborts the install (exit 1). It must never assert over a doc we kept.
+#   - the governance DEAD-REF scan is warn-only advisory, run by install's first-run verification. Its
+#     entire job is to say "this doc names a script that is not here". Suppressing it on the operator's
+#     own docs would suppress it exactly where it matters — that is the LTVera bug.
+# So assert the self-check ignores the kept router and that nothing blocks — NOT that the script name
+# never appears anywhere in the output.
 T="$(new_target kept-router)"
 printf '# MY ROUTER\n\nRun `my-private-deploy.sh` before shipping.\n' > "$T/ROUTER.md"
 out="$("$REPO/install.sh" "$T" --with-startup-docs --no-register 2>&1)"; rc=$?
 check "$rc" "0" "an operator's own ROUTER.md never fails the install"
-case "$out" in *"self-check skipped"*) ok "self-check skips a kept router and says why" ;;
+case "$out" in *"self-check skipped — ROUTER.md was kept"*) ok "self-check skips a kept router and says why" ;;
                *) bad "did not skip the self-check for a kept router"; printf '%s\n' "$out" ;; esac
-case "$out" in *"my-private-deploy.sh"*) bad "flagged the operator's own script reference" ;;
-               *) ok "the operator's own dead .sh ref is not flagged" ;; esac
+case "$out" in *'ROUTER.md names "my-private-deploy.sh"'*) bad "the self-check policed the operator's own script" ;;
+               *) ok "the self-check never asserts over a kept router" ;; esac
+case "$out" in *"dead script reference(s)"*) bad "install raised a blocking dead-ref failure for a kept router" ;;
+               *) ok "no install-blocking dead-ref failure for a kept router" ;; esac
+# The advisory warn IS expected and correct: their router points at a script their repo does not have.
+case "$out" in *"dead reference 'my-private-deploy.sh'"*) ok "governance still warns (advisory) on the operator's dead ref" ;;
+               *) bad "governance failed to warn about a genuinely dead .sh ref" ;; esac
 grep -q 'my-private-deploy.sh' "$T/ROUTER.md" && ok "the operator's router is left untouched" || bad "operator's router was modified"
 
 # --- 11. NEGATIVE CONTROL: a bare filename that genuinely resolves must not flag --------------------

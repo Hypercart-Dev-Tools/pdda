@@ -73,16 +73,21 @@ The template exists because this repo's `ROUTER.md` documents things a target do
 Copying it verbatim pointed every target's agents at scripts absent from their repo (GH-23). The template
 is the canonical router minus those sections; keep the two in step when either changes.
 
-**Post-install self-check.** When `--with-startup-docs` *writes* `ROUTER.md`, the installer then asserts
-that every `*.sh` path that router names resolves to a file present in the target. A dead reference exits
-non-zero with the offending names. This is the assertion that would have caught GH-23 at install time.
-Two boundaries make it safe to keep enabled:
+**Post-install self-check.** For every startup doc `--with-startup-docs` actually *writes* — `ROUTER.md`,
+`AGENTS.md`, `GUIDING-PRINCIPLES.md` — the installer asserts that every `*.sh` path that doc names
+resolves to a file present in the target. A dead reference exits non-zero with the offending names. This
+is the assertion that would have caught GH-23 at install time. Two boundaries make it safe to keep enabled:
 
-- It validates only a router the installer **wrote**. If your own `ROUTER.md` was kept (create-only), it
-  is yours and is never checked — the installer will not fail your install over your own scripts.
+- It validates only a doc the installer **wrote**, decided per file. If your own `ROUTER.md` was kept
+  (create-only) it is yours and is never checked — the installer will not fail your install over your own
+  scripts — while an `AGENTS.md` scaffolded beside it in the same run still is. Each skipped doc says so.
 - It runs against the **written artifact**, not the source template. During GH-23 P1 the first draft of
   `templates/ROUTER.target.md` reintroduced the very bug it exists to fix; only an assertion on the
   *output* caught it. Checking the input would have passed.
+
+Originally this covered `ROUTER.md` alone. The router was never special: GH-23 P3's widened dead-reference
+scan found the identical defect — a dead `install.sh` — sitting in the `GUIDING-PRINCIPLES.md` scaffolded
+into every target. Any doc the installer writes can name a script it does not ship.
 
 A failure here is a bug in PDDA's template, not in your repo. The install still completes — the target is
 usable, its router is misleading — and the non-zero exit is what stops `pdda-sync.sh register` from

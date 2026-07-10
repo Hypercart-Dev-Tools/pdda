@@ -2,6 +2,57 @@
 
 ## 2026-07-09
 
+### GH-23 P3 + GH-14 Phase 2: the dead-reference scan learns to read commands, and `run` stops lying
+
+Two defects, one shape: **a check that could not run must not report success.**
+
+`pdda-check-governance` matched `.md` only, so a governance doc could name any script it liked and nothing
+would notice. That is how `--with-startup-docs` shipped a router full of scripts targets never receive.
+The scan now reads `.sh` too — but a suffix widening alone would have caught almost none of the real cases.
+A router's load-bearing references are the **commands** it tells an agent to run, and commands carry
+arguments, so they close neither a markdown link nor a backtick span right after the suffix. A third
+pattern extracts paths in **command position**: the token opening a code span or a scanned fence line.
+
+The negative controls are the substance of the change, not paperwork. The rule that pulls the sync tool's
+name out of a fenced invocation must never pull a subcommand word out of a documented command, never fire
+on a glob, and never mistake a script name mid-sentence for a path. Nine such controls ship with it, each
+verified to pass against the pre-P3 code it guards.
+
+Turning it on indicted this repo before it helped anyone else:
+
+- The canonical router named a script under the gitignored, absent vendored-harness directory. The router
+  that spread dead references was carrying its own.
+- `GUIDING-PRINCIPLES.md` named the installer as a path — and that file is scaffolded into every target,
+  where no installer exists. P1 fixed the router and walked straight past it.
+- The install manifest named the very template **P1 itself added**, dead in every target. The check written
+  in P3 found the debt created in P1.
+- Then it flagged the illustrative placeholders inside P3's own documentation of P3.
+
+A fresh install went to **46 dead-ref warns** before the shipped-doc exemption manifest was rebuilt from a
+real scan (now 0) — GH-15's self-inflicted-noise failure, one regex away from repeating. `.sh` refs are
+exactly the ones that differ between the canonical repo and a target.
+
+The installer's self-check was scoped to the wrong noun. It now asserts over **every** startup doc it
+writes, and still never over one it kept.
+
+**GH-14 Phase 2 (BUG-001b)** landed here because it is the same bug wearing different clothes.
+`pdda_gated_exit` forces each check's exit code to `0` outside `full` mode — correct, since `observe` and
+`light` must never fail a build — but `cmd_run` read success out of that zero. The mode gate exists to stop
+the run from **blocking**, not from **reporting**. A new adopter, who starts in `observe` by design, saw
+"all checks passed" printed over real errors. There are now three outcomes instead of two: passed,
+found-but-not-blocking, failed. Warnings still never move a run out of "passed" — a `warn` is the
+house-style advisory, and collapsing that distinction would make every recommendation read as a failure.
+The LLM readiness review is gated on findings rather than on the gated exit code, so an error-laden repo no
+longer spends an LLM call it was never supposed to spend.
+
+GH-23 was a check that could not **see**. GH-27 was a check that could not **reach** `gh`. BUG-001b was a
+check that could not **block**. All three reported success. That family is now closed.
+
+Suites: governance 14 → 31, install 33 → 38, plus a new run-mode reporting suite at 23. Every positive
+assertion was run against `main` and fails there; every negative control passes there — including
+"observe still exits 0", which proves the mode gate survived being fixed. The captured LTVera-Pandas router
+is now a regression fixture and must never scan clean again.
+
 ### GH-23 P2: the installer now validates its own output
 
 `install.sh --with-startup-docs` writes a `ROUTER.md` into the target, then asserts that every `*.sh` path

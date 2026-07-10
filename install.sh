@@ -365,26 +365,33 @@ seed_from_source() {  # <src-relpath> [<dst-relpath>]
 # `_pdda_gov_resolve_ref` in pdda.sh — a doc may legitimately say `pdda.sh` meaning `utils/pdda/pdda.sh`.
 SELFCHECK_FAILED=0
 
-assert_written_router_refs() {
-  local router="$TARGET/ROUTER.md" ref missing=0
-  [ -f "$router" ] || return 0
+# Scoped to the docs this installer WROTE this run — never to a doc it kept. A repo's own ROUTER.md or
+# AGENTS.md may name any script it likes (a private deploy helper, a script added after install); that
+# is the operator's business, not ours to validate. We assert only over output we are responsible for.
+#
+# GH-23 P3: originally this checked ROUTER.md alone, and so sailed straight past a dead `install.sh` in
+# the GUIDING-PRINCIPLES.md we scaffold into every target. The router was never special — any doc we
+# write can name a script we do not ship.
+assert_written_doc_refs() {  # <dst-relpath>
+  local doc_rel="$1" doc="$TARGET/$doc_rel" ref missing=0
+  [ -f "$doc" ] || return 0
 
-  say "  self-check  every *.sh named in the written ROUTER.md exists in the target"
+  say "  self-check  every *.sh named in the written $doc_rel exists in the target"
   while IFS= read -r ref; do
     [ -n "$ref" ] || continue
     case "$ref" in
       */*) [ -e "$TARGET/$ref" ] && continue ;;
       *)   [ -n "$(find "$TARGET" -name "$ref" -not -path '*/.git/*' -print -quit 2>/dev/null)" ] && continue ;;
     esac
-    printf '  ERROR  ROUTER.md names "%s" but no such file exists in %s\n' "$ref" "$TARGET" >&2
+    printf '  ERROR  %s names "%s" but no such file exists in %s\n' "$doc_rel" "$ref" "$TARGET" >&2
     missing=$((missing + 1))
-  done < <(grep -oE '[A-Za-z0-9_./-]+\.sh' "$router" | LC_ALL=C sort -u)
+  done < <(grep -oE '[A-Za-z0-9_./-]+\.sh' "$doc" | LC_ALL=C sort -u)
 
   if [ "$missing" -gt 0 ]; then
     {
-      printf '\n  %s dead script reference(s) in the ROUTER.md this installer just wrote.\n' "$missing"
-      printf '  This is a bug in PDDA'"'"'s templates/ROUTER.target.md, not in your repo.\n'
-      printf '  The target is installed and usable; its router is misleading. Please report it.\n\n'
+      printf '\n  %s dead script reference(s) in the %s this installer just wrote.\n' "$missing" "$doc_rel"
+      printf '  This is a bug in PDDA'"'"'s source doc for %s, not in your repo.\n' "$doc_rel"
+      printf '  The target is installed and usable; its startup docs are misleading. Please report it.\n\n'
     } >&2
     return 1
   fi
@@ -539,19 +546,28 @@ if [ "$WITH_STARTUP_DOCS" -eq 1 ]; then
   #   templated  ROUTER.md   <- templates/ROUTER.target.md, NOT this repo's ROUTER.md
   #   scaffold   AGENTS.md, GUIDING-PRINCIPLES.md   create-only; the target owns them after install
   #   runtime    .claude/skills/pdda/SKILL.md       PDDA owns it; safe to refresh verbatim
+  written_docs="" kept_docs=""
   seed_from_source "templates/ROUTER.target.md" "ROUTER.md"
-  router_written="$SEEDED_LAST"
+  if [ "$SEEDED_LAST" -eq 1 ]; then written_docs="$written_docs ROUTER.md"; else kept_docs="$kept_docs ROUTER.md"; fi
   seed_from_source "AGENTS.md"
+  if [ "$SEEDED_LAST" -eq 1 ]; then written_docs="$written_docs AGENTS.md"; else kept_docs="$kept_docs AGENTS.md"; fi
   seed_from_source "GUIDING-PRINCIPLES.md"
+  if [ "$SEEDED_LAST" -eq 1 ]; then written_docs="$written_docs GUIDING-PRINCIPLES.md"; else kept_docs="$kept_docs GUIDING-PRINCIPLES.md"; fi
   copy_runtime ".claude/skills/pdda/SKILL.md"
 
   # GH-23 P2 — post-install self-check. One assertion would have caught the whole GH-23 bug at install
-  # time: a router that names a script the repo does not contain.
-  if [ "$router_written" -eq 1 ]; then
-    assert_written_router_refs || SELFCHECK_FAILED=1
-  else
-    say "  self-check skipped — ROUTER.md was kept, not written (it is yours, not ours to validate)"
-  fi
+  # time: a startup doc that names a script the repo does not contain. P3 widened it from ROUTER.md to
+  # every doc we wrote, after the .sh dead-ref scan found the same defect sitting in GUIDING-PRINCIPLES.md.
+  #
+  # Written and kept are decided per doc, so the skip notice must be too: a run that scaffolds AGENTS.md
+  # beside a kept ROUTER.md validates the first and stays silent about the second — but must still SAY
+  # it is staying silent, or the operator cannot tell an unvalidated doc from a validated one.
+  for doc_rel in $written_docs; do
+    assert_written_doc_refs "$doc_rel" || SELFCHECK_FAILED=1
+  done
+  for doc_rel in $kept_docs; do
+    say "  self-check skipped — $doc_rel was kept, not written (it is yours, not ours to validate)"
+  done
 fi
 
 migrate_flat_layout

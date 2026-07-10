@@ -28,7 +28,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| **GH-23 P1 and GH-27 P1–P3 shipped; the wrap loop now fires.** `--with-startup-docs` no longer ships the canonical router into targets (0 dead refs, down from 9) nor destroys a repo-authored `AGENTS.md` (#25). `issue-doc-sync` now scans `3-COMPLETED`, catches the `Ready to close` hand-off phrase, warns when it *cannot* evaluate, and persists the gh-state cache — so the `Stop` hook stopped printing "all clear" over real drift and now names `/pdda-eod`. GH-12 and GH-15 wrapped and closed. | **GH-23 P2–P4**: post-install self-check on `*.sh` refs; widen `_pdda_gov_extract_refs` past `.md` — the third member of the "a check that could not run reports success" family, so land it with GH-14 Phase 2 (BUG-001b); then the cheap `/pdda` directive + opt-in `PreToolUse` gate. GH-10 Sentinel is the other active build (Phase 2b executor). |
+| **GH-23 P1–P3 shipped, closing the "a check that could not run reports success" family.** Targets no longer inherit the canonical router (#25 fixed alongside); `install.sh` validates every startup doc it writes; the dead-ref scan reads `.sh` including command-position paths; and **GH-14 Phase 2 (BUG-001b)** landed with it — `run` can no longer report "all checks passed" over errors the mode gate merely stopped from blocking. Earlier: GH-27 made the wrap loop fire, and GH-12/GH-15 wrapped and closed. | **GH-23 P4**: SessionStart directive 1 leads with `/pdda`; opt-in, default-off `PreToolUse` gate on `PROJECT/**`, amending the PDDA-hook skill's "does not touch PreToolUse" promise in the same commit. Then close #23. GH-10 Sentinel is the other active build (Phase 2b executor). |
 
 ## Ledger
 
@@ -64,16 +64,17 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
-- **GH-23 — agent on-ramp is wrong, expensive, and unenforced** (2026-07-09) - **P1 + P2 shipped.**
+- **GH-23 — agent on-ramp is wrong, expensive, and unenforced** (2026-07-09) - **P1–P3 shipped.**
   `--with-startup-docs` advertised an "adapted" `ROUTER.md` while `copy_runtime` copied it verbatim, so
   every target inherited the canonical repo's router — naming `install.sh` and `utils/pdda/pdda-sync.sh`,
-  neither of which exists in a target — and no check could see it (`_pdda_gov_extract_refs` matches `.md`
-  only). **P1** routes each startup doc by who owns it after install (templated / scaffold / runtime),
-  fixing #25 on the way; a fresh target now carries 0 dead refs, down from 9. **P2** makes `install.sh`
-  validate its own output: every `*.sh` named in a router it *wrote* must exist in the target, else
-  non-zero exit. Remaining: **P3** widen dead-ref scanning past `.md` (land it with GH-14 Phase 2 /
-  BUG-001b — both are `run` reporting success over a real defect), then **P4** make directive 1 cheap
-  (`/pdda`) and optionally gated. Issue
+  neither of which exists in a target — and no check could see it. **P1** routes each startup doc by who
+  owns it after install (templated / scaffold / runtime), fixing #25 on the way. **P2** makes `install.sh`
+  validate its own output. **P3** widens the dead-ref scan to `.sh`, including command-position paths that
+  carry arguments (a suffix widening alone catches neither a fenced invocation nor a flagged one), and
+  carries **GH-14 Phase 2 / BUG-001b**: `run` no longer prints "all checks passed" over errors that the
+  mode gate merely stopped from blocking. Canonical `ROUTER.md`/`GUIDING-PRINCIPLES.md` dead refs removed;
+  exemption manifest rebuilt from a real scan (fresh install 46 warns → 0). Remaining: **P4** make
+  directive 1 cheap (`/pdda`) and optionally gated. Issue
   [#23](https://github.com/Hypercart-Dev-Tools/pdda/issues/23). ->
   [PROJECT/2-WORKING/GH-23-AGENT-ONRAMP.md](PROJECT/2-WORKING/GH-23-AGENT-ONRAMP.md)
 - **PRD generator skill exploration — PRD-Kimi vs PRD-Perplexity, synthesized into PRD-pdda** (2026-07-08) -

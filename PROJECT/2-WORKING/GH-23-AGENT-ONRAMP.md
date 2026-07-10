@@ -2,7 +2,7 @@
 gh_issue: 23
 source: https://github.com/Hypercart-Dev-Tools/pdda/issues/23
 title: "Agent on-ramp is wrong, expensive, and unenforced: targets inherit the canonical repo's ROUTER.md verbatim"
-status: Active — promoted to 2-WORKING 2026-07-09; P1 not yet started
+status: Active — P1, P2, P3 shipped; P4 in progress
 created: 2026-07-09
 updated: 2026-07-09
 owner: noel
@@ -29,7 +29,7 @@ Full write-up lives on the issue; this is the in-repo back-reference.
 
 | What was just completed | What's next |
 |---|---|
-| Promoted `1-INBOX → 2-WORKING`; branch `gh-23-agent-onramp` rebased onto `main`. All four cited code claims independently re-verified. **Target-side symptom reproduced end-to-end against the live `LTVera-Pandas` install**, captured as a regression fixture at `test/fixtures/gh-23/LTVera-Pandas-ROUTER.md`. One mechanism correction found — see "Reproduction". | **P1** — stop shipping the canonical repo's router into targets, then make `install.sh --help` stop claiming "adapted". Every phase lands green on `utils/pdda/pdda.sh run`. |
+| **P3 shipped**, carrying GH-14 Phase 2 (BUG-001b) with it — the two are one defect. The dead-reference scan now reads `.sh`, including command-position paths that carry arguments; `pdda.sh run` can no longer print *all checks passed* over real errors. Canonical `ROUTER.md` and `GUIDING-PRINCIPLES.md` had their own dead refs removed, the installer's self-check widened past the router, and the shipped-doc exemption manifest grew to hold a fresh install at 0 warns (46 before). Suites: governance 14 → 31, install 33 → 38, new `pdda-run-mode-reporting.sh` 23. | **P4** — (a) SessionStart directive 1 leads with `/pdda`; (b) opt-in, default-off `PreToolUse` gate, amending the PDDA-hook skill's "does not touch PreToolUse" promise in the same commit. |
 
 ## Verification of the brief
 
@@ -104,8 +104,8 @@ is the closing brace of the preceding function. The finding is unaffected.
 |---|---|---|
 | P1 — template the target router; make `--help` true | **Shipped** — also fixes #25 | `pdda.sh run` green; 16/16 new tests |
 | P2 — post-install self-check on `*.sh` refs | **Shipped** | `pdda.sh run` green; suite 16 → 33 |
-| P3 — widen `_pdda_gov_extract_refs` to `.sh` + fenced blocks | Not started | `pdda.sh run` green + negative control |
-| P4 — cheap directive 1; opt-in default-off `PreToolUse` gate | Not started | `pdda.sh run` green |
+| P3 — widen `_pdda_gov_extract_refs` to `.sh`; + GH-14 Phase 2 | **Shipped** | `pdda.sh run` green; 7 negative controls; suites 14→31, 33→38, +23 new |
+| P4 — cheap directive 1; opt-in default-off `PreToolUse` gate | In progress | `pdda.sh run` green |
 
 ## P1 — shipped 2026-07-09
 
@@ -201,7 +201,7 @@ The negative controls are the ones that matter, because they are what keep this 
 
 | Case | Guards against |
 |---|---|
-| operator's own `ROUTER.md` with a dead `my-private-deploy.sh` → **no finding, exit 0** | the check policing files it does not own |
+| operator's own `ROUTER.md` with a dead `my-private-deploy.sh` → **self-check never asserts, exit 0** | the check policing files it does not own |
 | bare `pdda-lib.sh` resolving via the repo-wide fallback → **no finding** | tightening the matcher to paths-only, which looks correct |
 | no `--with-startup-docs` → **self-check never runs** | scope creep into plain installs |
 | poisoned template → **install still completes**, contract still lands | a mid-install abort leaving a half-provisioned tree |
@@ -211,6 +211,106 @@ The poisoned-template case builds a throwaway copy of this repo with `.git` excl
 
 `test/pdda-install-startup-docs.sh` — 16 assertions. Includes the negative control that matters: a test
 proving `--force` *does* overwrite, so the create-only guard cannot pass by being an unconditional skip.
+
+---
+
+## P3 — shipped 2026-07-09 (with GH-14 Phase 2)
+
+P3 in one line: **the dead-reference scan could not see the references that matter most — the commands.**
+
+### Two parts, one cause
+
+The brief predicted the fence was hiding the `pdda-sync.sh` invocations. It is not: `_pdda_gov_scannable_lines`
+exempts only `console`/`text`/`transcript` fences, so a ` ```bash ` fence *is* scanned. The single cause is
+the extractor, and it fails in two independent ways:
+
+1. **The suffix.** Both patterns hard-required `.md`. Widening to `.sh` catches the backticked whole-span refs.
+2. **The shape.** A command invocation is neither a markdown link nor a closed backtick span — it carries
+   arguments. `` `.xyz/utils/marathon-plan.sh --help` `` and a bare `utils/pdda/pdda-sync.sh push` match
+   *no* suffix-widened pattern, because neither closes right after the suffix. They need a third pattern
+   keyed on **command position**: the token that opens a code span or a scanned fence line.
+
+Part 2 is where the risk lives, and it is why the negative controls were written first. The same rule that
+extracts `pdda-sync.sh` from `pdda-sync.sh push` would extract `pdda.sh` from `` `pdda.sh run` `` — correct,
+as it happens, since the bare name resolves through the repo-wide fallback — but it must never extract `run`,
+never fire on a glob like `` `utils/pdda-*.sh` ``, and never read a script name sitting mid-sentence as a path.
+
+### The scan indicted its own repo, then its own author
+
+Turning it on produced findings before it produced confidence:
+
+- **Canonical `ROUTER.md:91`** named `.xyz/utils/marathon-plan.sh`. `.xyz/` is gitignored and absent. The
+  router that spread dead references into targets was carrying its own. Removed, per the operator's call.
+- **Canonical `GUIDING-PRINCIPLES.md:24`** named `install.sh` as a path — and that doc is *scaffolded into
+  every target*, where no installer exists. P1 fixed the router and walked past this. Reworded to prose.
+- **`utils/pdda/PDDA-INSTALL.md:67,84`** named `templates/ROUTER.target.md`. **P1 introduced those lines**,
+  dead in every target. The check built in P3 found the debt created in P1.
+- **`PROJECT/PDDA.md`**, after P3 was written, tripped on the illustrative placeholders in P3's *own
+  documentation* of P3. Reworded to describe the patterns rather than exhibit them.
+
+### The exemption manifest had to grow, or the check would have been turned off
+
+A fresh `install.sh <scratch> --with-startup-docs` emitted **46 dead-ref warns** with the widening and the
+old manifest — GH-15's self-inflicted-noise failure, replayed exactly. `.sh` refs are the ones that differ
+most between the canonical repo and a target. The manifest was rebuilt from that real scan (46 → 0), in
+three groups: canonical-only tools (installer, sync engine, `templates/`, `test/`); the legacy flat-layout
+paths `PDDA-INSTALL.md` names *because they must not exist*; and `config.sh`, which belongs to git-pulse.
+
+**Accepted false positive:** a doc naming a script that lives only on the operator's `PATH` warns once.
+Distinguishing it would require consulting the machine's `PATH`, making a deterministic check machine-dependent.
+Warn-only makes the cost one ignorable line.
+
+### The self-check was scoped to the wrong noun
+
+P2 asserted over `ROUTER.md`. The router was never special — `GUIDING-PRINCIPLES.md` carried the same defect.
+`assert_written_router_refs` became `assert_written_doc_refs`, applied to **every startup doc the installer
+actually wrote**, decided per file so a kept doc is still never policed. Against `main`, a poisoned
+`GUIDING-PRINCIPLES.md` exits `0` and ships the dead ref into the target; here it exits non-zero and names it.
+
+### GH-14 Phase 2 (BUG-001b) rode along, because it is the same bug
+
+`pdda_gated_exit` forces every check's exit code to `0` outside `full` mode. Correct — `observe` and `light`
+must never fail a build. But `cmd_run` inferred *all checks passed* from that same zero. **The mode gate is
+meant to stop the run from blocking, not from reporting.** A new adopter, who starts in `observe` by design,
+saw a green line over real errors.
+
+Fixed with run-level totals that survive `pdda_reset_counts` and ignore the gate, giving three outcomes
+instead of two: passed / found-but-not-blocking / failed. Warnings still never move a run out of "passed" —
+a `warn` is the advisory, and collapsing that distinction would make every recommendation read as a failure.
+The LLM readiness review is now gated on findings rather than the gated exit code, so an error-laden repo in
+`observe` no longer spends an LLM call it was never supposed to spend.
+
+This is the last member of the family. GH-23: a check that could not *see*. GH-27: a check that could not
+*reach* `gh`. BUG-001b: a check that could not *block*. All three reported success.
+
+### Tests — red first, in both directions
+
+| Suite | Before | After |
+|---|---|---|
+| `test/pdda-governance-check.sh` | 14 | 31 |
+| `test/pdda-install-startup-docs.sh` | 33 | 38 |
+| `test/pdda-run-mode-reporting.sh` | — | 23 (new) |
+
+Every positive was run against `main`'s pre-P3 code and **fails there**; every negative control **passes
+there**. Against `main`: 7 governance positives red, 7 negatives green; 5 run-mode positives red, 18 negatives
+green — including `observe: still exits 0`, which proves the mode gate was not broken in the fixing of it.
+
+The negative controls, which are the whole argument for the widening being safe:
+
+| Case | Guards against |
+|---|---|
+| `` `pdda.sh run` `` → no finding, and `run` never extracted | reading a subcommand as a path |
+| `utils/pdda/pdda.sh` present → no finding | over-flagging live refs |
+| `` `utils/pdda-*.sh` `` → no finding | treating a glob as a path claim |
+| `setup.sh` mid-sentence → no finding | command position degrading into "any `.sh` word" |
+| `./install.sh` in a fence → resolves at repo root | inventing dead refs in nested docs |
+| same ref twice on a line → exactly 1 finding | duplicate warns from the pattern union |
+| shipped doc names `install.sh` → exempt; **non-shipped doc names it → still flagged** | the exemption leaking past the docs it was scoped to |
+| clean run in every mode → still says *all checks passed* | "never claim success" being satisfied by never saying it |
+| warn-only run → still says *all checks passed*, exit 0 | advisories collapsing into failures |
+
+`test/fixtures/gh-23/LTVera-Pandas-ROUTER.md` — the byte-identical router that shipped into that repo — is
+now a regression fixture. It must never scan clean again.
 
 ## Problem
 

@@ -295,6 +295,15 @@ Implementation note:
   review)
 - each finding still carries a stable `check` id (e.g. `pdda-check-frontmatter`) in stdout and the
   activity log, independent of how the check is invoked
+- **`run` reports what it found, not what it blocked on.** The mode gate forces every check's exit code
+  to `0` outside `full`, so the closing line has three outcomes, not two: *all checks passed* (nothing
+  found), *N error(s) found, not blocking in `<mode>` mode* (found, gate suppressed the failure), and
+  *failures:* (found and blocked). Warnings never move the run out of the first state — a `warn` is the
+  house-style advisory, and letting it read as failure would collapse the distinction. Inferring success
+  from the gated exit code was BUG-001b: `run` printed *all checks passed* over real errors in `observe`
+  and `light`, which are precisely the modes a new adopter starts in. The LLM readiness review is gated
+  on the same signal, so an error-laden repo never spends an LLM call. **The rule:** a check that could
+  not run — or could not block — must never be scored as a check that passed.
 
 ### 1. Deterministic hygiene checks
 
@@ -483,9 +492,9 @@ Purpose:
   or a contract doc and the shipped code silently disagreeing about what commands or env vars exist
 
 Minimum behavior (four checks, one shared `pdda-check-governance` id):
-- **dead references** (`warn`) — every backtick-wrapped filename ending in `.md`, and every markdown
-  link whose target ends in `.md`, found inside a governance doc must resolve to a real file, checked
-  against the repo root or (for `./`/`../` links) the referencing file's own directory. A bare filename
+- **dead references** (`warn`) — every filename ending in `.md` **or `.sh`** named inside a governance
+  doc must resolve to a real file, checked against the repo root or (for `./`/`../` links) the
+  referencing file's own directory. A bare filename
   with no directory component (e.g. `blank.md`,
   which legitimately exists once per lifecycle folder) additionally falls back to a repo-wide basename
   search before being called dead — only a name absent *everywhere* is flagged. A `GH-<n>-*.md` name is
@@ -493,6 +502,21 @@ Minimum behavior (four checks, one shared `pdda-check-governance` id):
   cross-references. `warn`, not `error`: prose extraction is inherently more heuristic than the
   mechanical checks above, so a false flag should cost one ignorable line, not a blocked build (same
   calibration as `pdda.sh stale`/`pdda.sh changelog`).
+  - **Three extraction patterns** (union, then deduplicated): the target of a markdown link; a code span
+    that contains nothing but the path; and **command-position paths** — a script token that opens a code
+    span or a scanned fence line. The third exists because a router's most load-bearing references are
+    the commands it tells an agent to run, and those carry arguments, so they close neither a link nor a
+    backtick span right after the suffix. A vendored harness script invoked with a `--help` flag inside a
+    code span, and a bare sync-tool invocation with its subcommand inside a scanned ` ```bash ` fence,
+    both name a real file and matched nothing before GH-23 P3. Command position — line start, or
+    immediately after a backtick — is where a shell command's *program* sits; a script name appearing
+    later in a sentence is prose, and is not extracted. That is what keeps a documented invocation such
+    as `pdda.sh run` from being read as two separate references. A leading `./` is stripped, because in
+    command position it means "from the repo root I am standing in", not "relative to this doc".
+  - **Suffix widening was not free.** `.sh` references are the ones that differ most between the canonical
+    repo and a target, so the exemption manifest below had to grow with them — a fresh install went from
+    0 to 46 self-inflicted warns before it did. A ref to a script that exists only on the operator's
+    `PATH` (never in the repo) is a known, accepted false positive; it costs one advisory warn.
   - **GH-15 shipped-doc exemption manifest:** `utils/pdda/PDDA-INSTALL.md` and `PROJECT/PDDA.md` ship
     to every target install (`PDDA_GOV_SHIPPED_DOCS_DEFAULT`) but legitimately reference files
     `install.sh` deliberately does not copy there — the target's own repo-authored startup docs
@@ -507,6 +531,14 @@ Minimum behavior (four checks, one shared `pdda-check-governance` id):
     referencing one of these is still a real dead-reference bug and is never exempted. The manifest was
     built from an actual dead-reference scan of a bare `install.sh` target, not retyped from an issue's
     illustrative list — re-run that scan if the shipped-doc set or its prose changes materially.
+  - **GH-23 P3 additions to the same manifest**, each read off a real scan of a bare
+    `--with-startup-docs` target (46 warns before, 0 after), in three groups:
+    canonical-only **tools** a target never receives (the installer itself; the sync engine, which
+    `pdda-sync-manifest.conf` excludes because targets are leaf nodes; `templates/`; `test/`);
+    **legacy flat-layout paths** (`utils/pdda.sh`, `utils/pdda-lib.sh`, …) that the install manifest names
+    *precisely because they must not exist* — it documents the layout `install.sh` migrates away from,
+    and their `.md` sibling was already exempt for this reason; and `config.sh`, which belongs to
+    git-pulse, a separate program.
     **Known separate issue, not covered by this manifest:** this file's own CHANGELOG section
     dead-references the retired RECAP note-file and the REAL-AGENT-OBSERVATIONS compliance-findings
     file (see the "CHANGELOG.md" section below), neither of which exist anywhere in this repo, not
