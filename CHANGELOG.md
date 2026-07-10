@@ -2,6 +2,54 @@
 
 ## 2026-07-09
 
+### GH-23 P4: the on-ramp gets cheap, then verifiable
+
+The SessionStart reminder has five directives. Four name a command whose output proves it ran. Directive
+1 asked for a multi-file read and left no trace — the most expensive to obey and the only one nobody
+could check. An agent under context pressure drops exactly that one, which is what GH-23 was.
+
+It now leads with **invoke `/pdda`**: one action, since the skill already encodes the read order, with
+"read `ROUTER.md` and follow the order it gives" as the fallback where the skill is absent. The read
+order is unchanged; obeying it is no longer a reading list.
+
+Enforcement is a separate, **opt-in, default-off** `PreToolUse` gate (matcher `Write|Edit`) that refuses
+an edit to `PROJECT/**`, `ROADMAP.md`, or `CHANGELOG.md` when the session's transcript shows no read of
+`ROUTER.md` and no `/pdda` invocation. Invoking the skill satisfies it — blocking an agent that did
+precisely what directive 1 asked would be perverse.
+
+This is the only component in PDDA that acts rather than recommends, so it is fenced accordingly. Two
+independent switches, both off: registering the hook does nothing without a `.pdda-router-gate` file (or
+`PDDA_ROUTER_GATE=1`), and `PDDA_ROUTER_GATE=0` always wins. A repo without `PROJECT/PDDA.md` is never
+gated. `ROUTER.md` itself is never gated, or the one file that satisfies the gate would be unfixable
+while it is on. And it **fails open** on every path where it cannot establish that the router went unread
+— no `jq`, no readable transcript, an unparseable one, an unrecognized payload — allowing the write and
+saying on stderr that it could not evaluate. It blocks only on positive evidence.
+
+That last property is this repo's own recurring bug turned back on its enforcement layer. A gate that
+blocks on a guess would be the first thing anyone turns off, and they would be right.
+
+Two bugs found by the negative controls, neither visible to the positives:
+
+- The first draft piped `jq` straight into `grep -q`, collapsing "found no read of the router" and "could
+  not parse the transcript" into one exit status. A session truncated mid-write — routine — would have
+  blocked every governed edit for the rest of the day.
+- `git rev-parse` reports a *physical* repo root while the payload's `file_path` is whatever the caller
+  typed. Under macOS's `/tmp` → `/private/tmp` symlink the prefix strip missed, every governed doc looked
+  out of scope, and the gate became a silent no-op that still exited 0. **Every positive test passed** —
+  "allowed the write" is what a working gate and a dead gate both do most of the time. Only the paired
+  "lever on, router unread → blocks" control exposed it.
+
+`SKILLS/PDDA-hook/SKILL.md` previously promised the skill "does not touch `PreToolUse`". That sentence is
+now false, so it was amended in the same commit rather than left to rot — with a note on why, and on the
+fact that an operator who accepts only the default install still gets exactly the behavior it described.
+Every existing guardrail holds: never write a repo's committed `.claude/settings.json`; only the
+operator's own `~/.claude/settings.json` or an ignored `.claude/settings.local.json`.
+
+`test/pdda-router-read-gate.sh` — 38 assertions. Four cover the enforcement path. The other 34 cover
+staying out of the way: default-off silence, lever precedence, scope, non-PDDA repos, and eight fail-open
+paths. Plus the boundary that keeps fail-open from swallowing the whole gate: an **empty but valid**
+transcript is evidence, not a failure to gather it, and still blocks.
+
 ### GH-23 P3 + GH-14 Phase 2: the dead-reference scan learns to read commands, and `run` stops lying
 
 Two defects, one shape: **a check that could not run must not report success.**

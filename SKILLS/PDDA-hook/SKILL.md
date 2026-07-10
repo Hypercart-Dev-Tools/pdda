@@ -1,6 +1,6 @@
 ---
 name: pdda-hook
-description: Opt in to a deterministic SessionStart reminder that re-anchors PDDA doc-governance rules (ROUTER.md -> AGENTS.md -> PROJECT/PDDA.md) at every context boundary, instead of relying on the model to remember them from a single read. Use when the operator wants their own sessions to be more reliably PDDA-compliant across one repo or every PDDA repo on their machine, says things like "set up the PDDA hook", "make sure I always follow ROUTER.md", or invokes /pdda-hook. Installs nothing without confirmation and never edits a repo's committed .claude/settings.json.
+description: Opt in to a deterministic SessionStart reminder that re-anchors PDDA doc-governance rules (ROUTER.md -> AGENTS.md -> PROJECT/PDDA.md) at every context boundary, instead of relying on the model to remember them from a single read. Optionally, and only when asked, also install a default-off PreToolUse gate that refuses edits to governed docs when the session never opened ROUTER.md. Use when the operator wants their own sessions to be more reliably PDDA-compliant across one repo or every PDDA repo on their machine, says things like "set up the PDDA hook", "make sure I always follow ROUTER.md", or invokes /pdda-hook. Installs nothing without confirmation and never edits a repo's committed .claude/settings.json.
 ---
 
 # /pdda-hook — opt in to the PDDA doc-governance reminder
@@ -38,10 +38,14 @@ and non-PDDA repos.
 - **Dedup before writing.** If a hook already targets `SessionStart` with the same matcher in the target
   settings file, show the existing entry and ask whether to keep it, skip, or add alongside — never
   silently duplicate.
-- **Copy the canonical script, don't re-author it inline.** The source of truth is
-  `<skill-dir>/scripts/pdda-doc-governance-reminder.sh` (`<skill-dir>` = the absolute directory this
-  `SKILL.md` was loaded from). Copy that file verbatim to the resolved target path; don't hand-type a
-  fresh copy that can drift from the source.
+- **Copy the canonical script, don't re-author it inline.** The sources of truth are
+  `<skill-dir>/scripts/pdda-doc-governance-reminder.sh` and, for the optional gate,
+  `<skill-dir>/scripts/pdda-router-read-gate.sh` (`<skill-dir>` = the absolute directory this `SKILL.md`
+  was loaded from). Copy verbatim to the resolved target path; don't hand-type a fresh copy that can
+  drift from the source.
+- **The gate is not part of the default install.** It is `PreToolUse`, it refuses tool calls, and it is
+  the only thing here that acts rather than reminds. Offer it only when asked. See "Optional: the
+  router-read gate".
 
 ## Steps
 
@@ -84,11 +88,51 @@ and non-PDDA repos.
    currently running session — the operator needs to run `/hooks` (reloads config) once, or start a
    fresh session, before the hook fires.
 
+## Optional: the router-read gate (`PreToolUse`, off by default)
+
+Do not offer this unprompted. Install it only if the operator asks for enforcement rather than a
+reminder — "make it actually stop me", "I keep skipping ROUTER.md".
+
+Reminder directive 1 is the only directive that is both expensive and unverifiable; every other one
+names a command whose output proves it ran. That asymmetry is why agents drop it. This gate makes it
+verifiable: `<skill-dir>/scripts/pdda-router-read-gate.sh`, wired to `PreToolUse` with matcher
+`Write|Edit`, refuses an edit to `PROJECT/**`, `ROADMAP.md`, or `CHANGELOG.md` when nothing in the
+session's transcript shows `ROUTER.md` being read or `/pdda` being invoked.
+
+**Two independent switches, both off.** Registering the hook does nothing on its own — the gate also
+requires a `.pdda-router-gate` file at the repo root (or `PDDA_ROUTER_GATE=1`). `PDDA_ROUTER_GATE=0`
+always wins, so a single command can bypass it without deleting the lever. Same convention as
+`.pdda-quad` / `PDDA_QUAD`. A repo without `PROJECT/PDDA.md` is never gated, so one global registration
+stays safe everywhere.
+
+**It fails open, on purpose.** No `jq`, no readable transcript, an unparseable transcript, a payload it
+does not recognize — every one of those allows the write and says on stderr that it could not evaluate.
+The gate blocks only when it positively established that the router went unread. This is PDDA's own
+recurring bug (GH-23, GH-27, BUG-001b: *a check that could not run must not report success*) applied to
+the one component that acts instead of recommending. A gate that blocks on a guess would be the first
+thing anyone turns off, and they would be right to.
+
+Install steps mirror the ones above, with the same guardrails: copy the script, **pipe-test it first**,
+show the exact diff, and write only to `~/.claude/settings.json` or an ignored
+`.claude/settings.local.json` — **never a repo's committed `.claude/settings.json`**. Then tell the
+operator the gate is still inert until they create `.pdda-router-gate`, and show them the one-line
+bypass. Pipe-test with a payload naming a governed file:
+
+```bash
+printf '{"tool_name":"Edit","tool_input":{"file_path":"'"$PWD"'/ROADMAP.md"},"transcript_path":"/nonexistent","cwd":"'"$PWD"'"}' \
+  | <target-script-path>; echo "exit=$?"   # expect exit=0 and a "could not evaluate" line: fail-open
+```
+
 ## Operating stance
 
 - If the operator declines both scopes or the diff, leave the tree untouched and say so — don't retry
   with a different scope unasked.
 - If `<skill-dir>/scripts/pdda-doc-governance-reminder.sh` is missing (this skill folder was copied
   incompletely), say so and stop rather than reconstructing the script from memory.
-- This skill only ever adds a `SessionStart` hook entry; it does not touch `PreToolUse`, `PostToolUse`,
-  or any other hook event, and does not modify `ROUTER.md`, `AGENTS.md`, or `PROJECT/PDDA.md` themselves.
+- This skill adds a `SessionStart` hook entry by default, and — **only when the operator explicitly asks
+  for it** — one `PreToolUse` entry (see "Optional: the router-read gate"). It touches no other hook
+  event, and never modifies `ROUTER.md`, `AGENTS.md`, or `PROJECT/PDDA.md` themselves.
+  - *This line used to promise the skill "does not touch `PreToolUse`". GH-23 P4b changed that on
+    purpose, and amended the promise rather than leaving it quietly false. The gate remains off unless
+    the operator asks for it AND creates the lever file, so the default behavior this line originally
+    described is still what an operator gets by saying yes to step 1 alone.*

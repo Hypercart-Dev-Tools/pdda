@@ -14,8 +14,9 @@ root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 cat << 'REMINDER'
 DOC GOVERNANCE (PDDA) — this repo's docs are governed deterministically, not by memory:
-1. Read ROUTER.md first for startup order and canonical entry points; AGENTS.md for
-   behavioral rules; the linked PROJECT/** doc for the work being touched.
+1. Invoke the /pdda skill. It already encodes the startup read order, so this is one
+   cheap action, not a reading list. If /pdda is not installed here, read ROUTER.md
+   and follow the order it gives (AGENTS.md, then the linked PROJECT/** doc).
 2. If this turn touches PROJECT/** docs, ROADMAP.md, or CHANGELOG.md, follow the
    PROJECT/PDDA.md contract — keep ROADMAP.md pointers current, don't hand-roll
    checklists PDDA already owns.

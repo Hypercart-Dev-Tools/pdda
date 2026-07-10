@@ -28,7 +28,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| **GH-23 P1–P3 shipped, closing the "a check that could not run reports success" family.** Targets no longer inherit the canonical router (#25 fixed alongside); `install.sh` validates every startup doc it writes; the dead-ref scan reads `.sh` including command-position paths; and **GH-14 Phase 2 (BUG-001b)** landed with it — `run` can no longer report "all checks passed" over errors the mode gate merely stopped from blocking. Earlier: GH-27 made the wrap loop fire, and GH-12/GH-15 wrapped and closed. | **GH-23 P4**: SessionStart directive 1 leads with `/pdda`; opt-in, default-off `PreToolUse` gate on `PROJECT/**`, amending the PDDA-hook skill's "does not touch PreToolUse" promise in the same commit. Then close #23. GH-10 Sentinel is the other active build (Phase 2b executor). |
+| **GH-23 complete (P1–P4), closing the "a check that could not run reports success" family.** Targets no longer inherit the canonical router (#25 fixed alongside); `install.sh` validates every startup doc it writes; the dead-ref scan reads `.sh` including command-position paths; **GH-14 Phase 2 (BUG-001b)** landed with P3 — `run` can no longer report "all checks passed" over errors the mode gate merely stopped from blocking; and P4 made the on-ramp cheap (`/pdda`) then optionally enforceable. Earlier: GH-27 made the wrap loop fire, and GH-12/GH-15 wrapped and closed. | **Verify GH-23, then close #23** and move its doc to `3-COMPLETED` — closing is a human judgment. Then: repair the `LTVera-Pandas` install (needs an explicit `install.sh --with-startup-docs --force`; `pdda-sync.sh push` cannot reach a target's `ROUTER.md`). GH-10 Sentinel is the other active build (Phase 2b executor). |
 
 ## Ledger
 
@@ -64,18 +64,16 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
-- **GH-23 — agent on-ramp is wrong, expensive, and unenforced** (2026-07-09) - **P1–P3 shipped.**
-  `--with-startup-docs` advertised an "adapted" `ROUTER.md` while `copy_runtime` copied it verbatim, so
-  every target inherited the canonical repo's router — naming `install.sh` and `utils/pdda/pdda-sync.sh`,
-  neither of which exists in a target — and no check could see it. **P1** routes each startup doc by who
-  owns it after install (templated / scaffold / runtime), fixing #25 on the way. **P2** makes `install.sh`
-  validate its own output. **P3** widens the dead-ref scan to `.sh`, including command-position paths that
-  carry arguments (a suffix widening alone catches neither a fenced invocation nor a flagged one), and
-  carries **GH-14 Phase 2 / BUG-001b**: `run` no longer prints "all checks passed" over errors that the
-  mode gate merely stopped from blocking. Canonical `ROUTER.md`/`GUIDING-PRINCIPLES.md` dead refs removed;
-  exemption manifest rebuilt from a real scan (fresh install 46 warns → 0). Remaining: **P4** make
-  directive 1 cheap (`/pdda`) and optionally gated. Issue
-  [#23](https://github.com/Hypercart-Dev-Tools/pdda/issues/23). ->
+- **GH-23 — agent on-ramp is wrong, expensive, and unenforced** (2026-07-09) - **All four phases shipped;
+  ready to close pending operator verification.** `--with-startup-docs` advertised an "adapted" `ROUTER.md`
+  while `copy_runtime` copied it verbatim, so every target inherited the canonical repo's router — naming
+  `install.sh` and `utils/pdda/pdda-sync.sh`, neither of which exists in a target — and no check could see
+  it. **P1** routes each startup doc by who owns it after install, fixing #25 on the way. **P2** makes
+  `install.sh` validate its own output. **P3** widens the dead-ref scan to `.sh` including command-position
+  paths, and carries **GH-14 Phase 2 / BUG-001b**: `run` no longer prints "all checks passed" over errors
+  the mode gate merely stopped from blocking. **P4** makes reminder directive 1 cheap (`/pdda`) and, via an
+  opt-in default-off `PreToolUse` gate that fails open whenever it cannot prove the router went unread,
+  verifiable. Issue [#23](https://github.com/Hypercart-Dev-Tools/pdda/issues/23). ->
   [PROJECT/2-WORKING/GH-23-AGENT-ONRAMP.md](PROJECT/2-WORKING/GH-23-AGENT-ONRAMP.md)
 - **PRD generator skill exploration — PRD-Kimi vs PRD-Perplexity, synthesized into PRD-pdda** (2026-07-08) -
   three draft-stage variants of a not-yet-built `product-prd-builder` skill (structured PRD →
