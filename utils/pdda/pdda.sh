@@ -506,7 +506,12 @@ _pdda_issue_state_table() {
     cache) _pdda_cache_state_table ;;
     gh)    _pdda_gh_state_table ;;
     auto|*)
-      if command -v gh >/dev/null 2>&1 && out="$(_pdda_gh_state_table)"; then
+      if command -v gh >/dev/null 2>&1 && out="$(_pdda_gh_state_table)" && [ -n "$out" ]; then
+        # Persist what we just fetched (GH-27). The Stop hook reads this file with
+        # PDDA_ISSUE_SYNC_SOURCE=cache and makes no network call; with no writer on this path the cache
+        # never existed, so the hook reported "all clear" over real drift. Best-effort: a failed cache
+        # write must never break a lookup that already has its answer.
+        pdda_write_gh_state_cache "$out" || :
         printf '%s' "$out"
       else
         _pdda_cache_state_table
@@ -543,20 +548,41 @@ _pdda_is_terminal_word() {
   return 1
 }
 
+# Explicit hand-off phrases anywhere in a status line. The lead-word test above is deliberately narrow
+# (so "Phase 0 complete" mid-sentence never false-flags), but it is defeated by a self-contradictory
+# status such as `Active — Phases 1-4 complete … Ready to close to 3-COMPLETED.` — every human reads
+# that as done; the parser reads "active" and stops (GH-27 leak 2).
+#
+# These phrases are unambiguous operator hand-offs, not incidental progress notes. Matching is on the
+# whole status, case-insensitively. Keep the list short and literal: a general "does this prose mean
+# done?" parse is exactly the false-positive machine the lead-word anchor was built to avoid.
+PDDA_STATUS_HANDOFF_PHRASES="ready to close|ready for 3-completed|ready to move to 3-completed|awaiting close"
+_pdda_status_declares_handoff() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | grep -Eq "$PDDA_STATUS_HANDOFF_PHRASES"
+}
+
 check_issue_doc_sync() {
   pdda_reset_counts
   local CHECK_NAME="pdda-check-issue-doc-sync" rc=0
   local table file num state status_val leadword target rel_target
+
   table="$(_pdda_issue_state_table)"
 
+  # --- (1) active plans: PROJECT/2-WORKING ---------------------------------------------------------
   while IFS= read -r file; do
     num="$(_pdda_doc_issue_number "$file")"
-    [ -n "$num" ] || continue            # not an issue-tracked doc — nothing to reconcile
+    # A doc with no `gh_issue:` is not issue-tracked; there is nothing to reconcile it against.
+    # Deliberately NOT a finding: warning here would fire on every untracked plan doc in every
+    # installed target on the first run — the exact self-inflicted-noise failure GH-15 fixed. Making
+    # untracked plans declare themselves is worth doing behind an opt-in lever, not by default.
+    [ -n "$num" ] || continue
 
     state="$(printf '%s\n' "$table" | awk -F'\t' -v n="$num" '$1 == n { print toupper($2); exit }')"
     if [ -z "$state" ]; then
-      pdda_record_finding info "$CHECK_NAME" "$file" 1 \
-        "issue #$num state unavailable (gh absent/offline and no cached state) — sync not evaluated" "skip"
+      # A check that could not run is NOT a check that passed. Warn, so `run` and the Stop hook say so.
+      pdda_record_finding warn "$CHECK_NAME" "$file" 1 \
+        "issue #$num state unavailable (gh absent/offline and no cached state) — sync NOT evaluated; run: utils/pdda/pdda.sh gh-refresh" \
+        "state-unavailable"
       continue
     fi
 
@@ -570,15 +596,47 @@ check_issue_doc_sync() {
       continue                            # closed-issue drift dominates; skip the (b) test
     fi
 
-    # Direction (b): doc declares itself done (status lead word) while the issue is still OPEN.
+    # Direction (b): doc declares itself done while the issue is still OPEN. Two signals:
+    #   - the status LEAD WORD is terminal ("Shipped — …")
+    #   - or the status carries an explicit hand-off phrase anywhere ("Active — … Ready to close")
+    # The second exists because the first is defeated by a self-contradictory status (GH-27 leak 2).
     status_val="$(pdda_trim "$(pdda_frontmatter_value "$file" status)")"
     leadword="$(_pdda_status_leadword "$status_val")"
     if [ -n "$leadword" ] && _pdda_is_terminal_word "$leadword"; then
       pdda_record_finding warn "$CHECK_NAME" "$file" 1 \
         "doc status reads '$leadword' (done) but issue #$num is still OPEN — close the issue or correct the status" \
         "reconcile-status"
+    elif _pdda_status_declares_handoff "$status_val"; then
+      pdda_record_finding warn "$CHECK_NAME" "$file" 1 \
+        "doc status declares it is ready to close but issue #$num is still OPEN — recommend: git mv to 3-COMPLETED, then gh issue close $num" \
+        "reconcile-status"
     fi
   done < <(pdda_list_working_docs)
+
+  # --- (2) completed plans: PROJECT/3-COMPLETED ----------------------------------------------------
+  # A doc that reached 3-COMPLETED IS the operator's assertion that the work is done — recorded in a
+  # path, not in prose. A still-OPEN issue behind it is drift. Without this pass the check stops
+  # watching a doc at the exact moment it completes, so the `git mv` recommended above is what blinds
+  # it (GH-27 leak 1).
+  while IFS= read -r file; do
+    num="$(_pdda_doc_issue_number "$file")"
+    [ -n "$num" ] || continue            # completed docs need not be issue-tracked; nothing to reconcile
+
+    state="$(printf '%s\n' "$table" | awk -F'\t' -v n="$num" '$1 == n { print toupper($2); exit }')"
+    if [ -z "$state" ]; then
+      pdda_record_finding warn "$CHECK_NAME" "$file" 1 \
+        "issue #$num state unavailable (gh absent/offline and no cached state) — sync NOT evaluated; run: utils/pdda/pdda.sh gh-refresh" \
+        "state-unavailable"
+      continue
+    fi
+
+    if [ "$state" = "OPEN" ]; then
+      pdda_record_finding warn "$CHECK_NAME" "$file" 1 \
+        "doc is in 3-COMPLETED but issue #$num is still OPEN — recommend: gh issue close $num" \
+        "close-issue"
+    fi
+    # state=CLOSED in 3-COMPLETED is the fully reconciled end state: no finding.
+  done < <(pdda_list_completed_docs)
 
   pdda_emit_summary "$CHECK_NAME" "$rc"
   return "$(pdda_gated_exit "$rc")"

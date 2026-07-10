@@ -104,7 +104,10 @@ deterministic check plus the aggregate `run` as subcommands (`pdda.sh run`, `pdd
 `pdda.sh roadmap`, ...). `utils/pdda/pdda-lib.sh` holds the shared helpers it sources;
 `utils/pdda/pdda-doc-ready.sh` is the opt-in LLM readiness layer and `utils/pdda/pdda-catchup.sh` is
 the opt-in ROUTER.md triage layer. `utils/pdda/pdda-gh-refresh.sh` (`pdda.sh gh-refresh`) refreshes the
-cached GitHub issue-state file that `pdda.sh issue-doc-sync` reads when `gh` is offline.
+cached GitHub issue-state file that `pdda.sh issue-doc-sync` reads when `gh` is offline. That cache is
+also written automatically by any successful live lookup (every online `pdda.sh run`), so the offline
+consumers — chiefly the `Stop` hook — have last-known state without anyone remembering to run
+`gh-refresh`. Explicit `gh-refresh` remains useful to prime the cache before going offline.
 `utils/pdda/pdda-edit-doc-hook.sh` (tier 1, a `PostToolUse` single-file lint) and
 `utils/pdda/pdda-stop-doc-health.sh` (tier 2, a `Stop` consolidated full-scan) are the optional
 doc-health hooks — installs receive the scripts but **opt in by wiring them in their own

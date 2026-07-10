@@ -430,29 +430,48 @@ Expected exceptions:
 #### H. `pdda.sh issue-doc-sync`
 
 Purpose:
-- catch a `PROJECT/2-WORKING/GH-*.md` doc whose recorded state has drifted from its **GitHub issue**,
-  in either direction — the gap a 2026-06-29 manual reconciliation pass had to cross-reference by hand
+- catch a tracked plan doc whose recorded state has drifted from its **GitHub issue**, in either
+  direction — the gap a 2026-06-29 manual reconciliation pass had to cross-reference by hand
+
+Scope: **both** `PROJECT/2-WORKING/` (active plans) and `PROJECT/3-COMPLETED/` (finished plans). The
+completed bucket is not optional. Scanning `2-WORKING` alone means the check stops watching a doc at the
+exact moment it completes — so the `git mv` that drift (a) recommends is what blinds it, and the issue is
+orphaned forever (GH-27).
 
 Minimum behavior:
-- for each working doc, resolve its issue number from the `gh_issue` frontmatter key (preferred) or the
-  `GH-<number>-` filename; silently skip docs that carry neither (they are not issue-tracked)
-- resolve each issue's state from the best available source (see gh-degrade below), then flag two drifts:
+- for each doc in either bucket, resolve its issue number from the `gh_issue` frontmatter key (preferred)
+  or the `GH-<number>-` filename; silently skip docs that carry neither (they are not issue-tracked)
+- resolve each issue's state from the best available source (see gh-degrade below), then flag:
   - **(a)** issue **CLOSED** but the doc is still in `2-WORKING` -> `warn`, recommending the exact
     `git mv` to `PROJECT/3-COMPLETED` (flag-only; a human runs the one reversible move)
   - **(b)** issue **OPEN** but the doc's `status:` lead word declares it done (`complete`, `done`,
-    `shipped`, `fixed`, `closed`, `merged`, `resolved`, `landed`) -> `warn` to reconcile (close the
-    issue or correct the status). Anchoring on the status **lead word** means a mid-status mention like
-    `Active — Phase 0 complete` never false-flags.
+    `shipped`, `fixed`, `closed`, `merged`, `resolved`, `landed`) -> `warn` to reconcile. Anchoring on the
+    status **lead word** means a mid-status mention like `Active — Phase 0 complete` never false-flags.
+  - **(b2)** issue **OPEN** but the doc's `status:` carries an explicit hand-off phrase anywhere
+    (`ready to close`, `ready for 3-completed`, `awaiting close`) -> `warn`. Signal (b) alone is defeated
+    by a self-contradictory status such as `Active — Phases 1-4 complete … Ready to close to 3-COMPLETED`:
+    every human reads that as done; the lead word is `active`. The phrase list stays short and literal —
+    a general "does this prose mean done?" parse is the false-positive machine the lead-word anchor exists
+    to avoid.
+  - **(c)** doc is in `3-COMPLETED` but the issue is **OPEN** -> `warn`, recommending `gh issue close <n>`.
+    The lifecycle bucket is a deterministic signal; the status prose is not. `3-COMPLETED/` *is* the
+    operator's assertion that the work is done, recorded in a path and verifiable with `test -f`.
+    A doc in `3-COMPLETED` with a **CLOSED** issue is the fully reconciled end state: no finding.
 - `warn` (never `error` — does not block, even in `full`, mirroring `pdda.sh changelog`); **flag-only**,
-  never moves a file
+  never moves a file and never closes an issue
 - gh-degrade: with `PDDA_ISSUE_SYNC_SOURCE=auto` (default) it uses live `gh` when that succeeds, else a
-  cached state file (`PDDA_GH_STATE_CACHE`, written by `pdda-gh-refresh.sh`); when neither is available
-  it emits `info` (skip) for the affected doc and evaluates nothing. `gh`/`cache` force one source.
+  cached state file (`PDDA_GH_STATE_CACHE`). `gh`/`cache` force one source. **A successful live lookup
+  writes the cache** (best-effort, atomic), so the offline consumers — chiefly the `Stop` hook — have
+  last-known state without a network call. When neither source yields a state, the affected doc emits a
+  `warn` saying the sync was **NOT evaluated**: a check that could not run is not a check that passed.
 
 Why warn-only + flag-only:
 - every drift class here is mechanical, so the check carries zero false-judgment risk; a false flag is
   one ignorable warn line and a missed flag just leaves today's manual reconciliation — both cheap, so
   warn-only never-blocks is the right calibration (same stance as `pdda.sh stale` and `pdda.sh changelog`)
+- closing an issue is a **human judgment** about whether the work is genuinely done, so no script does it.
+  The `Stop` hook names the wrap (`/pdda-eod`) when this check reports reconciliation drift; the skill
+  proposes, the operator confirms. Detect deterministically, act only with a yes.
 
 #### I. `pdda.sh governance`
 
