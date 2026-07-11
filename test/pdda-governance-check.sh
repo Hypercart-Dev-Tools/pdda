@@ -343,5 +343,152 @@ EOF
 out="$(run_check)"
 assert_absent "$out" "dead reference" "a longer suffix (.shtml) never matches the .sh pattern"
 
+# ==================================================================================================
+# GH-33 — interpreter-wrapped script invocations (bash x.sh, sudo ./x.sh, sh setup.sh, env FOO=1 ./x.sh)
+# --------------------------------------------------------------------------------------------------
+# P3's command-position pattern only matches a .sh that OPENS a code span or scanned fence line — where
+# a shell command's PROGRAM sits. Hand the script to an interpreter and it moves to ARGUMENT position,
+# so the scan went blind: `bash utils/x.sh` extracted nothing. Each is a real path claim; a router could
+# point every agent at `bash missing.sh` and `pdda.sh run` stayed green. Same family as GH-23.
+#
+# The positives below FAIL against pre-GH-33 pdda.sh. The negatives are the whole risk of the widening:
+# an interpreter allowlist that also swallowed `bash -c "..."`, a quoted arg, or a $VAR would invent
+# dead refs out of ordinary shell prose.
+# ==================================================================================================
+
+# --- POSITIVE: `bash <path>` in argument position (the exact blind spot) ---------------------------
+new_sandbox
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+```bash
+bash utils/pdda/missing.sh
+```
+EOF
+out="$(run_check)"
+assert_contains "$out" "dead reference 'utils/pdda/missing.sh'" \
+  "an interpreter-wrapped 'bash <path>' names a dead script and is flagged (GH-33)"
+
+# --- POSITIVE: `sudo ./x.sh` — transparent sudo prefix, leading ./ resolves to a bare name ---------
+new_sandbox
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+```bash
+sudo ./deploy.sh
+```
+EOF
+out="$(run_check)"
+assert_contains "$out" "dead reference 'deploy.sh'" "a sudo-prefixed './x.sh' is flagged when dead (GH-33)"
+
+# --- POSITIVE: `sh <path>` and `source <path>` are interpreters too -------------------------------
+new_sandbox
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+```bash
+sh scripts/setup.sh
+source lib/helpers.sh
+```
+EOF
+out="$(run_check)"
+assert_contains "$out" "dead reference 'scripts/setup.sh'" "an 'sh <path>' invocation is flagged (GH-33)"
+assert_contains "$out" "dead reference 'lib/helpers.sh'" "a 'source <path>' invocation is flagged (GH-33)"
+
+# --- POSITIVE: `env FOO=1 ./x.sh` — env + assignments, then the path IS the program ----------------
+new_sandbox
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+```bash
+env FOO=1 ./run.sh
+```
+EOF
+out="$(run_check)"
+assert_contains "$out" "dead reference 'run.sh'" "an 'env VAR=val ./x.sh' invocation resolves the path and is flagged (GH-33)"
+
+# --- NEGATIVE CONTROL: `bash -c "..."` — the argument is code, not a path -------------------------
+new_sandbox
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+```bash
+bash -c "run deploy.sh now"
+```
+EOF
+out="$(run_check)"
+assert_absent "$out" "dead reference" "a .sh inside a 'bash -c' string argument is never a path claim (GH-33)"
+
+# --- NEGATIVE CONTROL: `bash "$VAR/x.sh"` — a variable expansion is not a path claim ---------------
+new_sandbox
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+```bash
+bash "$SCRIPTS/setup.sh"
+```
+EOF
+out="$(run_check)"
+assert_absent "$out" "dead reference" "a \$VAR-prefixed argument after an interpreter is not extracted (GH-33)"
+
+# --- NEGATIVE CONTROL: `sudo rm -rf x` — a wrapper with no .sh program yields nothing --------------
+new_sandbox
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+Cleanup: `sudo rm -rf build` before reinstalling.
+EOF
+out="$(run_check)"
+assert_absent "$out" "dead reference" "a sudo-prefixed command with no script argument yields no finding (GH-33)"
+
+# --- NEGATIVE CONTROL: a live interpreter-wrapped ref must NOT be flagged --------------------------
+new_sandbox
+mkdir -p "$SBOX/utils/pdda"
+: > "$SBOX/utils/pdda/pdda.sh"
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+```bash
+bash utils/pdda/pdda.sh run
+```
+EOF
+out="$(run_check)"
+assert_absent "$out" "dead reference" "an interpreter-wrapped ref to a file that exists is not flagged (GH-33)"
+
+# ==================================================================================================
+# GH-34 — the bare-filename fallback treated a reference as a glob, not a literal.
+# --------------------------------------------------------------------------------------------------
+# _pdda_gov_resolve_ref's repo-wide fallback passed the ref straight to `find -name "$ref"`, which
+# globs. A markdown link (whose extraction class admits [ ] * ?) carrying `build[1].sh` resolved against
+# a repo holding `build1.sh` — a DIFFERENT file — so the dead ref was scored LIVE. A false negative in
+# the check whose whole job is catching them. (Backtick/command-position refs are shielded — their
+# classes exclude glob metachars — but markdown-link refs are not, which is the reachable vector.)
+# ==================================================================================================
+
+# --- POSITIVE: a glob-metachar ref must match literally, not as a pattern --------------------------
+new_sandbox
+: > "$SBOX/build1.sh"          # the DIFFERENT file a glob would wrongly match
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+See [the packager](build[1].sh) for the build step.
+EOF
+out="$(run_check)"
+assert_contains "$out" "dead reference 'build[1].sh'" \
+  "a glob-metachar ref is matched literally; 'build[1].sh' does not resolve against 'build1.sh' (GH-34)"
+
+# --- NEGATIVE CONTROL: the literal bare-filename fallback still resolves a real mention ------------
+new_sandbox
+mkdir -p "$SBOX/utils/pdda"
+: > "$SBOX/utils/pdda/pdda-lib.sh"
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+The helpers live in `pdda-lib.sh`.
+EOF
+out="$(run_check)"
+assert_absent "$out" "dead reference 'pdda-lib.sh'" \
+  "a bare filename that exists elsewhere still resolves under literal matching (GH-34 no regression)"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

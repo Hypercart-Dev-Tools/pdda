@@ -1,5 +1,33 @@
 # CHANGELOG.md
 
+## 2026-07-11
+
+### GH-33 + GH-34: the dead-ref scan reads interpreter-wrapped invocations and matches basenames literally
+
+Two adversarial-review follow-ups from GH-23 P3, landed together (they touch the same extraction/
+resolution code).
+
+**GH-33** — `_pdda_gov_extract_refs` gained a fourth pattern for interpreter-wrapped scripts. P3's
+command-position pattern only saw a `.sh` in *program* position; hand the script to an interpreter and
+it moves to *argument* position, where the scan went blind (`bash utils/x.sh`, `sudo ./x.sh`,
+`sh setup.sh`, `env FOO=1 ./x.sh` all extracted nothing). The new pattern strips an allowlist of
+transparent wrappers — `sudo`, `env` (with `VAR=val` assignments), and the interpreters
+`bash`/`sh`/`zsh`/`source`/`.` — to recover the path. The leading char class rejects `-` and `"`/`$`,
+so `bash -c "…"`, a quoted argument, and a `$VAR` expansion are never mistaken for path claims.
+Nine tests (5 positive, 4 negative); the 5 positives were red against pre-fix `pdda.sh`.
+
+**GH-34** — the bare-filename fallback in `_pdda_gov_resolve_ref` (pdda.sh) and `assert_written_doc_refs`
+(install.sh) passed the ref to `find -name`, which globs. A **markdown-link** ref of `build[1].sh`
+(the link extractor's class admits `[ ] * ?`) resolved against a *different* file `build1.sh`, scoring
+a dead ref live — a false negative in the check whose whole job is catching them. Both sites now compare
+basenames literally via process substitution (not a pipe, so `break` can't strand `find` in a
+`pipefail` pipeline under `set -euo pipefail`). The governance side is reachable and has a red-first
+test; install.sh's own extractor emits no glob metachars, so its fix is hardening that removes the
+reliance on that distant invariant.
+
+Governance suite 41 → 47; full suite green (12 files). `pdda.sh run` on this repo stays clean — the
+widened pattern self-inflicted no new warns.
+
 ## 2026-07-10
 
 ### GH-23 closed; doc moved to 3-COMPLETED

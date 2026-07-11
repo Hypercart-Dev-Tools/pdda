@@ -742,6 +742,15 @@ _pdda_gov_extract_refs() {
     printf '%s\n' "$text" \
       | grep -oE '(^|`)[[:space:]]*(\.{1,2}/)?[A-Za-z0-9_.][A-Za-z0-9_./-]*\.sh([[:space:]`,;:)"'"'"']|$)' \
       | sed -E 's/^`//; s/^[[:space:]]+//; s/[[:space:]`,;:)"'"'"']+$//; s|^\./||'
+    # (d) interpreter-wrapped invocation: `bash x.sh`, `sudo ./x.sh`, `sh setup.sh`, `env FOO=1 ./x.sh`.
+    # When a script is handed to an interpreter it leaves PROGRAM position (which (c) keys on) for
+    # ARGUMENT position and (c) goes blind. An explicit allowlist of transparent wrappers — sudo, env
+    # (with VAR=val assignments), and the interpreters bash/sh/zsh/source/. — is stripped to recover the
+    # path. The leading char class rejects `-` (so `bash -c` is not a path) and `"`/`$` (so a quoted or
+    # variable-expanded argument is never mistaken for a path claim). GH-33.
+    printf '%s\n' "$text" \
+      | grep -oE '(^|`)[[:space:]]*((sudo|source|bash|zsh|env|sh|\.)([[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*)*[[:space:]]+)+(\.{1,2}/)?[A-Za-z0-9_.][A-Za-z0-9_./-]*\.sh([[:space:]`,;:)"'"'"']|$)' \
+      | sed -E 's/^`//; s/^[[:space:]]+//; s/^((sudo|source|bash|zsh|env|sh|\.)([[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*)*[[:space:]]+)+//; s/[[:space:]`,;:)"'"'"']+$//; s|^\./||'
   } | grep -Ev '(^|/)GH-[0-9]+-[^/]*\.md(#.*)?$' | LC_ALL=C sort -u
 }
 
@@ -753,7 +762,7 @@ _pdda_gov_extract_refs() {
 # ref WITH a directory component stays a precise claim: if that exact path is wrong, that IS the bug
 # (e.g. a doc pointing at PROJECT/2-WORKING/X.md after X.md was completed and moved to 3-COMPLETED/).
 _pdda_gov_resolve_ref() {
-  local ref="$1" from_dir="$2" path candidate found
+  local ref="$1" from_dir="$2" path candidate found p
   path="${ref%%#*}"
   case "$path" in
     http://*|https://*|//*) return 1 ;;
@@ -763,7 +772,14 @@ _pdda_gov_resolve_ref() {
     *)
       candidate="$PDDA_REPO_ROOT/$path"
       if [ ! -f "$candidate" ]; then
-        found="$(find "$PDDA_REPO_ROOT" -name "$path" -not -path '*/.git/*' 2>/dev/null | head -1)"
+        # basename match must be LITERAL, not a glob: `find -name "$path"` would read a markdown-link
+        # ref of `build[1].sh` (whose extraction class admits [ ] * ?) as a pattern and resolve it
+        # against a DIFFERENT file `build1.sh`, scoring a dead ref live. Compare basenames as strings.
+        # First traversal match wins, preserving the previous `| head -1` semantics. GH-34.
+        found=""
+        while IFS= read -r -d '' p; do
+          if [ "${p##*/}" = "$path" ]; then found="$p"; break; fi
+        done < <(find "$PDDA_REPO_ROOT" -not -path '*/.git/*' -print0 2>/dev/null)
         [ -n "$found" ] && candidate="$found"
       fi
       ;;
