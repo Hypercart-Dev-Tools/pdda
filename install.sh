@@ -373,7 +373,7 @@ SELFCHECK_FAILED=0
 # the GUIDING-PRINCIPLES.md we scaffold into every target. The router was never special — any doc we
 # write can name a script we do not ship.
 assert_written_doc_refs() {  # <dst-relpath>
-  local doc_rel="$1" doc="$TARGET/$doc_rel" ref missing=0
+  local doc_rel="$1" doc="$TARGET/$doc_rel" ref missing=0 found p
   [ -f "$doc" ] || return 0
 
   say "  self-check  every *.sh named in the written $doc_rel exists in the target"
@@ -381,7 +381,15 @@ assert_written_doc_refs() {  # <dst-relpath>
     [ -n "$ref" ] || continue
     case "$ref" in
       */*) [ -e "$TARGET/$ref" ] && continue ;;
-      *)   [ -n "$(find "$TARGET" -name "$ref" -not -path '*/.git/*' -print -quit 2>/dev/null)" ] && continue ;;
+      # literal basename match, not `find -name "$ref"` (which globs): today the extractor below emits
+      # no glob metachars, but matching literally removes the reliance on that and keeps this in step
+      # with _pdda_gov_resolve_ref. Process substitution (not a pipe) so `break` cannot leave `find` in
+      # a pipefail pipeline under `set -euo pipefail`. First match wins. GH-34.
+      *)   found=""
+           while IFS= read -r -d '' p; do
+             if [ "${p##*/}" = "$ref" ]; then found="$p"; break; fi
+           done < <(find "$TARGET" -not -path '*/.git/*' -print0 2>/dev/null)
+           [ -n "$found" ] && continue ;;
     esac
     printf '  ERROR  %s names "%s" but no such file exists in %s\n' "$doc_rel" "$ref" "$TARGET" >&2
     missing=$((missing + 1))

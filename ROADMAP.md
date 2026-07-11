@@ -28,7 +28,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 | What was just completed | What's next |
 |---|---|
-| **GH-23 shipped and closed (P1–P4, PR #32 → 5ef638a), closing the "a check that could not run reports success" family.** Targets no longer inherit the canonical router (#25 fixed alongside); `install.sh` validates every startup doc it writes; the dead-ref scan reads `.sh` including command-position paths; **GH-14 Phase 2 (BUG-001b)** landed with P3 — `run` can no longer report "all checks passed" over errors the mode gate merely stopped from blocking; and P4 made the on-ramp cheap (`/pdda`) then optionally enforceable. Doc moved to `3-COMPLETED`. Earlier: GH-27 made the wrap loop fire, and GH-12/GH-15 wrapped and closed. | **Repair the `LTVera-Pandas` install** — it still carries the pre-P1 verbatim router; needs an explicit `install.sh --with-startup-docs --force` (`pdda-sync.sh push` cannot reach a target's `ROUTER.md`), backing up its 60KB `AGENTS.md` first. **GH-10 Sentinel** is the other active build (Phase 2b executor). Smaller: follow-ups #33/#34 (dead-ref scan misses interpreter-wrapped and `find -name` refs). |
+| **GH-23 shipped and closed (P1–P4, PR #32 → 5ef638a), closing the "a check that could not run reports success" family.** Targets no longer inherit the canonical router (#25 fixed alongside); `install.sh` validates every startup doc it writes; the dead-ref scan reads `.sh` including command-position paths; **GH-14 Phase 2 (BUG-001b)** landed with P3 — `run` can no longer report "all checks passed" over errors the mode gate merely stopped from blocking; and P4 made the on-ramp cheap (`/pdda`) then optionally enforceable. Doc moved to `3-COMPLETED`. Follow-ups **#33** (interpreter-wrapped `.sh` invocations) and **#34** (`find -name` glob → literal basename) landed 2026-07-11; governance suite 41 → 47. Earlier: GH-27 made the wrap loop fire, and GH-12/GH-15 wrapped and closed. | **Repair the `LTVera-Pandas` install** — it still carries the pre-P1 verbatim router; needs an explicit `install.sh --with-startup-docs --force` (`pdda-sync.sh push` cannot reach a target's `ROUTER.md`), backing up its 60KB `AGENTS.md` first (tracked as [BinoidCBD/LTVera-Pandas#49](https://github.com/BinoidCBD/LTVera-Pandas/issues/49)). **GH-10 Sentinel** is the other active build — Phase 3 replay/eval harness next. |
 
 ## Ledger
 
@@ -109,7 +109,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   dead-ref scan to command-position `.sh` and carries **GH-14 Phase 2 / BUG-001b** (`run` no longer reports
   "all checks passed" over gated errors); **P4** makes reminder directive 1 cheap (`/pdda`) then verifiable
   via an opt-in default-off `PreToolUse` gate that fails open when it cannot prove the router went unread.
-  Codex consult caught a fail-closed path pre-merge; 273 assertions green; follow-ups #33/#34 filed. Issue
+  Codex consult caught a fail-closed path pre-merge; 273 assertions green; follow-ups #33/#34 filed (resolved 2026-07-11). Issue
   [#23](https://github.com/Hypercart-Dev-Tools/pdda/issues/23) (closed). ->
   [PROJECT/3-COMPLETED/GH-23-AGENT-ONRAMP.md](PROJECT/3-COMPLETED/GH-23-AGENT-ONRAMP.md)
 - **GH-27 — issue-doc-sync stopped watching a doc at the moment it completed** (2026-07-09) - the loop
