@@ -1,5 +1,50 @@
 # CHANGELOG.md
 
+## 2026-07-14
+
+### GH-35: Release primitive — first-class GitHub Releases integration
+
+Adds a `release` tier to the PDDA shipping chain, completing the four-tier hierarchy:
+`task/issue → project → marathon → release`.
+
+**What was built (minimal viable slice):**
+
+- **`PROJECT/releases/` lifecycle bucket** — new cross-cutting shipping artifact bucket (outside the
+  `1-INBOX/2-WORKING/3-COMPLETED/4-MISC` tree). Installer seeds `blank.md` placeholder. Convention
+  defined in `PROJECT/PDDA.md` → "Release doc convention".
+
+- **`pdda.sh release-readiness`** — new deterministic check. Scans `RELEASE-*.md` docs with
+  `status: RC`; errors if any linked marathon isn't in `3-COMPLETED`; errors if any `issues_closed`
+  issue is still OPEN (via the same gh-degrade stack as `issue-doc-sync`); warns if `CHANGELOG.md`
+  has no entry matching the tag; warns if `gh_release_url` is empty; warns if tag not in release
+  cache. Joined `pdda.sh run` automatically.
+
+- **`pdda.sh gh-release-sync`** — parallel to `pdda.sh gh-refresh`. Calls `gh release list`,
+  writes `.pdda-gh-release-state.tsv` (atomic), provides offline-degrade data for
+  `release-readiness`. Gitignored in this repo and in target installs.
+
+- **`roadmap-coverage` extended** — now covers `PROJECT/releases/*.md` with `status: Draft|RC`
+  alongside `2-WORKING` active docs and `1-INBOX` captures. Published release docs are not required
+  to be in the ROADMAP ledger (same convention as `3-COMPLETED` project docs).
+
+- **`/release` skill** — new opt-in skill (`.claude/skills/release/SKILL.md`) that reads linked
+  marathon + issue docs, synthesizes the GitHub Release body from their `## Lessons Learned` and
+  `## Quad Concepts` sections, previews a draft, then calls `gh release create <tag>` and writes
+  `gh_release_url` back into the release doc. Preview-first / confirm-before-publish discipline.
+
+- **`install.sh` + `PDDA-INSTALL.md`** — `install.sh` now seeds `PROJECT/releases/blank.md` and
+  adds `.pdda-gh-release-state.tsv` to the target `.gitignore`. `PDDA-INSTALL.md` updated with the
+  new lifecycle bucket, env vars (`PDDA_RELEASES_DIR`, `PDDA_GH_RELEASE_CACHE`), and the new
+  `pdda-gh-release-sync.sh` script in the install set + chmod list.
+
+- **`ROUTER.md`** updated with `release-readiness` and `gh-release-sync` command rails.
+
+- **`pdda-lib.sh`** additions: `PDDA_RELEASES_DIR`, `PDDA_GH_RELEASE_CACHE` env vars;
+  `_pdda_gh_release_table`, `pdda_write_gh_release_cache`, `pdda_frontmatter_list_values`,
+  `pdda_list_release_active_docs` helpers.
+
+All changes additive and non-breaking. New checks start warn-only in `observe`/`light` modes.
+
 ## 2026-07-11
 
 ### GH-33 + GH-34: the dead-ref scan reads interpreter-wrapped invocations and matches basenames literally

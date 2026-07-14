@@ -577,6 +577,95 @@ contradictions in prose (two docs stating conflicting policy, a claim that quiet
 judgment call for the LLM layer or a human — see the `/governance-audit` skill, which runs this check
 first and then reads the same doc set for that fuzzier class of inconsistency.
 
+#### J. `pdda.sh release-readiness`
+
+Purpose:
+- verify that a release doc in `PROJECT/releases/` with `status: RC` is actually ready to publish —
+  all linked marathons completed, all linked issues closed, CHANGELOG updated, GitHub Release created
+
+Scope: every `PROJECT/releases/RELEASE-*.md` with `status: Draft` or `status: RC`
+(`roadmap-coverage` tracks both; `release-readiness` focuses on the RC gate).
+
+Minimum behavior:
+- for each RC-status release doc, extract `tag`, `marathons`, `issues_closed`, `gh_release_url` from
+  frontmatter; silently skip docs that are `Published`
+- **marathon check**: for each path listed under `marathons:`, verify the file lives under
+  `PROJECT/3-COMPLETED/` (by full path or basename lookup); `error` if any linked marathon is not yet
+  in the completed bucket
+- **issue check**: for each number listed under `issues_closed:`, resolve its state from the same
+  gh-degrade stack used by `issue-doc-sync`; `error` if any listed issue is still OPEN
+- **changelog check**: `warn` if `CHANGELOG.md` contains no line matching the release `tag` value
+- **gh_release_url check**: `warn` if `gh_release_url` is empty (release not yet published to GitHub)
+- **release cache check**: if `PDDA_GH_RELEASE_CACHE` exists, `warn` if the release tag is not in
+  the cache (release published in the doc but not reflected in the synced cache)
+- error-level findings block in `full` mode; `observe`/`light` modes report only (warn-only there,
+  same as all new checks entering the suite)
+- like `issue-doc-sync`: flag-only, never creates or publishes a GitHub Release automatically
+
+gh-degrade: same degrade stack as `issue-doc-sync` — live `gh` when available, else
+`PDDA_GH_RELEASE_CACHE` (written by `pdda.sh gh-release-sync`). A successful live lookup writes the
+cache. When neither yields state, emits a `warn` that the check was **NOT evaluated**.
+
+#### `pdda.sh gh-release-sync`
+
+Purpose:
+- refresh the cached GitHub release-state file (`PDDA_GH_RELEASE_CACHE`, default
+  `.pdda-gh-release-state.tsv`) so `release-readiness` has last-known data when `gh` is offline
+
+Behavior:
+- calls `gh release list --limit 100 --json tagName,isDraft,isPrerelease,publishedAt` for the
+  current repo, writes a TSV: `tag ⇥ state ⇥ published_at`
+- atomic write (temp file + `mv`) so a partial network failure never corrupts the cache
+- run on the same cadence as `gh-refresh` (suggested: hourly, before `pdda.sh run`)
+- `PDDA_GH_RELEASE_CACHE` env var overrides the cache path (same pattern as `PDDA_GH_STATE_CACHE`)
+
+#### Release doc convention — `PROJECT/releases/RELEASE-<tag>.md`
+
+`PROJECT/releases/` is a lifecycle bucket outside the `1-INBOX/2-WORKING/3-COMPLETED/4-MISC` tree
+because a release is a cross-cutting shipping artifact that bundles multiple completed marathons, not
+a single work item in flight.
+
+Required frontmatter:
+
+```yaml
+title: "Release v1.2.0"
+tag: v1.2.0            # the GitHub release tag
+status: Draft | RC | Published
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+owner: <person>
+gh_release_url: <url>  # populated when the GitHub Release is created
+marathons:             # one or more marathon plan docs bundled in this release
+  - PROJECT/2-WORKING/MARATHON-PLAN-2026-07-07.md
+issues_closed:         # GH issue numbers this release closes
+  - 11
+  - 21
+```
+
+Body structure:
+- `## What's in this release` — prose summary (used as the GitHub Release body)
+- `## Marathons bundled` — links to the marathon plan docs
+- `## Issues closed` — links to each GH issue
+- `## Release checklist` (deterministic QA gate):
+  - `[ ]` All linked marathons are in `PROJECT/3-COMPLETED/`
+  - `[ ]` All linked issues are closed in GitHub
+  - `[ ]` `CHANGELOG.md` entry exists for this tag
+  - `[ ]` GitHub Release created and `gh_release_url` populated
+- `## Lessons Learned` (same contract as other completed docs)
+
+Status lifecycle: `Draft` → `RC` → `Published`. `release-readiness` gates the RC → Published
+transition. Once `Published`, the doc is removed from the active ROADMAP.md ledger (same convention
+as a project doc moving to `3-COMPLETED`).
+
+The four-tier shipping chain:
+
+```
+task/issue  (GH-*.md in 1-INBOX)
+  → project (2-WORKING active doc)
+    → marathon (marathon/MARATHON-*.yaml + PROJECT/2-WORKING/MARATHON-PLAN-*.md)
+      → release (PROJECT/releases/RELEASE-*.md + GitHub Release tag)
+```
+
 ### 2. LLM-assisted doc readiness review
 
 This catches the issues where structure exists but planning quality is weak.
