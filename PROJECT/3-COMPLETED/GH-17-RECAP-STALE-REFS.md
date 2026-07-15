@@ -2,6 +2,13 @@
 gh_issue: 17
 source: https://github.com/Hypercart-Dev-Tools/pdda/issues/17
 title: "PROJECT/PDDA.md dead-references RECAP.md and REAL-AGENT-OBSERVATIONS.md — neither file exists"
+status: Fixed (pending PR merge)
+created: 2026-07-08
+doc_type: bugfix
+context_tags: [governance, doc-accuracy]
+related: [PROJECT/PDDA.md, GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md]
+---
+
 status: Completed — both conventions confirmed retired; prose corrected, 4 dead-ref warns cleared
 created: 2026-07-08
 updated: 2026-07-08
@@ -55,6 +62,25 @@ Small — a ~2-4 line prose correction in `PROJECT/PDDA.md` once intent is confi
 issue-first SOP's trivial-edit floor size-wise; tracked here because it needs a decision first, not just
 a mechanical fix.
 
+## Resolution (2026-07-08)
+
+Checked the sibling `xyz-3-agents-swarm` repo (the project this standalone `pdda` repo's runtime and
+contract docs were originally extracted from) — both `PROJECT/4-MISC/RECAP.md` and
+`PROJECT/4-MISC/REAL-AGENT-OBSERVATIONS.md` genuinely exist there, as Trinity-spike-specific artifacts
+(a session recap, a real-agent hand-test log). Confirmed via `git log -S"RECAP.md" -- PROJECT/PDDA.md`
+that both mentions have been present since this repo's first commit — they were never real files here;
+the prose was copy-pasted from the origin repo's context without being genericized for the standalone
+PDDA product doc.
+
+That resolves the "needs a human decision" question cleanly: this was never a "should this file exist"
+case, it's a "this contract doc named another repo's project-specific files by mistake" case. Fixed by
+genericizing the three affected passages in `PROJECT/PDDA.md`'s "CHANGELOG.md — end-of-iteration record"
+section (and the GH-15 exemption-manifest note that referenced this as an open item) to describe the
+*concept* (a superseded narrative log; an optional local compliance-observations doc) without naming
+specific filenames that don't belong to the generic PDDA contract.
+
+**Verified:** `pdda.sh governance` now reports `errors=0 warns=0` (previously 4 warns). Full `pdda.sh
+run` clean. Shipped together with GH-18 on branch `fix/GH-17-GH-18`; PR open, not yet merged.
 ## Decision (2026-07-08)
 
 **Both conventions are retired.** Neither file should be recreated. Confirmed by the maintainer, and

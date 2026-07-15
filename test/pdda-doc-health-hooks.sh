@@ -130,6 +130,22 @@ run_stop_hook
 assert_rc0 "stop/drift: exits 0 even with findings (never blocks)"
 assert_has "issue #2 is CLOSED" "stop/drift: report includes issue-doc-sync against the cached gh-state"
 assert_has "warn(s)" "stop/drift: consolidated counts shown"
+# GH-27 P3: a script may detect that a unit of work finished; it must never close the issue itself.
+# The one legitimate action is to name the wrap that asks. Without this the operator sees a warn, has
+# no prompt to act, and the drift survives to the next session.
+assert_has "/pdda-eod" "stop/drift: reconciliation drift points the operator at the wrap"
+assert_has "nothing closes without your yes" "stop/drift: the prompt states it is propose-then-confirm"
+
+# NEGATIVE CONTROL: a fully reconciled tree must NOT nag about wrapping. The prompt is a response to
+# real drift, not decoration on every stop — otherwise operators learn to ignore the hook entirely.
+new_sandbox
+good_doc "$SBOX/PROJECT/2-WORKING/GH-3-open.md"
+printf -- '- [GH-3](PROJECT/2-WORKING/GH-3-open.md)\n' >> "$SBOX/ROADMAP.md"
+printf '# Changelog\n\n## 2026-06-29\n\n- seeded\n' > "$SBOX/CHANGELOG.md"
+printf '3\tOPEN\n' > "$SBOX/.pdda-gh-state.tsv"
+run_stop_hook
+assert_rc0 "stop/reconciled: exits 0"
+assert_absent "/pdda-eod" "stop/reconciled: no wrap prompt when nothing is drifting"
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

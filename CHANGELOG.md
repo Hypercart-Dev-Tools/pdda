@@ -1,5 +1,44 @@
 # CHANGELOG.md
 
+## 2026-07-11
+
+### GH-33 + GH-34: the dead-ref scan reads interpreter-wrapped invocations and matches basenames literally
+
+Two adversarial-review follow-ups from GH-23 P3, landed together (they touch the same extraction/
+resolution code).
+
+**GH-33** — `_pdda_gov_extract_refs` gained a fourth pattern for interpreter-wrapped scripts. P3's
+command-position pattern only saw a `.sh` in *program* position; hand the script to an interpreter and
+it moves to *argument* position, where the scan went blind (`bash utils/x.sh`, `sudo ./x.sh`,
+`sh setup.sh`, `env FOO=1 ./x.sh` all extracted nothing). The new pattern strips an allowlist of
+transparent wrappers — `sudo`, `env` (with `VAR=val` assignments), and the interpreters
+`bash`/`sh`/`zsh`/`source`/`.` — to recover the path. The leading char class rejects `-` and `"`/`$`,
+so `bash -c "…"`, a quoted argument, and a `$VAR` expansion are never mistaken for path claims.
+Nine tests (5 positive, 4 negative); the 5 positives were red against pre-fix `pdda.sh`.
+
+**GH-34** — the bare-filename fallback in `_pdda_gov_resolve_ref` (pdda.sh) and `assert_written_doc_refs`
+(install.sh) passed the ref to `find -name`, which globs. A **markdown-link** ref of `build[1].sh`
+(the link extractor's class admits `[ ] * ?`) resolved against a *different* file `build1.sh`, scoring
+a dead ref live — a false negative in the check whose whole job is catching them. Both sites now compare
+basenames literally via process substitution (not a pipe, so `break` can't strand `find` in a
+`pipefail` pipeline under `set -euo pipefail`). The governance side is reachable and has a red-first
+test; install.sh's own extractor emits no glob metachars, so its fix is hardening that removes the
+reliance on that distant invariant.
+
+Governance suite 41 → 47; full suite green (12 files). `pdda.sh run` on this repo stays clean — the
+widened pattern self-inflicted no new warns.
+
+## 2026-07-10
+
+### GH-23 closed; doc moved to 3-COMPLETED
+
+PR #32 merged to `main` (fast-forward to `5ef638a`), carrying GH-23 P3+P4 and the pre-merge Codex-consult
+fixes. Issue #23 closed. Its working doc moved `2-WORKING → 3-COMPLETED` (it already carried its `## Lessons
+Learned (For Future Agents)` section), frontmatter `status` set to Completed, and the ROADMAP entry moved
+from **In progress** to **Completed** with its pointer retargeted to the new path. The issue title's stale
+"HQ's ROUTER.md" was corrected to "the canonical ROUTER.md" at close. Follow-ups #33 (interpreter-wrapped
+`.sh` refs missed) and #34 (`find -name` treats a bare ref as a glob) remain open for their own work.
+
 ## 2026-07-09
 
 ### GH-28: registry-to-git-pulse-sync projection warns on drift it can't fix (#28)
@@ -21,6 +60,335 @@ cases (dirty warns, clean-after-commit is silent, behind warns, install still co
 
 **Explicitly out of scope:** fixing or automating the operator's own stalled git-pulse checkout — that's
 their tooling to unstick, not a PDDA code change.
+### GH-23 P4: the on-ramp gets cheap, then verifiable
+
+The SessionStart reminder has five directives. Four name a command whose output proves it ran. Directive
+1 asked for a multi-file read and left no trace — the most expensive to obey and the only one nobody
+could check. An agent under context pressure drops exactly that one, which is what GH-23 was.
+
+It now leads with **invoke `/pdda`**: one action, since the skill already encodes the read order, with
+"read `ROUTER.md` and follow the order it gives" as the fallback where the skill is absent. The read
+order is unchanged; obeying it is no longer a reading list.
+
+Enforcement is a separate, **opt-in, default-off** `PreToolUse` gate (matcher `Write|Edit`) that refuses
+an edit to `PROJECT/**`, `ROADMAP.md`, or `CHANGELOG.md` when the session's transcript shows no read of
+`ROUTER.md` and no `/pdda` invocation. Invoking the skill satisfies it — blocking an agent that did
+precisely what directive 1 asked would be perverse.
+
+This is the only component in PDDA that acts rather than recommends, so it is fenced accordingly. Two
+independent switches, both off: registering the hook does nothing without a `.pdda-router-gate` file (or
+`PDDA_ROUTER_GATE=1`), and `PDDA_ROUTER_GATE=0` always wins. A repo without `PROJECT/PDDA.md` is never
+gated. `ROUTER.md` itself is never gated, or the one file that satisfies the gate would be unfixable
+while it is on. And it **fails open** on every path where it cannot establish that the router went unread
+— no `jq`, no readable transcript, an unparseable one, an unrecognized payload — allowing the write and
+saying on stderr that it could not evaluate. It blocks only on positive evidence.
+
+That last property is this repo's own recurring bug turned back on its enforcement layer. A gate that
+blocks on a guess would be the first thing anyone turns off, and they would be right.
+
+Two bugs found by the negative controls, neither visible to the positives:
+
+- The first draft piped `jq` straight into `grep -q`, collapsing "found no read of the router" and "could
+  not parse the transcript" into one exit status. A session truncated mid-write — routine — would have
+  blocked every governed edit for the rest of the day.
+- `git rev-parse` reports a *physical* repo root while the payload's `file_path` is whatever the caller
+  typed. Under macOS's `/tmp` → `/private/tmp` symlink the prefix strip missed, every governed doc looked
+  out of scope, and the gate became a silent no-op that still exited 0. **Every positive test passed** —
+  "allowed the write" is what a working gate and a dead gate both do most of the time. Only the paired
+  "lever on, router unread → blocks" control exposed it.
+
+`SKILLS/PDDA-hook/SKILL.md` previously promised the skill "does not touch `PreToolUse`". That sentence is
+now false, so it was amended in the same commit rather than left to rot — with a note on why, and on the
+fact that an operator who accepts only the default install still gets exactly the behavior it described.
+Every existing guardrail holds: never write a repo's committed `.claude/settings.json`; only the
+operator's own `~/.claude/settings.json` or an ignored `.claude/settings.local.json`.
+
+`test/pdda-router-read-gate.sh` — 47 assertions. A handful cover the enforcement path. The rest cover
+staying out of the way: default-off silence, lever precedence, scope, non-PDDA repos, and the fail-open
+paths. Plus the boundary that keeps fail-open from swallowing the whole gate: an **empty but valid**
+transcript is evidence, not a failure to gather it, and still blocks.
+
+### Adversarial cross-model review, and what it broke
+
+An independent read of the above (Codex, read-only, in a throwaway worktree) found a fail-**closed** path
+in the gate — the one thing it promises never to do:
+
+- **`transcript_path=/dev/stdin` blocked.** The script drains stdin to read its own payload, so the
+  "transcript" was an empty, already-consumed stream. `-r` accepted it, the scan came back empty, and the
+  gate treated *nothing to read* as *evidence of not reading*. Requiring a **regular file** (`-f`) fixes it,
+  and takes a directory and a FIFO — which would have hung `jq` forever — with it.
+- **Scope was decided on the raw string.** `PROJECT/../../etc/passwd` matches the glob `PROJECT/*` while
+  pointing nowhere near the repo. Paths are now resolved and required to be contained in the repo; a
+  relative `file_path` resolves against the payload's `cwd`, not the hook's. (The reported reproduction was
+  wrong — in isolation it already exited 0 — but the defect underneath it was real.)
+- **`foo.shtml` was harvested as `foo.sh`** by the installer's self-check, pre-existing since P2. A target
+  documenting a `.shtml` page would have failed its own install. Fixed with a word boundary.
+- **Command refs terminated by `,` `;` `:` `)` were missed** — a command is rarely the last thing on its
+  line. Terminator class widened. A trailing `.` stays excluded on purpose: it cannot be told apart from a
+  suffix, and `deploy.sh.bak` would be harvested as `deploy.sh`.
+
+Two confirmed gaps were **filed rather than guessed at**: interpreter-wrapped invocations (`bash x.sh`)
+sit in argument position and need an allowlist plus negative controls; and `find -name "$ref"` treats a
+bare name as a glob.
+
+The lesson is the day's lesson again. The gate's founding invariant — *a check that could not run must not
+report a result* — was broken by a single character, `-r` where `-f` was meant. Thirty-eight tests written
+specifically to defend that invariant missed it, because it never occurred to their author to hand the
+thing a file descriptor. Negative controls were the right instinct; the input space was larger than the
+imagination that generated them.
+
+### GH-23 P3 + GH-14 Phase 2: the dead-reference scan learns to read commands, and `run` stops lying
+
+Two defects, one shape: **a check that could not run must not report success.**
+
+`pdda-check-governance` matched `.md` only, so a governance doc could name any script it liked and nothing
+would notice. That is how `--with-startup-docs` shipped a router full of scripts targets never receive.
+The scan now reads `.sh` too — but a suffix widening alone would have caught almost none of the real cases.
+A router's load-bearing references are the **commands** it tells an agent to run, and commands carry
+arguments, so they close neither a markdown link nor a backtick span right after the suffix. A third
+pattern extracts paths in **command position**: the token opening a code span or a scanned fence line.
+
+The negative controls are the substance of the change, not paperwork. The rule that pulls the sync tool's
+name out of a fenced invocation must never pull a subcommand word out of a documented command, never fire
+on a glob, and never mistake a script name mid-sentence for a path. Nine such controls ship with it, each
+verified to pass against the pre-P3 code it guards.
+
+Turning it on indicted this repo before it helped anyone else:
+
+- The canonical router named a script under the gitignored, absent vendored-harness directory. The router
+  that spread dead references was carrying its own.
+- `GUIDING-PRINCIPLES.md` named the installer as a path — and that file is scaffolded into every target,
+  where no installer exists. P1 fixed the router and walked straight past it.
+- The install manifest named the very template **P1 itself added**, dead in every target. The check written
+  in P3 found the debt created in P1.
+- Then it flagged the illustrative placeholders inside P3's own documentation of P3.
+
+A fresh install went to **46 dead-ref warns** before the shipped-doc exemption manifest was rebuilt from a
+real scan (now 0) — GH-15's self-inflicted-noise failure, one regex away from repeating. `.sh` refs are
+exactly the ones that differ between the canonical repo and a target.
+
+The installer's self-check was scoped to the wrong noun. It now asserts over **every** startup doc it
+writes, and still never over one it kept.
+
+**GH-14 Phase 2 (BUG-001b)** landed here because it is the same bug wearing different clothes.
+`pdda_gated_exit` forces each check's exit code to `0` outside `full` mode — correct, since `observe` and
+`light` must never fail a build — but `cmd_run` read success out of that zero. The mode gate exists to stop
+the run from **blocking**, not from **reporting**. A new adopter, who starts in `observe` by design, saw
+"all checks passed" printed over real errors. There are now three outcomes instead of two: passed,
+found-but-not-blocking, failed. Warnings still never move a run out of "passed" — a `warn` is the
+house-style advisory, and collapsing that distinction would make every recommendation read as a failure.
+The LLM readiness review is gated on findings rather than on the gated exit code, so an error-laden repo no
+longer spends an LLM call it was never supposed to spend.
+
+GH-23 was a check that could not **see**. GH-27 was a check that could not **reach** `gh`. BUG-001b was a
+check that could not **block**. All three reported success. That family is now closed.
+
+Suites: governance 14 → 31, install 33 → 38, plus a new run-mode reporting suite at 23. Every positive
+assertion was run against `main` and fails there; every negative control passes there — including
+"observe still exits 0", which proves the mode gate survived being fixed. The captured LTVera-Pandas router
+is now a regression fixture and must never scan clean again.
+
+### GH-23 P2: the installer now validates its own output
+
+`install.sh --with-startup-docs` writes a `ROUTER.md` into the target, then asserts that every `*.sh` path
+that router names resolves to a file present in the target. A dead reference prints each offending name and
+exits non-zero.
+
+This is the single assertion that would have caught the whole of GH-23 at install time. For months
+`--with-startup-docs` shipped the canonical repo's own router into every target — telling agents to run
+`install.sh` and `utils/pdda/pdda-sync.sh`, neither of which a target has — and nothing noticed, because
+`pdda-check-governance` only scans `.md` references. (That gap is P3.)
+
+Verified against the original bug. With the GH-23 refs re-injected into the template:
+
+```
+ERROR  ROUTER.md names "install.sh" but no such file exists in <target>
+ERROR  ROUTER.md names "utils/pdda/pdda-sync.sh" but no such file exists in <target>
+2 dead script reference(s) in the ROUTER.md this installer just wrote.
+```
+
+exit `1`. The same scenario against `main`'s pre-P2 `install.sh` exits `0` and ships the router silently.
+
+**Two boundaries, both learned rather than designed.**
+
+*Only validate a router the installer wrote.* If `--with-startup-docs` kept the operator's existing
+`ROUTER.md`, that file is theirs — failing their install over their own scripts would be indefensible, and
+would make this the first check anyone disables. `seed_from_source` now reports whether it wrote or kept,
+and the assertion is skipped for a kept file, with a line saying so.
+
+*Run it against the written artifact, not the source template.* P1's own smoke test is the proof: the first
+draft of `templates/ROUTER.target.md` told targets that a local edit "is overwritten on the next
+`pdda-sync.sh push`" — naming a script targets do not have. The template reintroduced the exact bug it
+exists to fix. Checking the *input* would have passed.
+
+**Severity is deliberately mode-independent.** The doc-hygiene `pdda.sh run` at the end of an install is
+warn-only in `observe`/`light`, correctly — it inspects the target's own docs. The self-check inspects
+**PDDA's own output**, so a dead ref there is a PDDA template bug and always exits non-zero. That exit is
+what stops `pdda-sync.sh register` from propagating a broken router further. The install still completes:
+aborting midway would leave a half-provisioned tree, strictly worse than a usable repo with a misleading
+router and a loud error. Two tests pin that.
+
+Bare filenames fall back to a repo-wide basename search, mirroring `_pdda_gov_resolve_ref` — a doc may
+legitimately write `pdda-lib.sh` meaning `utils/pdda/pdda-lib.sh`.
+
+**Also fixed, found while running the suite for this change.** `test/pdda-publish-projection.sh` failed
+3/17 on a stock macOS shell and passed everywhere else. macOS sets `TMPDIR` with a trailing slash, so
+`mktemp -d "$TMPDIR/x.XXXX"` yields `/…/T//x.abc` — while `install.sh` normalizes its target via
+`cd && pwd` to a single slash. The registry stored the normalized path; every assertion compared it
+against the raw doubled-slash string. Invisible in CI and in any sandbox that sets `TMPDIR` without the
+trailing slash. Now normalized at the sandbox root; verified 17/17 with `TMPDIR` both with and without it.
+
+Pre-existing and unrelated to this phase, but worth fixing on sight: **a test that fails on a correct
+codebase is worse than no test.** It teaches people to ignore the suite — the same disease as a check that
+reports success over a real defect.
+
+Lockstep per AGENTS.md #5: `install.sh` changed, so `--help` and `utils/pdda/PDDA-INSTALL.md` changed in
+the same commit.
+
+Verification: `test/pdda-install-startup-docs.sh` **16 → 33 tests, all green**. `utils/pdda/pdda.sh run`
+→ `errors=0 warns=0`. The four negative controls are the load-bearing ones — an operator's own dead `.sh`
+ref goes unflagged, a bare filename that resolves is not a false positive, a plain install never runs the
+check, and a poisoned template still leaves the contract installed. Without them, a "fix" that fails every
+install, or one that aborts halfway, passes every positive test.
+
+Reversibility: **Easy** — one function, one flag variable, one exit branch.
+### Wrap: GH-12 and GH-15 reconciled — the first two units of work the new loop caught
+
+The wrap the tooling asked for. Both were flagged by `issue-doc-sync` the moment GH-27 P1–P3 landed, and
+both were verified against the code before anything was closed — `/pdda-eod`'s rule is *never close an
+issue because a doc looks done*.
+
+**GH-12 (Quad Concepts).** The doc claimed `Phases 1–4 complete … 42/42 + 6/6`. Re-verified: both
+subcommands present in the dispatcher, the `.pdda-quad` lever absent as designed (off by default), the
+LLM rubric wired, both documented in `ROUTER.md`, and the suites re-run — **42/42 and 6/6**. Doc moved
+`2-WORKING → 3-COMPLETED`, issue #12 closed. It had been done-but-open for two days, and it was the live
+evidence for GH-27's leak 2: `status: Active — … Ready to close` defeated the lead-word heuristic. The
+hand-off-phrase signal added in P1 is what now catches this class.
+
+**GH-15 (fresh-install governance noise).** Doc already sat in `3-COMPLETED` with issue #15 open —
+exactly the leak the new `3-COMPLETED` pass exists to catch. Re-verified: the exemption manifests ship,
+`test/pdda-governance-check.sh` is 13/13, and a real fresh install now reports **1** governance warn, not
+the 4 the doc claimed. Better than promised — GH-23 P1 removed the target router's dead refs in the
+interim. Issue #15 closed.
+
+Also corrected: `ROADMAP.md` had labelled issue #15 `(closed)` while GitHub said `OPEN`. That single
+false claim in the ledger is the human-facing symptom of the whole GH-27 bug — a doc asserting a
+reconciliation that never happened, with nothing checking it. The `3-COMPLETED` pass now checks it.
+
+Verification: `utils/pdda/pdda.sh run` → `errors=0 warns=0`, from `warns=2` before the wrap. Those two
+warns were true positives; they are gone because the work behind them got finished properly, not because
+anything was suppressed.
+
+### GH-27 P1–P3 shipped: the wrap loop now fires, and it asks
+
+Before: `pdda.sh run` reported `warns=0` and the `Stop` hook printed **"all clear"** while two issues sat
+done-but-open. After: both surface, and the hook names the wrap that asks.
+
+**P1 — scope and honesty.** The check scanned `PROJECT/2-WORKING` only. Direction (a) recommends
+`git mv … 3-COMPLETED/`; the moment the operator complies the doc leaves scope and its open issue is
+orphaned. The remediation the check recommends was what blinded it. It now scans `3-COMPLETED` too
+(`pdda_list_completed_docs()`, new in `pdda-lib.sh`): doc there + issue OPEN → `warn`, `recommend: gh
+issue close <n>`. Doc there + issue CLOSED is the reconciled end state → silent. And
+`state unavailable` is now a **`warn`, not `info`** — a check that could not run is not a check that
+passed.
+
+**Correction to the issue's own analysis.** It claimed the `3-COMPLETED` scan would "subsume leak 2."
+It does not, and the error only surfaced during implementation. GH-12's doc is in `2-WORKING`; scanning
+`3-COMPLETED` structurally cannot see it. Leak 2 is *prose says done, bucket says active*, and it needed
+its own signal: a short literal list of operator hand-off phrases (`ready to close`,
+`ready for 3-completed`, `awaiting close`) matched anywhere in `status:`. Deliberately not a general
+"does this prose mean done?" parse — that is the false-positive machine the lead-word anchor exists to
+avoid. A negative control (`Active — Phase 0 complete, Phase 1 in progress`) pins the boundary.
+
+**P2 — persistence, and the reason the loop never fired.** The `Stop` hook reads the gh-state cache with
+`PDDA_ISSUE_SYNC_SOURCE=cache` and makes no network call — correct design. But `.pdda-gh-state.tsv` never
+existed: `run` fetched live state on every invocation and **threw it away**, and the only writer was a
+manual `gh-refresh` nobody ran. A successful live lookup now writes the cache through a new shared
+`pdda_write_gh_state_cache()`, extracted from `pdda-gh-refresh.sh` so both writers share one definition
+of the format and the atomic temp-file + `mv`. One missing file had broken all three layers of a
+correctly-built system.
+
+**P3 — the ask.** A script can detect that a unit of work finished. It must never close the issue; that
+is a human judgment, and the house style is *recommend, never act*. So the hook does the one thing a
+script legitimately can — it names the wrap: *"a unit of work looks finished but is not wrapped — run
+`/pdda-eod`."* `SKILLS/PDDA-EOD/SKILL.md` is retargeted from the clock to the unit of work: the trigger
+is **completion, not the end of day**, which is the only moment "should this issue be closed?" is
+answerable. Its step 7 now takes close-candidates straight from the check's findings rather than
+re-deriving them, including the row for "the check could not run — do not read this as nothing to do."
+
+No new subsystem, no new vocabulary. `PROJECT/PDDA.md` already names the unit: `CHANGELOG.md` is updated
+*"at the end of each iteration."* Adding `wrap`/`postflight` on top would be two words for one concept.
+
+**Cut from scope, deliberately.** The plan proposed warning on `2-WORKING` docs carrying no `gh_issue:`.
+The existing suite asserted `(non-GH) untracked doc produces no findings`, and honoring the plan would
+have fired a warn on every untracked plan doc in every installed target on first run — the exact
+self-inflicted-noise failure GH-15 was filed to fix. Cut, and left as an opt-in lever. That test's
+existence is the point: it encoded a deliberate decision and stopped a change that looked obviously good
+on paper.
+
+Also fixed a latent bug in the test harness: `printf '----\n…'` makes bash read the leading `--` as an
+end-of-options marker, so the diagnostic dump only ever failed on the failure path — where it was needed.
+
+Lockstep per AGENTS.md #5: `issue-doc-sync`'s behavior changed, so `PROJECT/PDDA.md` §H and
+`utils/pdda/PDDA-INSTALL.md` changed in the same commit.
+
+Verification: `test/pdda-issue-doc-sync.sh` **14 → 33 tests, all green**. The twelve new assertions were
+run against `main`'s pre-fix `pdda.sh` and **all twelve fail there** — that is what proves they reproduce
+the leaks rather than restate the fix. The four negative controls **pass against pre-fix code too**,
+which is what proves they are guards. `test/pdda-doc-health-hooks.sh` 18 → 22. Every other suite green
+(governance 13, changelog 7, publish 17, quad 6, install-startup-docs 16, sentinel-run 26).
+
+`utils/pdda/pdda.sh run` → `errors=0 warns=2`. **Those two warns are the feature, not a regression:** the
+check correctly reporting that GH-12 and GH-15 finished and were never wrapped. Clearing them means
+closing #12 and #15 — a human judgment, so the tooling stops here and asks.
+
+### GH-27 captured: the doc/issue reconciliation loop exists, and stops watching at completion
+
+Intake only — no fix in this iteration. Filed
+[#27](https://github.com/Hypercart-Dev-Tools/pdda/issues/27), captured
+[PROJECT/1-INBOX/GH-27-ISSUE-DOC-RECONCILE.md](PROJECT/1-INBOX/GH-27-ISSUE-DOC-RECONCILE.md), parked it in
+[ROADMAP.md](ROADMAP.md).
+
+Prompted by the observation that PDDA/XYZ repos accumulate stale plans and issues that are done but never
+closed. The intuitive diagnosis — *a reconciliation loop is missing* — is wrong. `pdda.sh issue-doc-sync`
+already checks both directions, is warn-only, prints the exact `git mv` remediation, and degrades
+gracefully when `gh` is absent. The design is sound. **It reports `warns=0` on two live leaks in this very
+repo.**
+
+**Leak 1: following the check's own advice blinds it.** `check_issue_doc_sync` iterates
+`pdda_list_working_docs` — `PROJECT/2-WORKING` only. Direction (a) tells the operator
+`recommend: git mv … PROJECT/3-COMPLETED/`. The moment they comply, the doc leaves scope and its still-open
+issue is never mentioned again. `PROJECT/3-COMPLETED/GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md` sits there
+today while issue #15 is OPEN.
+
+**Leak 2: the status prose lies and the heuristic believes it.** GH-12's doc reads
+`status: Active — Phases 1–4 complete … Ready to close to 3-COMPLETED.` while issue #12 is OPEN. Direction
+(b) fires only on a terminal *lead word*; the lead word is `Active`. Every human reading that line knows
+the work is finished.
+
+Two further failure modes share the root. With no `gh` and no cache the check emits `info … sync not
+evaluated` — **an unevaluated check scored as a passing one**, which in `observe` mode surfaces as "all
+checks passed." That is the third instance this week of BUG-001b's shape (GH-14 Phase 2 is the first,
+GH-23's `.md`-only dead-ref scan the second). And `.pdda-gh-state.tsv` is never written: `run` uses live
+`gh` and discards what it fetched, so `gh-refresh` remains a manual command nobody runs and every offline
+run is permanently blind.
+
+The insight the fix rests on: **the lifecycle bucket is a deterministic signal; the status prose is not.**
+`3-COMPLETED/` *is* the operator's assertion that the work is done — recorded in a path, verifiable with
+`test -f`. Key off the bucket and the fragile lead-word heuristic becomes unnecessary rather than merely
+improved.
+
+Two warn-only phases, no new subsystem. Deliberately rejected as over-engineering: auto-closing issues
+(closing is a human judgment; PDDA's house style is *recommend, never act*), auto-`git mv`, webhooks, cron,
+bots, an LLM completeness judge, and adding `gh_issue` to `REQUIRED_KEYS` (it would break every non-issue
+doc in every installed target).
+
+`test/pdda-issue-doc-sync.sh` grows from 14 to 25 cases. Worth stating plainly: **that suite passed
+throughout both leaks.** It encoded the check's behavior rather than its purpose. Four of the eleven new
+cases are negative controls — a doc in `3-COMPLETED` whose issue is genuinely closed, a `2-WORKING` doc
+that is genuinely in progress, an explicit `issue_exempt: true`, and an exit-code guard — because without
+them a "fix" that warns on everything, or one that starts blocking builds, would pass every positive test.
+The two cases reproducing the live leaks are to be written first and watched to fail.
 
 ### GH-23 P1: stop shipping the canonical router into targets — and stop eating their AGENTS.md (#25)
 
@@ -185,6 +553,29 @@ costs most and is checked least.
 
 ## 2026-07-08
 
+### GH-17 + GH-18 fixed: the two follow-ups GH-15 surfaced, resolved in one pass
+
+Both were filed as separate GitHub issues after GH-15 verification surfaced them as side effects (see
+below), then fixed together on branch `fix/GH-17-GH-18` (PR open, not yet merged at time of writing).
+
+- **GH-17 — `PROJECT/PDDA.md` dead-referenced `RECAP.md`/`REAL-AGENT-OBSERVATIONS.md`.** Root cause
+  found: checked the sibling `xyz-3-agents-swarm` repo — this standalone `pdda` repo's runtime and
+  contract docs were originally extracted from it, and both files genuinely exist there as
+  Trinity-spike-specific artifacts (a session recap, a real-agent hand-test log). `git log -S"RECAP.md"
+  -- PROJECT/PDDA.md` confirms both mentions have been present since this repo's first commit — never
+  real files here, a copy-paste leftover from the origin repo's context rather than an intentional
+  claim about this repo. Resolved (not just exempted, per Guiding Principles #4) by genericizing the
+  three affected passages in the "CHANGELOG.md — end-of-iteration record" section to describe the
+  *concept* (a superseded narrative log; an optional local compliance-observations doc an adopting repo
+  may keep) without naming specific filenames PDDA itself doesn't require.
+- **GH-18 — `ROUTER.md` didn't document the `glance`/`quad-concepts` subcommands**, tripping
+  `pdda-check-governance`'s error-level subcommand-drift check on HQ. Both were added to `pdda.sh`'s
+  dispatcher in GH-12 but never made it into `ROUTER.md`'s Command rails list (`README.md` already had
+  them correctly). Fixed: added both to `ROUTER.md`, in `pdda.sh help`'s own subcommand order.
+
+**Verification:** `pdda.sh governance` on this branch: `errors=0 warns=0` (previously `errors=2 warns=4`
+on `main`). Full `pdda.sh run` clean. Both `PROJECT/1-INBOX/GH-17-*.md` / `GH-18-*.md` captures updated
+with resolution notes and moved to `PROJECT/3-COMPLETED/`.
 ### HQ governance cleared to zero: GH-17 + GH-18 fixed, three inactive docs archived
 
 `utils/pdda/pdda.sh run` on this repo went from **3 errors + 6 warns → 0 errors + 0 warns**. PDDA had

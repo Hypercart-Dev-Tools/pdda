@@ -295,6 +295,15 @@ Implementation note:
   review)
 - each finding still carries a stable `check` id (e.g. `pdda-check-frontmatter`) in stdout and the
   activity log, independent of how the check is invoked
+- **`run` reports what it found, not what it blocked on.** The mode gate forces every check's exit code
+  to `0` outside `full`, so the closing line has three outcomes, not two: *all checks passed* (nothing
+  found), *N error(s) found, not blocking in `<mode>` mode* (found, gate suppressed the failure), and
+  *failures:* (found and blocked). Warnings never move the run out of the first state — a `warn` is the
+  house-style advisory, and letting it read as failure would collapse the distinction. Inferring success
+  from the gated exit code was BUG-001b: `run` printed *all checks passed* over real errors in `observe`
+  and `light`, which are precisely the modes a new adopter starts in. The LLM readiness review is gated
+  on the same signal, so an error-laden repo never spends an LLM call. **The rule:** a check that could
+  not run — or could not block — must never be scored as a check that passed.
 
 ### 1. Deterministic hygiene checks
 
@@ -430,29 +439,48 @@ Expected exceptions:
 #### H. `pdda.sh issue-doc-sync`
 
 Purpose:
-- catch a `PROJECT/2-WORKING/GH-*.md` doc whose recorded state has drifted from its **GitHub issue**,
-  in either direction — the gap a 2026-06-29 manual reconciliation pass had to cross-reference by hand
+- catch a tracked plan doc whose recorded state has drifted from its **GitHub issue**, in either
+  direction — the gap a 2026-06-29 manual reconciliation pass had to cross-reference by hand
+
+Scope: **both** `PROJECT/2-WORKING/` (active plans) and `PROJECT/3-COMPLETED/` (finished plans). The
+completed bucket is not optional. Scanning `2-WORKING` alone means the check stops watching a doc at the
+exact moment it completes — so the `git mv` that drift (a) recommends is what blinds it, and the issue is
+orphaned forever (GH-27).
 
 Minimum behavior:
-- for each working doc, resolve its issue number from the `gh_issue` frontmatter key (preferred) or the
-  `GH-<number>-` filename; silently skip docs that carry neither (they are not issue-tracked)
-- resolve each issue's state from the best available source (see gh-degrade below), then flag two drifts:
+- for each doc in either bucket, resolve its issue number from the `gh_issue` frontmatter key (preferred)
+  or the `GH-<number>-` filename; silently skip docs that carry neither (they are not issue-tracked)
+- resolve each issue's state from the best available source (see gh-degrade below), then flag:
   - **(a)** issue **CLOSED** but the doc is still in `2-WORKING` -> `warn`, recommending the exact
     `git mv` to `PROJECT/3-COMPLETED` (flag-only; a human runs the one reversible move)
   - **(b)** issue **OPEN** but the doc's `status:` lead word declares it done (`complete`, `done`,
-    `shipped`, `fixed`, `closed`, `merged`, `resolved`, `landed`) -> `warn` to reconcile (close the
-    issue or correct the status). Anchoring on the status **lead word** means a mid-status mention like
-    `Active — Phase 0 complete` never false-flags.
+    `shipped`, `fixed`, `closed`, `merged`, `resolved`, `landed`) -> `warn` to reconcile. Anchoring on the
+    status **lead word** means a mid-status mention like `Active — Phase 0 complete` never false-flags.
+  - **(b2)** issue **OPEN** but the doc's `status:` carries an explicit hand-off phrase anywhere
+    (`ready to close`, `ready for 3-completed`, `awaiting close`) -> `warn`. Signal (b) alone is defeated
+    by a self-contradictory status such as `Active — Phases 1-4 complete … Ready to close to 3-COMPLETED`:
+    every human reads that as done; the lead word is `active`. The phrase list stays short and literal —
+    a general "does this prose mean done?" parse is the false-positive machine the lead-word anchor exists
+    to avoid.
+  - **(c)** doc is in `3-COMPLETED` but the issue is **OPEN** -> `warn`, recommending `gh issue close <n>`.
+    The lifecycle bucket is a deterministic signal; the status prose is not. `3-COMPLETED/` *is* the
+    operator's assertion that the work is done, recorded in a path and verifiable with `test -f`.
+    A doc in `3-COMPLETED` with a **CLOSED** issue is the fully reconciled end state: no finding.
 - `warn` (never `error` — does not block, even in `full`, mirroring `pdda.sh changelog`); **flag-only**,
-  never moves a file
+  never moves a file and never closes an issue
 - gh-degrade: with `PDDA_ISSUE_SYNC_SOURCE=auto` (default) it uses live `gh` when that succeeds, else a
-  cached state file (`PDDA_GH_STATE_CACHE`, written by `pdda-gh-refresh.sh`); when neither is available
-  it emits `info` (skip) for the affected doc and evaluates nothing. `gh`/`cache` force one source.
+  cached state file (`PDDA_GH_STATE_CACHE`). `gh`/`cache` force one source. **A successful live lookup
+  writes the cache** (best-effort, atomic), so the offline consumers — chiefly the `Stop` hook — have
+  last-known state without a network call. When neither source yields a state, the affected doc emits a
+  `warn` saying the sync was **NOT evaluated**: a check that could not run is not a check that passed.
 
 Why warn-only + flag-only:
 - every drift class here is mechanical, so the check carries zero false-judgment risk; a false flag is
   one ignorable warn line and a missed flag just leaves today's manual reconciliation — both cheap, so
   warn-only never-blocks is the right calibration (same stance as `pdda.sh stale` and `pdda.sh changelog`)
+- closing an issue is a **human judgment** about whether the work is genuinely done, so no script does it.
+  The `Stop` hook names the wrap (`/pdda-eod`) when this check reports reconciliation drift; the skill
+  proposes, the operator confirms. Detect deterministically, act only with a yes.
 
 #### I. `pdda.sh governance`
 
@@ -464,9 +492,9 @@ Purpose:
   or a contract doc and the shipped code silently disagreeing about what commands or env vars exist
 
 Minimum behavior (four checks, one shared `pdda-check-governance` id):
-- **dead references** (`warn`) — every backtick-wrapped filename ending in `.md`, and every markdown
-  link whose target ends in `.md`, found inside a governance doc must resolve to a real file, checked
-  against the repo root or (for `./`/`../` links) the referencing file's own directory. A bare filename
+- **dead references** (`warn`) — every filename ending in `.md` **or `.sh`** named inside a governance
+  doc must resolve to a real file, checked against the repo root or (for `./`/`../` links) the
+  referencing file's own directory. A bare filename
   with no directory component (e.g. `blank.md`,
   which legitimately exists once per lifecycle folder) additionally falls back to a repo-wide basename
   search before being called dead — only a name absent *everywhere* is flagged. A `GH-<n>-*.md` name is
@@ -474,6 +502,21 @@ Minimum behavior (four checks, one shared `pdda-check-governance` id):
   cross-references. `warn`, not `error`: prose extraction is inherently more heuristic than the
   mechanical checks above, so a false flag should cost one ignorable line, not a blocked build (same
   calibration as `pdda.sh stale`/`pdda.sh changelog`).
+  - **Three extraction patterns** (union, then deduplicated): the target of a markdown link; a code span
+    that contains nothing but the path; and **command-position paths** — a script token that opens a code
+    span or a scanned fence line. The third exists because a router's most load-bearing references are
+    the commands it tells an agent to run, and those carry arguments, so they close neither a link nor a
+    backtick span right after the suffix. A vendored harness script invoked with a `--help` flag inside a
+    code span, and a bare sync-tool invocation with its subcommand inside a scanned ` ```bash ` fence,
+    both name a real file and matched nothing before GH-23 P3. Command position — line start, or
+    immediately after a backtick — is where a shell command's *program* sits; a script name appearing
+    later in a sentence is prose, and is not extracted. That is what keeps a documented invocation such
+    as `pdda.sh run` from being read as two separate references. A leading `./` is stripped, because in
+    command position it means "from the repo root I am standing in", not "relative to this doc".
+  - **Suffix widening was not free.** `.sh` references are the ones that differ most between the canonical
+    repo and a target, so the exemption manifest below had to grow with them — a fresh install went from
+    0 to 46 self-inflicted warns before it did. A ref to a script that exists only on the operator's
+    `PATH` (never in the repo) is a known, accepted false positive; it costs one advisory warn.
   - **GH-15 shipped-doc exemption manifest:** `utils/pdda/PDDA-INSTALL.md` and `PROJECT/PDDA.md` ship
     to every target install (`PDDA_GOV_SHIPPED_DOCS_DEFAULT`) but legitimately reference files
     `install.sh` deliberately does not copy there — the target's own repo-authored startup docs
@@ -488,6 +531,20 @@ Minimum behavior (four checks, one shared `pdda-check-governance` id):
     referencing one of these is still a real dead-reference bug and is never exempted. The manifest was
     built from an actual dead-reference scan of a bare `install.sh` target, not retyped from an issue's
     illustrative list — re-run that scan if the shipped-doc set or its prose changes materially.
+    **GH-17 (resolved separately from this manifest):** this file's own "CHANGELOG.md" section used to
+    dead-reference two specific filenames (a retired recap note, a compliance-observations file) that
+    turned out to be artifacts of the repo this contract doc was originally adapted from, never real
+    files in this standalone PDDA repo. Naming them here was a copy-paste leftover, not a real PDDA
+    requirement — genericized below rather than exempted, since a name that's dead *everywhere* is a
+    real accuracy bug (Principle #4), not an install-boundary false positive like the manifest above.
+  - **GH-23 P3 additions to the same manifest**, each read off a real scan of a bare
+    `--with-startup-docs` target (46 warns before, 0 after), in three groups:
+    canonical-only **tools** a target never receives (the installer itself; the sync engine, which
+    `pdda-sync-manifest.conf` excludes because targets are leaf nodes; `templates/`; `test/`);
+    **legacy flat-layout paths** (`utils/pdda.sh`, `utils/pdda-lib.sh`, …) that the install manifest names
+    *precisely because they must not exist* — it documents the layout `install.sh` migrates away from,
+    and their `.md` sibling was already exempt for this reason; and `config.sh`, which belongs to
+    git-pulse, a separate program.
     **Known separate issue, not covered by this manifest:** this file's own CHANGELOG section
     dead-references the retired RECAP note-file and the REAL-AGENT-OBSERVATIONS compliance-findings
     file (see the "CHANGELOG.md" section below), neither of which exist anywhere in this repo, not
@@ -666,6 +723,10 @@ How this is enforced (so it cannot quietly rot in either direction):
 ## CHANGELOG.md — end-of-iteration record (first-class)
 
 `CHANGELOG.md` is a first-class PDDA artifact: the canonical, newest-first running log of what changed,
+updated **at the end of each iteration**. It is the one narrative/provenance log this contract
+prescribes — if an adopting repo kept its own ad hoc recap or run-observation notes before adopting
+PDDA, `CHANGELOG.md` supersedes them; PDDA does not require or name any such file itself (Principle #4 —
+one canonical place per fact). Durable Costly / one-way-door bets still earn a `decisions/` record.
 updated **at the end of each iteration**. It supersedes the retired RECAP convention as the running
 provenance/narrative log, and it also absorbs the run-specific compliance findings the retired
 REAL-AGENT-OBSERVATIONS convention used to collect. Durable Costly / one-way-door bets still earn a
@@ -686,6 +747,8 @@ Maintained append-only:
 
 - add a new dated entry per iteration; **never rewrite a past entry's numbers, claims, or
   recommendation** — *especially* not when it turned out wrong. Correct a past entry by appending a
+  dated correction, not by editing history. This append-only guarantee is the whole point of having one
+  canonical narrative log instead of scattered ad hoc notes.
   dated correction, not by editing history. This is the provenance guarantee the retired RECAP
   convention used to carry.
 
@@ -694,6 +757,10 @@ Recording a bet (when a change is consequential):
 - when a decision is Costly, a one-way door, or rides on an assumption that could be wrong, the entry
   records the call, the bet/assumption, the expected signal with a by-when, the reversibility read, a
   revisit trigger, and a graduate / iterate / abandon recommendation. Below that threshold a plain
+  entry suffices. Durable bets also earn a `decisions/` record. An adopting repo is free to keep its own
+  separate run-specific compliance-observations doc if that's useful to it, but that's a local
+  convention this contract neither requires nor names. (`AGENTS.md` principle #7 supplies the
+  behavioral trigger — *record the bet*; this contract owns the *where and how*.)
   entry suffices. Durable bets also earn a `decisions/` record; run-specific compliance findings go in
   the iteration's own `CHANGELOG.md` entry. (`AGENTS.md` principle #7 supplies the behavioral trigger —
   *record the bet*; this contract owns the *where and how*, so governance is not fragmented across the

@@ -1,12 +1,31 @@
 ---
 name: pdda-eod
-description: Run an end-of-day PDDA wrap for this repo. Use when the operator wants a read-only end-of-day report, help reconciling PROJECT docs with ROADMAP.md and CHANGELOG.md, a clean pushed git tree, or user-verified closing of 100%-done GitHub issues. Delegate deterministic checks to utils/pdda/pdda.sh, keep every mutation propose-then-confirm, and degrade cleanly when gh/auth is unavailable.
+description: Run a PDDA iteration wrap for this repo. Use at the end of any unit of work — a task, a phase, a project doc, a marathon, or a day — and especially when `pdda.sh issue-doc-sync` reports reconciliation drift (a doc in 3-COMPLETED whose issue is still open, or a doc that declares itself ready to close). Also use when the operator wants a read-only status report, help reconciling PROJECT docs with ROADMAP.md and CHANGELOG.md, a clean pushed git tree, or user-verified closing of 100%-done GitHub issues. Delegate deterministic checks to utils/pdda/pdda.sh, keep every mutation propose-then-confirm, and degrade cleanly when gh/auth is unavailable.
 ---
 
-# /pdda-eod — end-of-day wrap for this repo
+# /pdda-eod — the iteration wrap for this repo
 
-Use this skill to close out a work session in the PDDA source-of-truth repo. It is a sequenced
+Use this skill to close out a **unit of work** in the PDDA source-of-truth repo. It is a sequenced
 operator workflow, not a free-form brainstorm.
+
+## When this fires
+
+The name says "EOD", but the trigger is **completion, not the clock**. `PROJECT/PDDA.md` already names
+the unit: `CHANGELOG.md` is updated *"at the end of each iteration."* An iteration ends when a task, a
+phase, a project doc, or a marathon finishes — which is the only moment the question *"should this issue
+be closed?"* is actually answerable. Waiting for the end of the day just means asking it late.
+
+Run this when any of these is true:
+
+- The `Stop` hook reported doc/issue reconciliation drift and pointed you here.
+- `utils/pdda/pdda.sh issue-doc-sync` warns that a doc is in `PROJECT/3-COMPLETED/` while its issue is
+  still OPEN, or that a doc's status declares it is ready to close.
+- A phase, milestone, or marathon lane just finished its last gate.
+- The operator asks for an end-of-day wrap.
+
+A deterministic script can *detect* that a unit of work has finished. It must never close the issue —
+that is a human judgment, and PDDA's house style is **recommend, never act**. This skill is the layer
+that asks.
 
 The source of truth for the design is the GH-6 plan doc — `PROJECT/2-WORKING/GH-6-PDDA-EOD.md` while
 in flight, or `PROJECT/3-COMPLETED/GH-6-PDDA-EOD.md` once shipped. Keep this skill lean; do not turn it
@@ -97,6 +116,21 @@ into a second plan doc.
 
    After the push succeeds, present candidate issues that appear 100% done. Close only the ones the
    user explicitly verifies. Cite the pushed commit/PR and the owning doc in the closing comment.
+
+   **Take the candidates from `issue-doc-sync`, do not re-derive them.** The check already answers this
+   deterministically, in both directions:
+
+   | Finding | Meaning | Proposal |
+   |---|---|---|
+   | `doc is in 3-COMPLETED but issue #N is still OPEN` | the operator already asserted the work is done, by moving the file | close #N |
+   | `doc status declares it is ready to close but issue #N is still OPEN` | the doc says done, the bucket says active | `git mv` to `3-COMPLETED`, then close #N |
+   | `issue #N is CLOSED but the doc is still in 2-WORKING` | GitHub says done, the tree does not | `git mv` to `3-COMPLETED` |
+   | `issue #N state unavailable … sync NOT evaluated` | **the check could not run** | run `utils/pdda/pdda.sh gh-refresh`, then re-check. Do not treat this as "nothing to do." |
+
+   That last row matters. An unevaluated check is not a passing check. If `gh` is unavailable, say which
+   issues went unreconciled rather than reporting a clean wrap.
+
+   Never close an issue because a doc *looks* done. Cite the evidence, name the finding, ask.
 
 ## Operating stance
 
