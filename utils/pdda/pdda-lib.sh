@@ -476,8 +476,10 @@ pdda_list_release_active_docs() {
   while IFS= read -r file; do
     status_raw="$(pdda_trim "$(pdda_frontmatter_value "$file" "status")")"
     status_lc="$(printf '%s' "$status_raw" | tr '[:upper:]' '[:lower:]')"
+    # Exact canonical-token match (Draft|RC per PROJECT/PDDA.md). A loose `*rc*` substring would also
+    # match words like "archived" and force a spurious ROADMAP pointer on a non-active doc.
     case "$status_lc" in
-      *draft*|*rc*|*release\ candidate*) printf '%s\n' "$file" ;;
+      draft|rc|"release candidate") printf '%s\n' "$file" ;;
     esac
   done < <(find "$dir" -type f -name 'RELEASE-*.md' ! -name 'blank.md' 2>/dev/null | LC_ALL=C sort)
 }

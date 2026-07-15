@@ -596,15 +596,21 @@ Minimum behavior:
   gh-degrade stack used by `issue-doc-sync`; `error` if any listed issue is still OPEN
 - **changelog check**: `warn` if `CHANGELOG.md` contains no line matching the release `tag` value
 - **gh_release_url check**: `warn` if `gh_release_url` is empty (release not yet published to GitHub)
-- **release cache check**: if `PDDA_GH_RELEASE_CACHE` exists, `warn` if the release tag is not in
-  the cache (release published in the doc but not reflected in the synced cache)
+- **release cache check** (cache-only cross-check): `warn` if the release tag is not present in
+  `PDDA_GH_RELEASE_CACHE` (release recorded in the doc but not reflected in the synced cache); if the
+  cache is absent/empty, `warn` that the cross-check was **NOT evaluated** (never a silent pass) —
+  prime it with `pdda.sh gh-release-sync`
 - error-level findings block in `full` mode; `observe`/`light` modes report only (warn-only there,
   same as all new checks entering the suite)
 - like `issue-doc-sync`: flag-only, never creates or publishes a GitHub Release automatically
 
-gh-degrade: same degrade stack as `issue-doc-sync` — live `gh` when available, else
-`PDDA_GH_RELEASE_CACHE` (written by `pdda.sh gh-release-sync`). A successful live lookup writes the
-cache. When neither yields state, emits a `warn` that the check was **NOT evaluated**.
+gh-degrade: two distinct paths.
+- **issue check** uses the full `issue-doc-sync` degrade stack — live `gh` when available, else the
+  cached issue state (`PDDA_GH_STATE_CACHE`); a successful live lookup writes that cache; when neither
+  yields state, it emits a `warn` that the issue was **NOT evaluated**.
+- **release-tag cross-check** is **cache-only** — it reads `PDDA_GH_RELEASE_CACHE`
+  (written by `pdda.sh gh-release-sync`) and never self-fetches. An absent/empty cache produces a
+  **NOT evaluated** `warn` rather than a silent pass.
 
 #### `pdda.sh gh-release-sync`
 
@@ -613,8 +619,9 @@ Purpose:
   `.pdda-gh-release-state.tsv`) so `release-readiness` has last-known data when `gh` is offline
 
 Behavior:
-- calls `gh release list --limit 100 --json tagName,isDraft,isPrerelease,publishedAt` for the
-  current repo, writes a TSV: `tag ⇥ state ⇥ published_at`
+- calls `gh release list --limit 100 --json tagName` for the current repo, writes one release tag
+  per line (comment-prefixed header + one `tagName` per line; tags carry no whitespace, so no TSV
+  columns are needed)
 - atomic write (temp file + `mv`) so a partial network failure never corrupts the cache
 - run on the same cadence as `gh-refresh` (suggested: hourly, before `pdda.sh run`)
 - `PDDA_GH_RELEASE_CACHE` env var overrides the cache path (same pattern as `PDDA_GH_STATE_CACHE`)

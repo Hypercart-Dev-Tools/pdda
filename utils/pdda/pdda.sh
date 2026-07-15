@@ -689,7 +689,8 @@ check_release_readiness() {
   local issue_table
   issue_table="$(_pdda_issue_state_table)"
 
-  # Load the release tag cache for optional cross-check (5); warn-only and cache-only — never fetch.
+  # Load the release tag cache for the cross-check (5); warn-only and cache-only — never fetch
+  # (an absent cache is surfaced as NOT evaluated in the check, not treated as a pass).
   local release_tags=""
   if [ -f "$PDDA_GH_RELEASE_CACHE" ]; then
     release_tags="$(grep -v '^[[:space:]]*#' "$PDDA_GH_RELEASE_CACHE" 2>/dev/null || true)"
@@ -700,9 +701,11 @@ check_release_readiness() {
 
     status_raw="$(pdda_trim "$(pdda_frontmatter_value "$file" "status")")"
     status_lc="$(printf '%s' "$status_raw" | tr '[:upper:]' '[:lower:]')"
-    # Only validate RC docs — Draft docs are checked by roadmap-coverage only.
+    # Only validate RC docs — Draft docs are checked by roadmap-coverage only. Match the canonical
+    # status token exactly (Draft|RC|Published per PROJECT/PDDA.md); a loose `*rc*` substring would
+    # also catch words like "archived" (a-rc-hived) and misclassify them as RC.
     case "$status_lc" in
-      *rc*|*release\ candidate*) ;;
+      rc|"release candidate") ;;
       *) continue ;;
     esac
 
@@ -776,9 +779,15 @@ check_release_readiness() {
         "create-github-release"
     fi
 
-    # (5) If the release tag cache is available, cross-check that the tag exists on GitHub.
-    if [ -n "$tag" ] && [ -n "$release_tags" ]; then
-      if ! printf '%s\n' "$release_tags" | grep -Fxq "$tag"; then
+    # (5) Cache-only cross-check that the tag exists on GitHub. This never self-fetches; an absent
+    #     or empty cache is reported as NOT evaluated, not a silent pass (same discipline as the
+    #     issue check above and the offline "NOT evaluated" contract in issue-doc-sync).
+    if [ -n "$tag" ]; then
+      if [ -z "$release_tags" ]; then
+        pdda_record_finding warn "$CHECK_NAME" "$file" 1 \
+          "release-tag cross-check NOT evaluated — no gh-release cache; run: utils/pdda/pdda.sh gh-release-sync" \
+          "refresh-release-cache"
+      elif ! printf '%s\n' "$release_tags" | grep -Fxq "$tag"; then
         pdda_record_finding warn "$CHECK_NAME" "$file" 1 \
           "tag '$tag' not found in the gh-release cache — run: utils/pdda/pdda.sh gh-release-sync to refresh" \
           "refresh-release-cache"
