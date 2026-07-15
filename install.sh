@@ -84,11 +84,12 @@ Options:
   -h, --help             This message.
 
 What gets installed (zero state):
-  utils/pdda/{pdda.sh,pdda-lib.sh,pdda-doc-ready.sh,pdda-catchup.sh,pdda-gh-refresh.sh}   (runtime, refreshed)
+  utils/pdda/{pdda.sh,pdda-lib.sh,pdda-doc-ready.sh,pdda-catchup.sh,pdda-gh-refresh.sh,pdda-gh-release-sync.sh}   (runtime, refreshed)
   PROJECT/PDDA.md                                            (the contract, refreshed)
   PROJECT/{1-INBOX,2-WORKING,3-COMPLETED,4-MISC}/blank.md    (lifecycle buckets)
+  PROJECT/releases/blank.md                                  (release lifecycle bucket)
   ROADMAP.md CHANGELOG.md PROJECT/PDDA-ACTIVITY.jsonl .pdda-mode .pdda-quad   (blank seeds, create-only)
-  .gitignore += PROJECT/PDDA-ACTIVITY.jsonl .pdda-gh-state.tsv     (churning runtime state)
+  .gitignore += PROJECT/PDDA-ACTIVITY.jsonl .pdda-gh-state.tsv .pdda-gh-release-state.tsv  (churning runtime state)
 
 It also records the install in a per-user, machine-local registry (~/.config/pdda/registry.tsv) so
 pdda-sync.sh knows where every copy lives. The registry is never committed. --no-register skips it.
@@ -430,7 +431,7 @@ seed_file() {  # <relpath>  (content on stdin)
 # pre-gitignore install already committed (a no-op for entries that were never tracked).
 ensure_runtime_ignored() {
   local gi="$TARGET/.gitignore" entry
-  for entry in "PROJECT/PDDA-ACTIVITY.jsonl" ".pdda-gh-state.tsv"; do
+  for entry in "PROJECT/PDDA-ACTIVITY.jsonl" ".pdda-gh-state.tsv" ".pdda-gh-release-state.tsv"; do
     if [ -f "$gi" ] && grep -qxF "$entry" "$gi"; then
       say "  keep      .gitignore ($entry already ignored)"
     else
@@ -617,6 +618,10 @@ for bucket in 1-INBOX 2-WORKING 3-COMPLETED 4-MISC; do
 <!-- placeholder so this lifecycle bucket exists in version control; PDDA checks ignore blank.md -->
 BLANK
 done
+# Release bucket — a cross-cutting shipping artifact outside the 1-4 lifecycle tree.
+seed_file "PROJECT/releases/blank.md" <<'BLANK'
+<!-- placeholder so this lifecycle bucket exists in version control; PDDA checks ignore blank.md -->
+BLANK
 
 say ""
 say "Zero-state seeds:"

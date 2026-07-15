@@ -114,6 +114,7 @@ utils/pdda/pdda.sh
 utils/pdda/pdda-doc-ready.sh
 utils/pdda/pdda-catchup.sh
 utils/pdda/pdda-gh-refresh.sh
+utils/pdda/pdda-gh-release-sync.sh
 utils/pdda/pdda-edit-doc-hook.sh
 utils/pdda/pdda-stop-doc-health.sh
 ```
@@ -128,6 +129,9 @@ cached GitHub issue-state file that `pdda.sh issue-doc-sync` reads when `gh` is 
 also written automatically by any successful live lookup (every online `pdda.sh run`), so the offline
 consumers — chiefly the `Stop` hook — have last-known state without anyone remembering to run
 `gh-refresh`. Explicit `gh-refresh` remains useful to prime the cache before going offline.
+`utils/pdda/pdda-gh-release-sync.sh` (`pdda.sh gh-release-sync`) refreshes the cached GitHub
+release-state file that `pdda.sh release-readiness` reads when `gh` is offline (same degrade pattern
+as issue state). Run it on the same hourly cadence as `gh-refresh`, before the deterministic suite.
 `utils/pdda/pdda-edit-doc-hook.sh` (tier 1, a `PostToolUse` single-file lint) and
 `utils/pdda/pdda-stop-doc-health.sh` (tier 2, a `Stop` consolidated full-scan) are the optional
 doc-health hooks — installs receive the scripts but **opt in by wiring them in their own
@@ -144,6 +148,7 @@ PROJECT/1-INBOX/
 PROJECT/2-WORKING/
 PROJECT/3-COMPLETED/
 PROJECT/4-MISC/
+PROJECT/releases/
 utils/pdda/
 ROADMAP.md
 CHANGELOG.md
@@ -170,10 +175,10 @@ Create a fresh empty file instead.
 2. Copy the canonical install-set files verbatim to the same relative paths in the target repo. -> expect `PROJECT/PDDA.md` and all shipped `utils/pdda-*.sh` files to exist.
 3. Create baseline `ROADMAP.md` and `CHANGELOG.md` files if the target repo does not already have them. -> expect the roadmap contract to have a file to guard and the changelog check to warn less.
 4. Create an empty `PROJECT/PDDA-ACTIVITY.jsonl` if it does not exist. -> expect a zero- or low-byte log file, not this repo's historical log.
-4a. Add `PROJECT/PDDA-ACTIVITY.jsonl` to the target's `.gitignore` (and `git rm --cached` it if already tracked). -> expect the churning runtime log to stop dirtying `git status` on every run.
+4a. Add `PROJECT/PDDA-ACTIVITY.jsonl`, `.pdda-gh-state.tsv`, and `.pdda-gh-release-state.tsv` to the target's `.gitignore` (and `git rm --cached` any that are already tracked). -> expect the churning runtime state to stop dirtying `git status` on every run.
 4b. Record the install in the per-user, machine-local registry `${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv` (one tab-delimited row per target: `target · last_install_utc · mode · source_commit · startup_docs`; latest install wins). -> expect `pdda-sync.sh` to read this to find copies that are behind. Machine-local, never committed; `--no-register` or `PDDA_REGISTRY` adjust it.
 4c. If git-pulse (a separate, GitHub-backed activity-sync tool) is present, also write a path-normalized projection of the registry into `<git-pulse-repo>/pdda/registry-<device>.tsv` (col 1 reduced to the bare repo name; **no absolute paths**), letting git-pulse's own sync roll PDDA install status up across devices. -> expect this to be best-effort and fail-open: absent git-pulse it is silently skipped and the install is unaffected. The local registry stays the source of truth. The git-pulse checkout is auto-detected: explicit `PDDA_GITPULSE_DIR` wins, else git-pulse's own `config.sh` `sync_repo_dir`, else the first existing of `${XDG_CONFIG_HOME:-$HOME/.config}/git-pulse/repo` or `~/git-pulse-sync`; set `PDDA_GITPULSE_DIR` to a nonexistent path to disable, and `--no-register` skips it too. **Hazard (GH-28):** if a machine has more than one git-pulse checkout on disk, `sync_repo_dir` always wins over the `~/git-pulse-sync` fallback — check which one is actually current with `origin` before assuming the projection reached your other devices. -> expect a follow-up warning (`warn: git-pulse checkout … is N commit(s) behind` / `… is uncommitted`) printed right after this step whenever the resolved checkout is dirty or behind its own upstream as of its last fetch (no network call is made here); the write to disk still always succeeds regardless.
-5. Make the shell scripts executable. -> expect `chmod +x utils/pdda/pdda.sh utils/pdda/pdda-doc-ready.sh utils/pdda/pdda-lib.sh utils/pdda/pdda-catchup.sh utils/pdda/pdda-gh-refresh.sh utils/pdda/pdda-edit-doc-hook.sh utils/pdda/pdda-stop-doc-health.sh` to succeed.
+5. Make the shell scripts executable. -> expect `chmod +x utils/pdda/pdda.sh utils/pdda/pdda-doc-ready.sh utils/pdda/pdda-lib.sh utils/pdda/pdda-catchup.sh utils/pdda/pdda-gh-refresh.sh utils/pdda/pdda-gh-release-sync.sh utils/pdda/pdda-edit-doc-hook.sh utils/pdda/pdda-stop-doc-health.sh` to succeed.
 6. Optionally create a repo-root `.pdda-mode` file with `observe` for first install. -> expect a non-destructive first run.
 7. If the target repo uses a different doc layout, set environment overrides instead of editing the scripts first. -> expect the checks to honor the env vars below.
 8. Run `utils/pdda/pdda.sh run` in the target repo. -> expect report-only behavior in `observe` mode and an append to `PROJECT/PDDA-ACTIVITY.jsonl`.
@@ -189,8 +194,10 @@ PDDA_MODE
 PDDA_WORKING_DIR
 PDDA_COMPLETED_DIR
 PDDA_MISC_DIR
+PDDA_RELEASES_DIR
 PDDA_ACTIVITY_LOG
 PDDA_GH_STATE_CACHE
+PDDA_GH_RELEASE_CACHE
 PDDA_ROADMAP
 PDDA_STALE_DAYS
 PDDA_ISSUE_SYNC_SOURCE
