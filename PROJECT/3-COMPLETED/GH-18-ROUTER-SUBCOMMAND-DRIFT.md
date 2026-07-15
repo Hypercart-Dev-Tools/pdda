@@ -3,11 +3,24 @@ gh_issue: 18
 source: https://github.com/Hypercart-Dev-Tools/pdda/issues/18
 title: "ROUTER.md doesn't document the glance and quad-concepts pdda.sh subcommands (governance error)"
 status: Fixed (pending PR merge)
+status: Completed — both subcommands documented; governance subcommand-drift errors cleared
 created: 2026-07-08
+updated: 2026-07-08
+owner: noel
 doc_type: bugfix
 context_tags: [governance, install, quad-concepts]
 related: [ROUTER.md, GH-12-QUAD-CONCEPTS-MODE.md, GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md]
+goal: >
+  Restore AGENTS.md #5 installer-surface lockstep by documenting the `glance` and `quad-concepts`
+  subcommands — both added to the `pdda.sh` dispatcher by GH-12 — in ROUTER.md's Command rails list,
+  clearing the two error-level `pdda-check-governance` findings on HQ.
 ---
+
+## Status
+
+| What was just completed | What's next |
+|---|---|
+| Added `pdda.sh quad-concepts` and `pdda.sh glance` to `ROUTER.md`'s Command rails list, with inline blurbs copied from `pdda.sh help` so the two surfaces read identically. Verified: `pdda.sh governance` subcommand-drift errors went 2 → 0. | Nothing. Close issue #18. |
 
 ## Problem
 
@@ -45,3 +58,22 @@ lists them (`quad-concepts` after `status-table`, `glance` right after that) —
 
 **Verified:** `pdda.sh governance` now reports `errors=0 warns=0` (previously `errors=2`). Full `pdda.sh
 run` clean. Shipped together with GH-17 on branch `fix/GH-17-GH-18`; PR open, not yet merged.
+Applied as specified. Two lines added to `ROUTER.md`'s Command rails block, positioned after `stale`
+and before `issue-doc-sync`, with blurbs lifted verbatim from `pdda.sh help` so the two surfaces cannot
+drift apart on wording:
+
+```
+utils/pdda/pdda.sh quad-concepts    # opt-in: a "## Quad Concepts" section of 1-4 bullets (lever: .pdda-quad / PDDA_QUAD)
+utils/pdda/pdda.sh glance           # read-only roll-up: title + Quad Concepts for each PROJECT/2-WORKING doc
+```
+
+**Verified:** `utils/pdda/pdda.sh governance` → subcommand-drift `errors=2` before, `errors=0` after.
+
+## Lessons Learned (For Future Agents)
+
+- The subcommand-drift check reads `ROUTER.md` for *any* mention of the subcommand name, not a
+  specific format. It caught this because GH-12 shipped dispatcher entries and `help` text but stopped
+  short of `ROUTER.md` — the one surface an agent reads first. **Adding a `pdda.sh` subcommand is a
+  three-file change (dispatcher + `help` + `ROUTER.md`), not two.**
+- Copying the blurb from `pdda.sh help` verbatim, rather than paraphrasing, means a future wording
+  change in one place is a visible diff in the other.

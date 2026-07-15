@@ -53,15 +53,11 @@ For targeted PDDA debugging, run a single check by name:
 ```bash
 utils/pdda/pdda.sh frontmatter
 utils/pdda/pdda.sh status-table
-utils/pdda/pdda.sh quad-concepts  # opt-in "## Quad Concepts" shape check (lever: .pdda-quad / PDDA_QUAD)
-utils/pdda/pdda.sh glance      # read-only roll-up: title + Quad Concepts across PROJECT/2-WORKING
 utils/pdda/pdda.sh hardcoded-paths
 utils/pdda/pdda.sh roadmap
 utils/pdda/pdda.sh roadmap-coverage
 utils/pdda/pdda.sh changelog
 utils/pdda/pdda.sh stale
-utils/pdda/pdda.sh quad-concepts    # opt-in: a "## Quad Concepts" section of 1-4 bullets (lever: .pdda-quad / PDDA_QUAD)
-utils/pdda/pdda.sh glance           # read-only roll-up: title + Quad Concepts for each PROJECT/2-WORKING doc
 utils/pdda/pdda.sh issue-doc-sync   # flag GH-*.md docs drifted from their GitHub issue state (warn-only; gh-degrades to cache)
 utils/pdda/pdda.sh governance  # governance-doc cross-reference + doc/code drift (this file, AGENTS.md, CLAUDE.md, ...)
 utils/pdda/pdda.sh gh-refresh  # refresh the cached GitHub issue-state file issue-doc-sync reads offline (needs gh)
@@ -70,7 +66,7 @@ utils/pdda/pdda.sh catchup     # LLM repo triage and ROUTER.md recommendations �
 utils/pdda/pdda.sh help        # list every command
 ```
 
-To distribute this runtime from this clone (the canonical repo) to other registered repos:
+To distribute this runtime from this clone (HQ) to other registered repos:
 
 ```bash
 utils/pdda/pdda-sync.sh register --yes /path/to/repo   # enroll + initial install
@@ -82,17 +78,10 @@ utils/pdda/pdda-sync.sh status                          # read-only drift report
 
 - If the task is about installing PDDA into another repo, run `install.sh <target>`; for the
   underlying spec or a by-hand/adapted install, start in `utils/pdda/PDDA-INSTALL.md`.
-- If the task is about keeping PDDA current across *several* repos from this one (canonical → targets:
+- If the task is about keeping PDDA current across *several* repos from this one (HQ → targets:
   register / push / status / optional launchd schedule), use `utils/pdda/pdda-sync.sh` — design and
   rationale in `PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md`, usage in `utils/pdda/PDDA-INSTALL.md`.
 - If the task is about document quality, active-doc lifecycle, roadmap sprawl, or automation policy, start in `PROJECT/PDDA.md`.
 - If the task is about repo-local maintenance state, start in `ROADMAP.md`.
 - If the task is about the changelog, provenance, or end-of-iteration logging, the governance is in `PROJECT/PDDA.md` (the "CHANGELOG.md — end-of-iteration record" contract).
-- If the task involves a Marathon or the wider XYZ harness (Consult/Relay/Swarm/Marathon), do not
-  re-derive the format here — it's owned upstream, not by PDDA. Canonical docs live in the
-  [xyz-3-agents-swarm](https://github.com/Claude-AI-Tools-Ventura-County/xyz-3-agents-swarm)
-  README's "Marathon" section, and the harness tooling ships with that repo, not this one. PDDA only
-  supplies the `PROJECT/2-WORKING` doc conventions XYZ reads. Some clones vendor the harness into an
-  untracked, gitignored sibling directory; because it is untracked, this repo cannot promise it is
-  there, so nothing here routes you to a path inside it.
 - To re-run this startup sequence mid-session (task switch, resume, post-compact, context drift), invoke the `/pdda` skill (`.claude/skills/pdda/SKILL.md`) instead of re-reading by hand.

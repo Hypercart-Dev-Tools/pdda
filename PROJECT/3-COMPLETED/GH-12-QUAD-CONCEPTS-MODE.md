@@ -1,8 +1,8 @@
 ---
 title: Quad Concepts mode — an opt-in ≤4 pain→fix glance layer atop plan docs
-status: Active — Phases 1–4 complete + final consult passed (no blockers; polish applied); 42/42 + 6/6. Ready to close to 3-COMPLETED.
+status: Completed — all 4 phases shipped + consult-passed; 42/42 + 6/6 re-verified 2026-07-09; issue #12 closed
 created: 2026-07-07
-updated: 2026-07-07
+updated: 2026-07-09
 owner: noel
 gh_issue: 12
 source: https://github.com/Hypercart-Dev-Tools/pdda/issues/12

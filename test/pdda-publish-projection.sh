@@ -16,7 +16,11 @@ fail() { FAIL=$((FAIL + 1)); printf 'FAIL - %s\n' "$1"; }
 assert_contains() { case "$1" in *"$2"*) pass "$3" ;; *) fail "$3 (missing: $2)"; printf '----\n%s\n----\n' "$1" ;; esac; }
 assert_absent()   { case "$1" in *"$2"*) fail "$3 (unexpected: $2)"; printf '----\n%s\n----\n' "$1" ;; *) pass "$3" ;; esac; }
 
-SBOX="$(mktemp -d "${TMPDIR:-/tmp}/pdda-publish.XXXXXX")"
+# Normalize the sandbox path. macOS sets TMPDIR with a trailing slash, so `mktemp -d "$TMPDIR/x.XXXX"`
+# yields `/…/T//x.abc123` — while install.sh normalizes its target via `cd && pwd` to a single slash.
+# The registry then holds the normalized path and every assertion on the raw `$SBOX/...` string misses.
+# Pre-existing; invisible in CI and in sandboxes that set TMPDIR without the trailing slash.
+SBOX="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/pdda-publish.XXXXXX")" && pwd)"
 cleanup() { [ -n "$SBOX" ] && { chmod -R u+w "$SBOX" 2>/dev/null; rm -rf "$SBOX"; }; }
 trap cleanup EXIT
 

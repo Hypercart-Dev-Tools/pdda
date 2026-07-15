@@ -506,7 +506,12 @@ _pdda_issue_state_table() {
     cache) _pdda_cache_state_table ;;
     gh)    _pdda_gh_state_table ;;
     auto|*)
-      if command -v gh >/dev/null 2>&1 && out="$(_pdda_gh_state_table)"; then
+      if command -v gh >/dev/null 2>&1 && out="$(_pdda_gh_state_table)" && [ -n "$out" ]; then
+        # Persist what we just fetched (GH-27). The Stop hook reads this file with
+        # PDDA_ISSUE_SYNC_SOURCE=cache and makes no network call; with no writer on this path the cache
+        # never existed, so the hook reported "all clear" over real drift. Best-effort: a failed cache
+        # write must never break a lookup that already has its answer.
+        pdda_write_gh_state_cache "$out" || :
         printf '%s' "$out"
       else
         _pdda_cache_state_table
@@ -543,20 +548,41 @@ _pdda_is_terminal_word() {
   return 1
 }
 
+# Explicit hand-off phrases anywhere in a status line. The lead-word test above is deliberately narrow
+# (so "Phase 0 complete" mid-sentence never false-flags), but it is defeated by a self-contradictory
+# status such as `Active — Phases 1-4 complete … Ready to close to 3-COMPLETED.` — every human reads
+# that as done; the parser reads "active" and stops (GH-27 leak 2).
+#
+# These phrases are unambiguous operator hand-offs, not incidental progress notes. Matching is on the
+# whole status, case-insensitively. Keep the list short and literal: a general "does this prose mean
+# done?" parse is exactly the false-positive machine the lead-word anchor was built to avoid.
+PDDA_STATUS_HANDOFF_PHRASES="ready to close|ready for 3-completed|ready to move to 3-completed|awaiting close"
+_pdda_status_declares_handoff() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | grep -Eq "$PDDA_STATUS_HANDOFF_PHRASES"
+}
+
 check_issue_doc_sync() {
   pdda_reset_counts
   local CHECK_NAME="pdda-check-issue-doc-sync" rc=0
   local table file num state status_val leadword target rel_target
+
   table="$(_pdda_issue_state_table)"
 
+  # --- (1) active plans: PROJECT/2-WORKING ---------------------------------------------------------
   while IFS= read -r file; do
     num="$(_pdda_doc_issue_number "$file")"
-    [ -n "$num" ] || continue            # not an issue-tracked doc — nothing to reconcile
+    # A doc with no `gh_issue:` is not issue-tracked; there is nothing to reconcile it against.
+    # Deliberately NOT a finding: warning here would fire on every untracked plan doc in every
+    # installed target on the first run — the exact self-inflicted-noise failure GH-15 fixed. Making
+    # untracked plans declare themselves is worth doing behind an opt-in lever, not by default.
+    [ -n "$num" ] || continue
 
     state="$(printf '%s\n' "$table" | awk -F'\t' -v n="$num" '$1 == n { print toupper($2); exit }')"
     if [ -z "$state" ]; then
-      pdda_record_finding info "$CHECK_NAME" "$file" 1 \
-        "issue #$num state unavailable (gh absent/offline and no cached state) — sync not evaluated" "skip"
+      # A check that could not run is NOT a check that passed. Warn, so `run` and the Stop hook say so.
+      pdda_record_finding warn "$CHECK_NAME" "$file" 1 \
+        "issue #$num state unavailable (gh absent/offline and no cached state) — sync NOT evaluated; run: utils/pdda/pdda.sh gh-refresh" \
+        "state-unavailable"
       continue
     fi
 
@@ -570,15 +596,47 @@ check_issue_doc_sync() {
       continue                            # closed-issue drift dominates; skip the (b) test
     fi
 
-    # Direction (b): doc declares itself done (status lead word) while the issue is still OPEN.
+    # Direction (b): doc declares itself done while the issue is still OPEN. Two signals:
+    #   - the status LEAD WORD is terminal ("Shipped — …")
+    #   - or the status carries an explicit hand-off phrase anywhere ("Active — … Ready to close")
+    # The second exists because the first is defeated by a self-contradictory status (GH-27 leak 2).
     status_val="$(pdda_trim "$(pdda_frontmatter_value "$file" status)")"
     leadword="$(_pdda_status_leadword "$status_val")"
     if [ -n "$leadword" ] && _pdda_is_terminal_word "$leadword"; then
       pdda_record_finding warn "$CHECK_NAME" "$file" 1 \
         "doc status reads '$leadword' (done) but issue #$num is still OPEN — close the issue or correct the status" \
         "reconcile-status"
+    elif _pdda_status_declares_handoff "$status_val"; then
+      pdda_record_finding warn "$CHECK_NAME" "$file" 1 \
+        "doc status declares it is ready to close but issue #$num is still OPEN — recommend: git mv to 3-COMPLETED, then gh issue close $num" \
+        "reconcile-status"
     fi
   done < <(pdda_list_working_docs)
+
+  # --- (2) completed plans: PROJECT/3-COMPLETED ----------------------------------------------------
+  # A doc that reached 3-COMPLETED IS the operator's assertion that the work is done — recorded in a
+  # path, not in prose. A still-OPEN issue behind it is drift. Without this pass the check stops
+  # watching a doc at the exact moment it completes, so the `git mv` recommended above is what blinds
+  # it (GH-27 leak 1).
+  while IFS= read -r file; do
+    num="$(_pdda_doc_issue_number "$file")"
+    [ -n "$num" ] || continue            # completed docs need not be issue-tracked; nothing to reconcile
+
+    state="$(printf '%s\n' "$table" | awk -F'\t' -v n="$num" '$1 == n { print toupper($2); exit }')"
+    if [ -z "$state" ]; then
+      pdda_record_finding warn "$CHECK_NAME" "$file" 1 \
+        "issue #$num state unavailable (gh absent/offline and no cached state) — sync NOT evaluated; run: utils/pdda/pdda.sh gh-refresh" \
+        "state-unavailable"
+      continue
+    fi
+
+    if [ "$state" = "OPEN" ]; then
+      pdda_record_finding warn "$CHECK_NAME" "$file" 1 \
+        "doc is in 3-COMPLETED but issue #$num is still OPEN — recommend: gh issue close $num" \
+        "close-issue"
+    fi
+    # state=CLOSED in 3-COMPLETED is the fully reconciled end state: no finding.
+  done < <(pdda_list_completed_docs)
 
   pdda_emit_summary "$CHECK_NAME" "$rc"
   return "$(pdda_gated_exit "$rc")"
@@ -598,15 +656,26 @@ PDDA_GOVERNANCE_INDEX_DEFAULT="ROUTER.md"
 
 # GH-15: two of the docs above (utils/pdda/PDDA-INSTALL.md, PROJECT/PDDA.md) are themselves shipped to
 # every target install, but legitimately reference files install.sh deliberately does NOT copy there —
-# the target's own repo-authored startup docs, HQ-only skill/companion-doc paths, and the pre-utils/pdda/
+# the target's own repo-authored startup docs, canonical-only skill/companion-doc paths, and the pre-utils/pdda/
 # legacy layout path. A fresh `install.sh . --mode observe` self-inflicted ~30 dead-reference/env-var
 # warns from this exact mismatch on first run, drowning the target's own drift signal in PDDA-on-PDDA
 # noise. This manifest was built from an actual dead-reference scan of a bare `install.sh` target
 # (not retyped from the issue's illustrative list), so it matches real warns, not guesses. Scoped ONLY
-# to the shipped docs named below — a repo-authored governance doc (this HQ repo's own ROUTER.md,
+# to the shipped docs named below — a repo-authored governance doc (this canonical repo's own ROUTER.md,
 # AGENTS.md, ...) referencing one of these is still a real dead-reference bug and stays flagged.
+#
+# GH-23 P3 widened the scan from .md to .sh, which grew this manifest along three axes. Each entry was
+# read off an actual scan of a bare `install.sh <scratch> --with-startup-docs` target, same method as
+# above — 46 warns before, 0 after:
+#   - canonical-only TOOLS a target never receives: install.sh (targets are installed, not installers),
+#     the sync engine (excluded by pdda-sync-manifest.conf: targets are leaf nodes), templates/, test/.
+#   - LEGACY flat-layout paths (utils/pdda.sh, ...) that PDDA-INSTALL.md names precisely BECAUSE they
+#     must not exist — it is documenting the layout install.sh migrates away from. Their .md sibling
+#     (utils/PDDA-INSTALL.md) was already exempt for this reason; the .sh ones only surfaced once the
+#     suffix widened.
+#   - config.sh, which belongs to git-pulse, a separate program. It is not ours and never will be here.
 PDDA_GOV_SHIPPED_DOCS_DEFAULT="utils/pdda/PDDA-INSTALL.md PROJECT/PDDA.md"
-PDDA_GOV_SHIPPED_DOC_REF_EXEMPTIONS_DEFAULT="ROUTER.md AGENTS.md GUIDING-PRINCIPLES.md README.md CLAUDE.md .claude/skills/pdda/SKILL.md .claude/skills/governance-audit/SKILL.md PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md utils/PDDA-INSTALL.md"
+PDDA_GOV_SHIPPED_DOC_REF_EXEMPTIONS_DEFAULT="ROUTER.md AGENTS.md GUIDING-PRINCIPLES.md README.md CLAUDE.md .claude/skills/pdda/SKILL.md .claude/skills/governance-audit/SKILL.md PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md utils/PDDA-INSTALL.md install.sh templates/ROUTER.target.md test/pdda-doc-health-hooks.sh pdda-sync.sh utils/pdda/pdda-sync.sh utils/pdda/pdda-manifest.sh utils/pdda.sh utils/pdda-lib.sh utils/pdda-doc-ready.sh utils/pdda-catchup.sh config.sh"
 PDDA_GOV_SHIPPED_DOC_ENVVAR_EXEMPTIONS_DEFAULT="PDDA_REGISTRY PDDA_GITPULSE_DIR PDDA_SYNC_MAX_SHRINK"
 
 # Print "<line>\t<text>" for lines outside an exempt fence/blockquote — same carve-out convention as
@@ -628,21 +697,61 @@ _pdda_gov_scannable_lines() {
   ' "$1"
 }
 
-# Extract candidate .md file references from one line: markdown-link targets `](target.md)` and
-# backtick-wrapped `` `target.md` `` spans, each optionally carrying a `#anchor`. Anchor-only links and
-# non-doc code spans (e.g. `` `pdda.sh run` ``) don't end in .md, so they never match — this check
-# validates file existence, not heading anchors. A bare `GH-<n>-*.md` name is filtered out — those are
-# illustrative instances of the issue-doc naming convention (PDDA.md's own examples), not fixed
-# cross-references to a real file.
+# Extract candidate file references from one line. Three patterns, unioned then deduplicated:
+#
+#   (a) markdown-link targets       `](target.md)`  `](target.sh)`   optionally carrying a `#anchor`
+#   (b) whole-span code refs        `` `target.md` ``  `` `target.sh` ``
+#   (c) command-position paths      a *.sh token opening a code span or a scanned fence line
+#
+# Why (c) exists (GH-23). A router's most load-bearing references are the commands it tells an agent to
+# run, and those never look like (a) or (b): they carry arguments. `` `.xyz/utils/marathon-plan.sh
+# --help` `` and a bare `utils/pdda/pdda-sync.sh push` inside a ```bash fence both name a real file, yet
+# neither closes its span right after the suffix. A router can therefore point every agent at a script
+# that does not exist and no check would ever see it — which is exactly how the LTVera-Pandas install
+# shipped a router full of scripts its target never received.
+#
+# Scope of (c) is deliberately narrow: the token must open the span or the line, which is where a shell
+# command's *program* sits. A `.sh` word later in a sentence is prose, not a path claim. That keeps
+# `` `pdda.sh run` `` from being read as two refs while still resolving `pdda.sh` itself.
+#
+# A leading `./` is stripped from (c): in command position `./install.sh` means "relative to the repo
+# root I am standing in", not "relative to the doc that mentions it". Left intact, it would resolve
+# against the referencing doc's directory and report a phantom dead ref for a script that plainly exists.
+#
+# Pattern (c) ends at whitespace, a backtick, end-of-line, or one of `,;:)"'` — the punctuation a command
+# is written against in prose ("run x.sh, then y") or in a fence ("x.sh; y.sh"). A trailing `.` is
+# deliberately NOT a terminator: it cannot be told apart from a suffix, and `deploy.sh.bak` would be
+# extracted as `deploy.sh`. A sentence ending in a bare command name is the rarer case; a false flag on a
+# real backup file is the worse one.
+#
+# Anchor-only links never match (no suffix) — this check validates file existence, not heading anchors.
+# A bare `GH-<n>-*.md` name is filtered out: those are illustrative instances of the issue-doc naming
+# convention (PDDA.md's own examples), not fixed cross-references to a real file.
+#
+# KNOWN GAP: an interpreter-wrapped invocation (`bash utils/x.sh`, `sudo ./x.sh`) still names a real path
+# but the .sh sits in argument position, so (c) skips it. Closing it needs an interpreter allowlist plus
+# negative controls (`bash -c "..."` must not flag); tracked separately rather than guessed at here.
 _pdda_gov_extract_refs() {
   local text="$1"
   { printf '%s\n' "$text" \
-      | grep -oE '\]\([^)[:space:]]+\.md(#[A-Za-z0-9_-]*)?\)' \
+      | grep -oE '\]\([^)[:space:]]+\.(md|sh)(#[A-Za-z0-9_-]*)?\)' \
       | sed -E 's/^\]\(//; s/\)$//'
     printf '%s\n' "$text" \
-      | grep -oE '`[A-Za-z0-9_./-]+\.md(#[A-Za-z0-9_-]*)?`' \
+      | grep -oE '`[A-Za-z0-9_./-]+\.(md|sh)(#[A-Za-z0-9_-]*)?`' \
       | sed -E 's/^`//; s/`$//'
-  } | grep -Ev '(^|/)GH-[0-9]+-[^/]*\.md(#.*)?$'
+    printf '%s\n' "$text" \
+      | grep -oE '(^|`)[[:space:]]*(\.{1,2}/)?[A-Za-z0-9_.][A-Za-z0-9_./-]*\.sh([[:space:]`,;:)"'"'"']|$)' \
+      | sed -E 's/^`//; s/^[[:space:]]+//; s/[[:space:]`,;:)"'"'"']+$//; s|^\./||'
+    # (d) interpreter-wrapped invocation: `bash x.sh`, `sudo ./x.sh`, `sh setup.sh`, `env FOO=1 ./x.sh`.
+    # When a script is handed to an interpreter it leaves PROGRAM position (which (c) keys on) for
+    # ARGUMENT position and (c) goes blind. An explicit allowlist of transparent wrappers — sudo, env
+    # (with VAR=val assignments), and the interpreters bash/sh/zsh/source/. — is stripped to recover the
+    # path. The leading char class rejects `-` (so `bash -c` is not a path) and `"`/`$` (so a quoted or
+    # variable-expanded argument is never mistaken for a path claim). GH-33.
+    printf '%s\n' "$text" \
+      | grep -oE '(^|`)[[:space:]]*((sudo|source|bash|zsh|env|sh|\.)([[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*)*[[:space:]]+)+(\.{1,2}/)?[A-Za-z0-9_.][A-Za-z0-9_./-]*\.sh([[:space:]`,;:)"'"'"']|$)' \
+      | sed -E 's/^`//; s/^[[:space:]]+//; s/^((sudo|source|bash|zsh|env|sh|\.)([[:space:]]+[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*)*[[:space:]]+)+//; s/[[:space:]`,;:)"'"'"']+$//; s|^\./||'
+  } | grep -Ev '(^|/)GH-[0-9]+-[^/]*\.md(#.*)?$' | LC_ALL=C sort -u
 }
 
 # Resolve a raw ref (its #anchor stripped) against repo root or the referencing file's directory.
@@ -653,7 +762,7 @@ _pdda_gov_extract_refs() {
 # ref WITH a directory component stays a precise claim: if that exact path is wrong, that IS the bug
 # (e.g. a doc pointing at PROJECT/2-WORKING/X.md after X.md was completed and moved to 3-COMPLETED/).
 _pdda_gov_resolve_ref() {
-  local ref="$1" from_dir="$2" path candidate found
+  local ref="$1" from_dir="$2" path candidate found p
   path="${ref%%#*}"
   case "$path" in
     http://*|https://*|//*) return 1 ;;
@@ -663,7 +772,14 @@ _pdda_gov_resolve_ref() {
     *)
       candidate="$PDDA_REPO_ROOT/$path"
       if [ ! -f "$candidate" ]; then
-        found="$(find "$PDDA_REPO_ROOT" -name "$path" -not -path '*/.git/*' 2>/dev/null | head -1)"
+        # basename match must be LITERAL, not a glob: `find -name "$path"` would read a markdown-link
+        # ref of `build[1].sh` (whose extraction class admits [ ] * ?) as a pattern and resolve it
+        # against a DIFFERENT file `build1.sh`, scoring a dead ref live. Compare basenames as strings.
+        # First traversal match wins, preserving the previous `| head -1` semantics. GH-34.
+        found=""
+        while IFS= read -r -d '' p; do
+          if [ "${p##*/}" = "$path" ]; then found="$p"; break; fi
+        done < <(find "$PDDA_REPO_ROOT" -not -path '*/.git/*' -print0 2>/dev/null)
         [ -n "$found" ] && candidate="$found"
       fi
       ;;
@@ -772,7 +888,7 @@ check_governance() {
   # --- (4) env-var drift: a PDDA_* var named in a governance doc should exist in a shipped script ---
   # warn-only: PDDA_GOVERNANCE_INDEX_DEFAULT names ONLY the files a target install actually receives
   # (utils/pdda/*.sh + install.sh). PDDA-INSTALL.md itself ships to every target but also documents
-  # utils/pdda/pdda-sync.sh (an HQ-only tool never copied to targets, per its own "Canonical install
+  # utils/pdda/pdda-sync.sh (a canonical-only tool never copied to targets, per its own "Canonical install
   # set" list) — so a var like PDDA_SYNC_BACKUPS legitimately mentioned there will never resolve in a
   # target install. That's expected, not drift, so a false flag must cost one ignorable line, not a
   # blocked build (same calibration as the dead-reference check above).
@@ -859,9 +975,12 @@ pdda-check-quad-concepts:check_quad_concepts"
   # pdda-doc-ready.sh script also self-skips when PDDA_LLM_BIN is unset.
   runner_say ""
   runner_say "== pdda-doc-ready =="
-  if [ "$EXIT_CODE" -ne 0 ]; then
-    runner_say "skipped pdda-doc-ready — fix the deterministic failures above first ($FAILED)"
-    pdda_log_activity info "pdda-doc-ready" "$PDDA_REPO_ROOT" 0 "readiness review skipped — deterministic checks failed:$FAILED" "skip"
+  if [ "$EXIT_CODE" -ne 0 ] || [ "$PDDA_RUN_ERRORS" -gt 0 ]; then
+    # Gate on the FINDINGS, not just the exit code (BUG-001b). In observe/light every check returns 0,
+    # so gating on EXIT_CODE alone spent an LLM call reviewing docs that never passed structural hygiene
+    # — the opposite of PDDA.md's "spend time only on docs that passed" rule.
+    runner_say "skipped pdda-doc-ready — fix the deterministic findings above first (${FAILED:-$PDDA_RUN_ERROR_CHECKS})"
+    pdda_log_activity info "pdda-doc-ready" "$PDDA_REPO_ROOT" 0 "readiness review skipped — deterministic checks reported errors:${FAILED:-$PDDA_RUN_ERROR_CHECKS}" "skip"
   elif "$HERE/pdda-doc-ready.sh"; then
     :
   else
@@ -869,14 +988,21 @@ pdda-check-quad-concepts:check_quad_concepts"
     FAILED="$FAILED pdda-doc-ready"
   fi
 
-  if [ "$EXIT_CODE" -eq 0 ]; then
-    runner_say ""
-    runner_say "PDDA run complete: all checks passed"
-    pdda_log_activity info "pdda-run" "$PDDA_REPO_ROOT" 0 "PDDA run completed successfully" "finish"
-  else
-    runner_say ""
+  # Three outcomes, not two (BUG-001b). "EXIT_CODE is 0" answers "did anything block?", which outside
+  # full mode is always no. Only PDDA_RUN_ERRORS answers "did anything go wrong?" — and that is the
+  # question the closing line claims to be answering.
+  runner_say ""
+  if [ "$EXIT_CODE" -ne 0 ]; then
     runner_say "PDDA run complete: failures:$FAILED"
     pdda_log_activity error "pdda-run" "$PDDA_REPO_ROOT" 0 "PDDA run completed with failures:$FAILED" "finish"
+  elif [ "$PDDA_RUN_ERRORS" -gt 0 ]; then
+    runner_say "PDDA run complete: $PDDA_RUN_ERRORS error(s) found, not blocking in $PDDA_MODE mode —$PDDA_RUN_ERROR_CHECKS"
+    runner_say "Run with PDDA_MODE=full (or .pdda-mode) once these are fixed, so they block."
+    pdda_log_activity error "pdda-run" "$PDDA_REPO_ROOT" 0 \
+      "PDDA run reported $PDDA_RUN_ERRORS error(s) in mode=$PDDA_MODE (non-blocking):$PDDA_RUN_ERROR_CHECKS" "finish"
+  else
+    runner_say "PDDA run complete: all checks passed"
+    pdda_log_activity info "pdda-run" "$PDDA_REPO_ROOT" 0 "PDDA run completed successfully" "finish"
   fi
 
   pdda_rotate_activity   # keep PROJECT/PDDA-ACTIVITY.jsonl bounded

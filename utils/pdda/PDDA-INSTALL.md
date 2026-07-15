@@ -23,8 +23,14 @@ a change to the install surface updates both.
 
 Re-run `install.sh` (no flags) against the target — `copy_runtime` overwrites the runtime + contract
 unconditionally, while seed/state files (`ROADMAP.md`, `CHANGELOG.md`, `.pdda-mode`, `PROJECT/**`,
-the activity log) are create-only and stay untouched. Do **not** pass `--force` (it overwrites seeds)
-or `--with-startup-docs` (it overwrites any repo-adapted `ROUTER.md`/`AGENTS.md`/`GUIDING-PRINCIPLES.md`).
+the activity log) are create-only and stay untouched. Do **not** pass `--force`: it overwrites seeds
+*and* the startup-doc scaffolds.
+
+`--with-startup-docs` is safe to re-pass: the three startup docs are create-only, so an existing
+`ROUTER.md`/`AGENTS.md`/`GUIDING-PRINCIPLES.md` is kept, not overwritten. (Before GH-25 it copied them
+verbatim and silently destroyed repo-authored versions.) To deliberately refresh a target's startup docs
+from the canonical repo — for instance to pick up a corrected `ROUTER.md` — pass
+`--with-startup-docs --force`, and diff before committing.
 
 ### Migrating a repo that predates the `utils/pdda/` layout
 
@@ -53,8 +59,39 @@ This standalone repo also carries repo-local startup docs (`ROUTER.md`, `AGENTS.
 `GUIDING-PRINCIPLES.md`, `README.md`) and the `/pdda` re-orient skill
 (`.claude/skills/pdda/SKILL.md`) so the installer source stays self-consistent, but those files are
 not part of the target-repo install surface unless the target explicitly wants them. `install.sh
---with-startup-docs` ships `ROUTER.md`, `AGENTS.md`, `GUIDING-PRINCIPLES.md`, and the `/pdda` skill
-together as the agent read-order scaffold. `.claude/skills/governance-audit/SKILL.md`
+--with-startup-docs` ships the agent read-order scaffold, and routes each file by **who owns it after
+the install** rather than copying all four the same way:
+
+| Semantics | Files | Behavior |
+|---|---|---|
+| **Templated** | `ROUTER.md` | written from `templates/ROUTER.target.md`; **this repo's own `ROUTER.md` is never copied** |
+| **Scaffold** | `AGENTS.md`, `GUIDING-PRINCIPLES.md` | create-only — an existing file is kept (`--force` to overwrite) |
+| **Runtime** | `.claude/skills/pdda/SKILL.md` | PDDA owns it; refreshed verbatim every install |
+
+The template exists because this repo's `ROUTER.md` documents things a target does not have: `install.sh`,
+`utils/pdda/pdda-sync.sh`, the runtime-distribution command rails, and the vendored `.xyz/` harness.
+Copying it verbatim pointed every target's agents at scripts absent from their repo (GH-23). The template
+is the canonical router minus those sections; keep the two in step when either changes.
+
+**Post-install self-check.** For every startup doc `--with-startup-docs` actually *writes* — `ROUTER.md`,
+`AGENTS.md`, `GUIDING-PRINCIPLES.md` — the installer asserts that every `*.sh` path that doc names
+resolves to a file present in the target. A dead reference exits non-zero with the offending names. This
+is the assertion that would have caught GH-23 at install time. Two boundaries make it safe to keep enabled:
+
+- It validates only a doc the installer **wrote**, decided per file. If your own `ROUTER.md` was kept
+  (create-only) it is yours and is never checked — the installer will not fail your install over your own
+  scripts — while an `AGENTS.md` scaffolded beside it in the same run still is. Each skipped doc says so.
+- It runs against the **written artifact**, not the source template. During GH-23 P1 the first draft of
+  `templates/ROUTER.target.md` reintroduced the very bug it exists to fix; only an assertion on the
+  *output* caught it. Checking the input would have passed.
+
+Originally this covered `ROUTER.md` alone. The router was never special: GH-23 P3's widened dead-reference
+scan found the identical defect — a dead `install.sh` — sitting in the `GUIDING-PRINCIPLES.md` scaffolded
+into every target. Any doc the installer writes can name a script it does not ship.
+
+A failure here is a bug in PDDA's template, not in your repo. The install still completes — the target is
+usable, its router is misleading — and the non-zero exit is what stops `pdda-sync.sh register` from
+propagating it further. `.claude/skills/governance-audit/SKILL.md`
 (the `pdda.sh governance` companion — see `PROJECT/PDDA.md` § "I. `pdda.sh governance`") is the same
 kind of repo-local, not-installed-by-default skill; copy it manually into a target repo if wanted.
 
@@ -87,7 +124,10 @@ deterministic check plus the aggregate `run` as subcommands (`pdda.sh run`, `pdd
 `pdda.sh roadmap`, ...). `utils/pdda/pdda-lib.sh` holds the shared helpers it sources;
 `utils/pdda/pdda-doc-ready.sh` is the opt-in LLM readiness layer and `utils/pdda/pdda-catchup.sh` is
 the opt-in ROUTER.md triage layer. `utils/pdda/pdda-gh-refresh.sh` (`pdda.sh gh-refresh`) refreshes the
-cached GitHub issue-state file that `pdda.sh issue-doc-sync` reads when `gh` is offline.
+cached GitHub issue-state file that `pdda.sh issue-doc-sync` reads when `gh` is offline. That cache is
+also written automatically by any successful live lookup (every online `pdda.sh run`), so the offline
+consumers — chiefly the `Stop` hook — have last-known state without anyone remembering to run
+`gh-refresh`. Explicit `gh-refresh` remains useful to prime the cache before going offline.
 `utils/pdda/pdda-edit-doc-hook.sh` (tier 1, a `PostToolUse` single-file lint) and
 `utils/pdda/pdda-stop-doc-health.sh` (tier 2, a `Stop` consolidated full-scan) are the optional
 doc-health hooks — installs receive the scripts but **opt in by wiring them in their own
@@ -182,9 +222,9 @@ that ship to every target install (`PDDA-INSTALL.md`, `PROJECT/PDDA.md`) so a fr
 `pdda.sh run` doesn't self-inflict dead-reference/env-var noise from files `install.sh` deliberately
 never copies: `PDDA_GOV_SHIPPED_DOCS` (which shipped docs the exemptions apply to; default
 `utils/pdda/PDDA-INSTALL.md PROJECT/PDDA.md`), `PDDA_GOV_SHIPPED_DOC_REF_EXEMPTIONS` (basenames/paths
-those docs may dead-reference without a warn — the target's own startup docs, HQ-only skill and
+those docs may dead-reference without a warn — the target's own startup docs, canonical-only skill and
 companion-doc paths, and the pre-`utils/pdda/` legacy install path), and
-`PDDA_GOV_SHIPPED_DOC_ENVVAR_EXEMPTIONS` (HQ-only-tool env vars those docs may mention without a warn).
+`PDDA_GOV_SHIPPED_DOC_ENVVAR_EXEMPTIONS` (canonical-only-tool env vars those docs may mention without a warn).
 A repo-authored governance doc outside `PDDA_GOV_SHIPPED_DOCS` (e.g. this repo's own `ROUTER.md`) is
 never exempted — a dead reference there stays a real drift signal.
 
@@ -234,14 +274,20 @@ Expected result:
 - `PROJECT/PDDA-ACTIVITY.jsonl` receives new entries
 - the suite exits `0` even if it reports findings
 
-## Syncing the runtime to other repos (HQ → targets)
+## Syncing the runtime to other repos (canonical → targets)
 
-Once PDDA lives in several repos, keep them current from one canonical source ("HQ" = this clone) with
-`utils/pdda/pdda-sync.sh`. HQ is the only writer; targets opt in via `register`. The synced file set is
+Once PDDA lives in several repos, keep them current from one canonical source (the "canonical repo" = this clone) with
+`utils/pdda/pdda-sync.sh`. The canonical repo is the only writer; targets opt in via `register`. The synced file set is
 the auto-regenerated manifest (`utils/pdda/pdda-sync-manifest.conf`, shared with `install.sh`), so a new
 runtime file under `utils/pdda/` propagates with no list edit. Per-repo adapted startup docs
 (`ROUTER.md`, `AGENTS.md`) are never touched. Full design + rationale:
 [`PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md`](../../PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md).
+
+> **`push` cannot repair a target's `ROUTER.md`.** The startup docs are outside the sync manifest by
+> design, so a target installed before GH-23 keeps its stale router indefinitely — `push` will never
+> replace it. Repairing an existing target is a deliberate, per-repo act:
+> `install.sh <target> --with-startup-docs --force`, then diff before committing. That command also
+> overwrites `AGENTS.md` and `GUIDING-PRINCIPLES.md`, so back up any repo-authored versions first.
 
 ```bash
 # Enroll a target (initial install via install.sh, then seeds sync state). Confirms first;
@@ -251,7 +297,7 @@ utils/pdda/pdda-sync.sh register [--mode observe|light|full] [--with-startup-doc
 # Distribute the current runtime on demand — one target, or all registered if omitted.
 utils/pdda/pdda-sync.sh push [/path/to/repo]
 utils/pdda/pdda-sync.sh push --dry-run        # preview copies AND deletions, write nothing
-utils/pdda/pdda-sync.sh push --no-delete      # copy/update only, skip HQ-side deletions
+utils/pdda/pdda-sync.sh push --no-delete      # copy/update only, skip canonical-side deletions
 
 utils/pdda/pdda-sync.sh list                  # registered targets + mode/source-commit/sync state
 utils/pdda/pdda-sync.sh status [/path/to/repo]# read-only: current/behind/diverged/missing/to-delete
@@ -263,15 +309,15 @@ utils/pdda/pdda-sync.sh install-agent         # opt-in; --no-load writes the pli
 utils/pdda/pdda-sync.sh uninstall-agent
 ```
 
-**Safety:** `push` only overwrites a file when HQ's copy has genuinely advanced (content hash, not
+**Safety:** `push` only overwrites a file when the canonical repo's copy has genuinely advanced (content hash, not
 mtime), so deliberate local edits between releases are preserved; any overwrite of a *diverged* target
-and any HQ-side deletion is backed up first under `temp/pdda-sync-backups/` (kept to the last
-`PDDA_SYNC_BACKUPS`, default 5). A dirty HQ is refused (`--allow-dirty` to override). HQ-side deletions
+and any canonical-side deletion is backed up first under `temp/pdda-sync-backups/` (kept to the last
+`PDDA_SYNC_BACKUPS`, default 5). A dirty canonical repo is refused (`--allow-dirty` to override). Canonical-side deletions
 mirror to targets, but a **manifest-poisoning guard** aborts the delete phase before touching any target
 if a declared source root resolves to zero files, the manifest is empty, or it shrank past
 `PDDA_SYNC_MAX_SHRINK`% (default 25) — override only with `--force-delete`.
 
-State lives under HQ's gitignored `temp/` (state stamps, manifest snapshots, backups, log, lock); the
+State lives under the canonical repo's gitignored `temp/` (state stamps, manifest snapshots, backups, log, lock); the
 target **registry** is machine-local at `${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv` (written by
 `install.sh`, the single registry writer), never committed.
 

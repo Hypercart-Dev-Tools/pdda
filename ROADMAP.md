@@ -29,11 +29,18 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 | What was just completed | What's next |
 |---|---|
 | GH-17 + GH-18 fixed on branch `fix/GH-17-GH-18` (PR open, not yet merged): `PROJECT/PDDA.md`'s stale RECAP.md/REAL-AGENT-OBSERVATIONS.md references genericized (turned out to be copy-paste leftovers from the origin repo, not this repo's own files), `ROUTER.md` now documents `glance`/`quad-concepts`. `pdda.sh governance` errors=0 warns=0 on the branch. | Merge the PR once reviewed. GH-14 Phase 1 (verified one-line fd fix) still queued to start. GH-10 Sentinel remains the other active build (Phase 2b executor). |
+| **GH-23 shipped and closed (P1–P4, PR #32 → 5ef638a), closing the "a check that could not run reports success" family.** Targets no longer inherit the canonical router (#25 fixed alongside); `install.sh` validates every startup doc it writes; the dead-ref scan reads `.sh` including command-position paths; **GH-14 Phase 2 (BUG-001b)** landed with P3 — `run` can no longer report "all checks passed" over errors the mode gate merely stopped from blocking; and P4 made the on-ramp cheap (`/pdda`) then optionally enforceable. Doc moved to `3-COMPLETED`. Follow-ups **#33** (interpreter-wrapped `.sh` invocations) and **#34** (`find -name` glob → literal basename) landed 2026-07-11; governance suite 41 → 47. Earlier: GH-27 made the wrap loop fire, and GH-12/GH-15 wrapped and closed. | **Repair the `LTVera-Pandas` install** — it still carries the pre-P1 verbatim router; needs an explicit `install.sh --with-startup-docs --force` (`pdda-sync.sh push` cannot reach a target's `ROUTER.md`), backing up its 60KB `AGENTS.md` first (tracked as [BinoidCBD/LTVera-Pandas#49](https://github.com/BinoidCBD/LTVera-Pandas/issues/49)). **GH-10 Sentinel** is the other active build — Phase 3 replay/eval harness next. |
 
 ## Ledger
 
 ### Queue / parked intake
 
+- **GH-21 — SKILLS/PDDA-hook opt-in SessionStart doc-governance reminder** (2026-07-08) - new bundled
+  skill that installs a `SessionStart` hook re-anchoring `ROUTER.md`/`AGENTS.md`/`PROJECT/PDDA.md` at
+  every context boundary (startup/resume/clear/compact), auto-scoped via `PROJECT/PDDA.md` detection,
+  global- or repo-local-scoped, propose-then-confirm, never touches a repo's committed `settings.json`.
+  Implemented same-session as capture. Issue [#21](https://github.com/Hypercart-Dev-Tools/pdda/issues/21). ->
+  [PROJECT/1-INBOX/GH-21-PDDA-HOOK-SKILL.md](PROJECT/1-INBOX/GH-21-PDDA-HOOK-SKILL.md)
 - **Marathon Plan (2026-07-07)** (2026-07-07) - the canonical XYZ-format marathon plan doc
   (hand-authored per `.xyz/README.md`'s Option B — the ROADMAP auto-generator, Option A, currently
   reports 0 active lanes) for the two build phases below, distinct from the machine-executable
@@ -58,6 +65,24 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### In progress
 
+- **PRD generator skill exploration — PRD-Kimi vs PRD-Perplexity, synthesized into PRD-pdda** (2026-07-08) -
+  three draft-stage variants of a not-yet-built `product-prd-builder` skill (structured PRD →
+  Spec/Roadmap interview). `PRD-Perplexity/` is the original draft (renamed, unchanged) and is the only
+  one shaped as a real skill (frontmatter + a `references/` folder); `PRD-Kimi/` is a single-file design
+  narrative that embeds its six proposed reference files inline as fenced blocks, and forks Phase 2 on an
+  Iron Triangle choice (Faster/Better/Cheaper). `PRD-pdda/` is the **synthesis of both**, and is the one
+  to build from: Perplexity's execution rigor (FR-IDs, P0/P1/P2, verifiable acceptance criteria, data
+  model, NFR table, guardrail metric, agent-executable milestones) written in Kimi's plain-English voice,
+  with Kimi's Iron Triangle promoted from a label to the *governor* of milestone count, pacing, and
+  validation-gate density. Adds a two-mode intake (quick-fire vs. brain dump) over one shared field set
+  and one shared inference library, capped at ≤10 interview questions. Kimi's Cheaper-branch "UX/Dev Ratio
+  Discipline" is carried through verbatim in spirit — the load-bearing idea that Cheaper's failure mode is
+  an *uneven* UX-vs-dev split, not underspending, and so demands *more* operator discipline than the other
+  two branches, not less. No `PROJECT/**` doc or GH issue yet (exploratory content, outside
+  `pdda.sh roadmap-coverage` scope); not yet converted into an installed skill. ->
+  [experimental/PRD-pdda/SKILL.md](experimental/PRD-pdda/SKILL.md),
+  [experimental/PRD-Kimi/SKILL.md](experimental/PRD-Kimi/SKILL.md),
+  [experimental/PRD-Perplexity/SKILL.md](experimental/PRD-Perplexity/SKILL.md)
 - **GH-14 — governance fd exhaustion on stock macOS bash 3.2** (2026-07-08) - dead-reference scan in
   `pdda-check-governance` (`utils/pdda/pdda.sh:695`) exhausts file descriptors under bash 3.2.57 (stock
   macOS, no Homebrew bash); worse, a crashed check still lets `pdda.sh run` report "all checks passed"
@@ -66,13 +91,6 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   repo's own bash 3.2.57. Phase 2 (BUG-001b summary field) next. Issue
   [#14](https://github.com/Hypercart-Dev-Tools/pdda/issues/14). ->
   [PROJECT/2-WORKING/GH-14-GOVERNANCE-FD-EXHAUSTION.md](PROJECT/2-WORKING/GH-14-GOVERNANCE-FD-EXHAUSTION.md)
-- **GH-12 — Quad Concepts mode** (2026-07-07) - opt-in glance layer: tracked plan docs carry a
-  `## Quad Concepts` section of 1–4 `pain → fix` bullets after `## Status`, so a cold-start reader gets
-  5-second orientation and an operator can see if a plan covers the real pains. Orthogonal opt-in lever
-  (`.pdda-quad`, off by default), structure-only deterministic check + warn-only LLM rubric. Synthesizes
-  a GLM 5.2 pass + two Codex/agy consults. **All 4 phases shipped + consult-passed** (check+lever, LLM
-  quality rubric, `pdda.sh glance` roll-up; 42/42 + 6/6). Ready to close to `3-COMPLETED`. Issue
-  [#12](https://github.com/Hypercart-Dev-Tools/pdda/issues/12). -> [PROJECT/2-WORKING/GH-12-QUAD-CONCEPTS-MODE.md](PROJECT/2-WORKING/GH-12-QUAD-CONCEPTS-MODE.md)
 - **GH-10 — Sentinel: repo-driven doc-governance automation** (2026-07-04) - the act-on-it layer for
   PDDA: on merge to `main`, build context from the diff, ask the model (via `PDDA_LLM_BIN`) whether
   governance docs should change, apply edits inside a git worktree on an allowlisted path set, gate on
@@ -81,8 +99,6 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   after a GLM 5.2 review). **Phase 1 shipped** (dry-run orchestrator `sentinel/run.sh`, 26/26 tests);
   Phase 2 (worktree apply) next. Issue [#10](https://github.com/Hypercart-Dev-Tools/pdda/issues/10).
   -> [PROJECT/2-WORKING/GH-10-SENTINEL.md](PROJECT/2-WORKING/GH-10-SENTINEL.md)
-- **Root `install.sh` + operator onboarding** (2026-06-25) - installer that provisions a foreign repo to a clean zero state; README rewritten for onboarding. Tracking issue pending `gh` re-auth. -> [PROJECT/2-WORKING/INSTALL-SCRIPT-AND-ONBOARDING.md](PROJECT/2-WORKING/INSTALL-SCRIPT-AND-ONBOARDING.md)
-- **Reconcile pdda-sync `list` vs `status` wording** (2026-06-30) - a just-installed-but-unpushed target read as `not-yet-pushed` in `list` while `status` reported it current; `list` is now content-aware (`current`/`out-of-sync` + `(unpushed)` marker). Iteration 1 shipped. -> [PROJECT/2-WORKING/SYNC-LIST-STATUS-RECONCILE.md](PROJECT/2-WORKING/SYNC-LIST-STATUS-RECONCILE.md)
 
 ### Completed
 
@@ -103,6 +119,44 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   GH-17 on branch `fix/GH-17-GH-18` (PR open, not yet merged). Issue
   [#18](https://github.com/Hypercart-Dev-Tools/pdda/issues/18). ->
   [PROJECT/3-COMPLETED/GH-18-ROUTER-SUBCOMMAND-DRIFT.md](PROJECT/3-COMPLETED/GH-18-ROUTER-SUBCOMMAND-DRIFT.md)
+- **GH-23 — agent on-ramp is wrong, expensive, and unenforced** (2026-07-09 → closed 2026-07-10) - four
+  phases, all shipped in PR #32. `--with-startup-docs` advertised an "adapted" `ROUTER.md` while
+  `copy_runtime` copied it verbatim, so every target inherited the canonical router — naming `install.sh`
+  and `pdda-sync.sh`, neither of which exists in a target, with no check able to see it. **P1** routes each
+  startup doc by owner (fixing #25); **P2** makes `install.sh` validate its own output; **P3** widens the
+  dead-ref scan to command-position `.sh` and carries **GH-14 Phase 2 / BUG-001b** (`run` no longer reports
+  "all checks passed" over gated errors); **P4** makes reminder directive 1 cheap (`/pdda`) then verifiable
+  via an opt-in default-off `PreToolUse` gate that fails open when it cannot prove the router went unread.
+  Codex consult caught a fail-closed path pre-merge; 273 assertions green; follow-ups #33/#34 filed (resolved 2026-07-11). Issue
+  [#23](https://github.com/Hypercart-Dev-Tools/pdda/issues/23) (closed). ->
+  [PROJECT/3-COMPLETED/GH-23-AGENT-ONRAMP.md](PROJECT/3-COMPLETED/GH-23-AGENT-ONRAMP.md)
+- **GH-27 — issue-doc-sync stopped watching a doc at the moment it completed** (2026-07-09) - the loop
+  was never missing: it reported `warns=0` over two live leaks while the `Stop` hook printed "all clear",
+  because it scanned `2-WORKING` only and the gh-state cache was never written. Now scans both buckets,
+  warns when it *cannot* evaluate, persists the cache on every live lookup, and points the operator at
+  `/pdda-eod` — retargeted from the clock to completion. Warn-only, recommend-never-act. Suite 14 → 33.
+  Wrapped #12 and #15. Issue [#27](https://github.com/Hypercart-Dev-Tools/pdda/issues/27) (closed). ->
+  [PROJECT/3-COMPLETED/GH-27-ISSUE-DOC-RECONCILE.md](PROJECT/3-COMPLETED/GH-27-ISSUE-DOC-RECONCILE.md)
+- **GH-12 — Quad Concepts mode** (2026-07-07 → wrapped 2026-07-09) - opt-in glance layer: a `.pdda-quad`
+  lever (off by default), a structure-only check, a warn-only LLM rubric, a `pdda.sh glance` roll-up. All
+  4 phases shipped; 42/42 + 6/6 re-verified at wrap. Sat done-but-open for two days — the live evidence
+  for GH-27's leak 2. Issue [#12](https://github.com/Hypercart-Dev-Tools/pdda/issues/12) (closed). ->
+  [PROJECT/3-COMPLETED/GH-12-QUAD-CONCEPTS-MODE.md](PROJECT/3-COMPLETED/GH-12-QUAD-CONCEPTS-MODE.md)
+- **GH-17 — PROJECT/PDDA.md dead-referenced two retired conventions** (2026-07-08) - `PROJECT/PDDA.md`'s
+  CHANGELOG section claimed `RECAP.md` was "retired → `PROJECT/4-MISC/`" and that
+  `REAL-AGENT-OBSERVATIONS.md` "still holds run-specific compliance findings". Neither file has ever
+  existed in this repo's git history — both were aspirational text inherited from the upstream repo PDDA
+  was extracted from. Maintainer confirmed both conventions retired; prose reworded to drop the
+  backticked-filename form the dead-reference check reads as a live cross-reference, and compliance
+  findings explicitly reassigned to `CHANGELOG.md` rather than silently orphaned. Verified: governance
+  dead-ref warns 4 → 0. Issue [#17](https://github.com/Hypercart-Dev-Tools/pdda/issues/17) (fixed;
+  pending close). -> [PROJECT/3-COMPLETED/GH-17-RECAP-STALE-REFS.md](PROJECT/3-COMPLETED/GH-17-RECAP-STALE-REFS.md)
+- **GH-18 — ROUTER.md missing glance/quad-concepts subcommand docs** (2026-07-08) - GH-12 added both
+  subcommands to the `pdda.sh` dispatcher and to `pdda.sh help`, but never to `ROUTER.md`'s Command rails
+  list, so `pdda-check-governance`'s subcommand-drift check errored on the canonical repo itself (AGENTS.md #5 lockstep).
+  Fixed by adding both lines with blurbs lifted verbatim from `pdda.sh help`. Verified: subcommand-drift
+  errors 2 → 0. Issue [#18](https://github.com/Hypercart-Dev-Tools/pdda/issues/18) (fixed; pending
+  close). -> [PROJECT/3-COMPLETED/GH-18-ROUTER-SUBCOMMAND-DRIFT.md](PROJECT/3-COMPLETED/GH-18-ROUTER-SUBCOMMAND-DRIFT.md)
 - **GH-15 — fresh installs self-inflict ~30 governance warns** (2026-07-08) - `PDDA-INSTALL.md` and
   `PROJECT/PDDA.md`, both shipped by the installer, dead-referenced files the installer deliberately
   omits (`ROUTER.md`, `AGENTS.md`, `GUIDING-PRINCIPLES.md`, `CLAUDE.md`, skill paths) plus 3 phantom
@@ -111,8 +165,10 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   illustrative list (added `CLAUDE.md` + a legacy path the list missed; deliberately excluded two
   lookalike warns — `RECAP.md`/`REAL-AGENT-OBSERVATIONS.md` — that turned out to be a separate,
   pre-existing doc-accuracy drift in `PROJECT/PDDA.md`, flagged as a follow-up rather than exempted).
-  Verified: 35→4 warns on a fresh target, negative control confirmed no over-suppression. Issue
-  [#15](https://github.com/Hypercart-Dev-Tools/pdda/issues/15) (closed). ->
+  Verified: 35→4 warns on a fresh target. Re-verified at wrap 2026-07-09: a fresh install now reports
+  **1** warn (GH-23 P1 removed the target router's dead refs). This entry falsely read "(closed)" for a
+  day — the drift GH-27's `3-COMPLETED` pass now catches. Issue
+  [#15](https://github.com/Hypercart-Dev-Tools/pdda/issues/15) (closed 2026-07-09). ->
   [PROJECT/3-COMPLETED/GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md](PROJECT/3-COMPLETED/GH-15-FRESH-INSTALL-GOVERNANCE-NOISE.md)
 - **Spike: XYZ harness -> Aider -> OpenRouter -> GLM 5.2** (2026-07-08) - tested whether the vendored
   `.xyz/relay-automation/aider-turn.sh` shim could drive GLM 5.2 (via OpenRouter) to autonomously execute
@@ -127,13 +183,31 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 - **Issue↔doc sync check + two-tier doc-health hooks** (2026-06-29) - new warn-only `pdda.sh issue-doc-sync` flags 2-WORKING/GH-*.md docs drifted from their GitHub issue state (both directions); `pdda.sh gh-refresh` writes the offline gh-state cache; two-tier PostToolUse (single-file lint) + Stop (consolidated full-scan) doc-health hooks. Deterministic, warn-only, fail-open; 31 tests; all phases shipped, committed + pushed. Issue [#5](https://github.com/Hypercart-Dev-Tools/pdda/issues/5) (closed). -> [PROJECT/3-COMPLETED/GH-5-ISSUE-DOC-SYNC.md](PROJECT/3-COMPLETED/GH-5-ISSUE-DOC-SYNC.md)
 - **PDDA-EOD skill — end-of-day wrap** (2026-06-29) - `/pdda-eod` runs hygiene checks, reconciles docs/ROADMAP/CHANGELOG, helps reach a clean/pushed tree, and closes 100%-done issues (user-verified); delegates deterministic work to `pdda.sh`, all propose-then-confirm. Shipped at `SKILLS/PDDA-EOD/SKILL.md`. Issue [#6](https://github.com/Hypercart-Dev-Tools/pdda/issues/6). -> [PROJECT/3-COMPLETED/GH-6-PDDA-EOD.md](PROJECT/3-COMPLETED/GH-6-PDDA-EOD.md)
-- **Sync the PDDA runtime to other repos** (2026-06-27 → completed 2026-06-29) - `utils/pdda/pdda-sync.sh`: HQ → registered-targets, on-demand `push` (manual primary, launchd optional) over an auto-regenerated manifest shared with `install.sh`; content-hash state-stamp copy, delete-mirror with backup, manifest-poisoning guard. Realigned + Codex relay-approved (4 rounds), built in 5 phases, every QA gate green + end-to-end dogfood. -> [PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md](PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md)
-- **Standalone baseline established** (2026-06-24) - repo-facing docs now describe `pdda` itself, placeholder scaffolding is normalized, and the install manifest matches the shipped scripts. -> [PROJECT/PDDA.md](PROJECT/PDDA.md) and [utils/PDDA-INSTALL.md](utils/PDDA-INSTALL.md)
-- **`utils/` consolidated to 3 files** (2026-06-24) - the 7 per-check scripts + `pdda-run.sh` collapsed into one `pdda.sh` dispatcher (`pdda.sh run` / `pdda.sh <check>`); `pdda-lib.sh` and the opt-in `pdda-doc-ready.sh` stay separate. Breaking change to the install contract; old filenames removed. -> [utils/PDDA-INSTALL.md](utils/PDDA-INSTALL.md)
+- **Sync the PDDA runtime to other repos** (2026-06-27 → completed 2026-06-29) - `utils/pdda/pdda-sync.sh`: canonical → registered-targets, on-demand `push` (manual primary, launchd optional) over an auto-regenerated manifest shared with `install.sh`; content-hash state-stamp copy, delete-mirror with backup, manifest-poisoning guard. Realigned + Codex relay-approved (4 rounds), built in 5 phases, every QA gate green + end-to-end dogfood. -> [PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md](PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md)
+- **Standalone baseline established** (2026-06-24) - repo-facing docs now describe `pdda` itself, placeholder scaffolding is normalized, and the install manifest matches the shipped scripts. -> [PROJECT/PDDA.md](PROJECT/PDDA.md) and [utils/pdda/PDDA-INSTALL.md](utils/pdda/PDDA-INSTALL.md)
+- **`utils/` consolidated to 3 files** (2026-06-24) - the 7 per-check scripts + `pdda-run.sh` collapsed into one `pdda.sh` dispatcher (`pdda.sh run` / `pdda.sh <check>`); `pdda-lib.sh` and the opt-in `pdda-doc-ready.sh` stay separate. Breaking change to the install contract; old filenames removed. -> [utils/pdda/PDDA-INSTALL.md](utils/pdda/PDDA-INSTALL.md)
 
 ### Deferred
 
-- No deferred docs.
+Archived to `PROJECT/4-MISC/` on 2026-07-08 — inactive, not completed. Each had tripped
+`pdda.sh stale`; archiving records that honestly rather than promoting them to `3-COMPLETED`
+(which would claim a completion none of them actually reached).
+
+- **Root `install.sh` + operator onboarding** (2026-06-25, archived 2026-07-08) - installer that
+  provisions a foreign repo to a clean zero state; README rewritten for onboarding. The installer
+  itself ships and works; the doc stalled at "tracking issue pending `gh` re-auth" and went 10 days
+  untouched. Revive it here if the tracking issue ever gets filed. ->
+  [PROJECT/4-MISC/INSTALL-SCRIPT-AND-ONBOARDING.md](PROJECT/4-MISC/INSTALL-SCRIPT-AND-ONBOARDING.md)
+- **Reconcile pdda-sync `list` vs `status` wording** (2026-06-30, archived 2026-07-08) - a
+  just-installed-but-unpushed target read as `not-yet-pushed` in `list` while `status` reported it
+  current; `list` is now content-aware (`current`/`out-of-sync` + `(unpushed)` marker). Iteration 1
+  shipped and no iteration 2 was ever scoped. ->
+  [PROJECT/4-MISC/SYNC-LIST-STATUS-RECONCILE.md](PROJECT/4-MISC/SYNC-LIST-STATUS-RECONCILE.md)
+- **QUAD-GML52 — raw GLM 5.2 design pass for Quad Concepts** (archived 2026-07-08) - the unedited
+  model output (concept + adversarial persona review + implementation plan) that seeded GH-12. Kept as
+  a provenance artifact; GH-12's own doc owns the execution detail, and all 4 of its phases shipped. It
+  was never an active working doc, only mis-filed as one. ->
+  [PROJECT/4-MISC/QUAD-GML52.md](PROJECT/4-MISC/QUAD-GML52.md)
 
 ---
 
