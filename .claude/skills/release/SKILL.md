@@ -10,8 +10,10 @@ previews a `gh release create` command built from that block's own fields, and �
 confirmation — publishes the GitHub Release and writes the returned URL back into `GH_URL:`.
 
 This is the **publish** front-door for a planned release. It does not add new entries to
-`RELEASES.md` (see `PROJECT/PDDA.md` → "RELEASES.md — release ledger" for the format) and it does
-not write `CHANGELOG.md` — that's a separate, operator-owned step (see step 6).
+`RELEASES.md` — for that, use [`/release-plan`](../../../SKILLS/RELEASE-PLAN/SKILL.md), the sibling
+**author** front-door (interviews the operator, cross-references `CHANGELOG.md` for a canonical
+version number, appends the block) — and it does not write `CHANGELOG.md` — that's a separate,
+operator-owned step (see step 6).
 
 ## Usage
 

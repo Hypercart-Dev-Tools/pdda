@@ -651,6 +651,10 @@ release-tag cache) — that was more data than was practical to keep current for
 `Status:` is the first field added back in, deliberately kept unvalidated (baby steps, not a new
 gated lifecycle) rather than reintroducing the old rigid `Draft → RC → Published` enum.
 
+Two skills operate on this file: `/release-plan` **authors** entries (interviews the operator,
+proposes a canonical version by cross-referencing `CHANGELOG.md`, previews, appends on confirmation)
+and `/release` **publishes** an existing entry to GitHub once its `Status` is ready to ship.
+
 #### `pdda.sh releases-current`
 
 Read-only roll-up (not part of `PDDA_DETERMINISTIC_CHECKS` — emits no findings, never gates): lists
