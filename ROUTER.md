@@ -1,3 +1,17 @@
+---
+about: >
+  PDDA stands for Project-Driven Doc Automation. PDDA keeps a repo's project plans, bug-fix docs,
+  and roadmap honest enough that a human or an agent can pick up work with minimal drift.
+  Deterministic shell checks enforce the parts that should never need judgment (frontmatter, an
+  exact status table, no hardcoded paths, a pointer-only roadmap); an opt-in LLM pass flags the
+  fuzzier readiness gaps. It starts non-blocking and you graduate it onto the rails deliberately.
+repo_url: https://github.com/Hypercart-Dev-Tools/pdda
+maintainers:
+  - Noel Saw
+  - Jedi Wright
+releases: RELEASES.md  # pointer only — forward-looking release-planning ledger, not a history
+---
+
 # ROUTER.md
 
 This file is the first entry point for an AI agent working in this repo: it tells you what to read, what to run, and which files are canonical.
@@ -10,6 +24,7 @@ This file is the first entry point for an AI agent working in this repo: it tell
 - `README.md` = human-facing repo/product overview
 - `ROADMAP.md` = pointer ledger for this repo's own maintenance work
 - `CHANGELOG.md` = the end-of-iteration running log (first-class PDDA artifact; governed by `PROJECT/PDDA.md`)
+- `RELEASES.md` = forward-looking release-planning ledger (first-class PDDA artifact; governed by `PROJECT/PDDA.md`)
 - `PROJECT/PDDA.md` = the canonical PDDA contract and automation rules
 - `utils/pdda/PDDA-INSTALL.md` = the extraction/install manifest for target repos
 - `install.sh` = the executable installer (automates `utils/pdda/PDDA-INSTALL.md`; keep the two in lockstep)
@@ -63,10 +78,10 @@ utils/pdda/pdda.sh stale
 utils/pdda/pdda.sh quad-concepts    # opt-in: a "## Quad Concepts" section of 1-4 bullets (lever: .pdda-quad / PDDA_QUAD)
 utils/pdda/pdda.sh glance           # read-only roll-up: title + Quad Concepts for each PROJECT/2-WORKING doc
 utils/pdda/pdda.sh issue-doc-sync   # flag GH-*.md docs drifted from their GitHub issue state (warn-only; gh-degrades to cache)
-utils/pdda/pdda.sh release-readiness  # verify RC-status release docs are shippable (marathons completed, issues closed, tag in CHANGELOG)
+utils/pdda/pdda.sh releases    # validate RELEASES.md, the release-planning ledger (warn-only nudge)
+utils/pdda/pdda.sh releases-current  # read-only roll-up: RELEASES.md entries whose Status isn't "Shipped"
 utils/pdda/pdda.sh governance  # governance-doc cross-reference + doc/code drift (this file, AGENTS.md, CLAUDE.md, ...)
 utils/pdda/pdda.sh gh-refresh  # refresh the cached GitHub issue-state file issue-doc-sync reads offline (needs gh)
-utils/pdda/pdda.sh gh-release-sync  # refresh the cached GitHub release-state file release-readiness reads offline (needs gh)
 utils/pdda/pdda.sh doc-ready   # LLM readiness review — set PDDA_LLM_BIN (codex/claude/agy) for recommendations, else it self-skips
 utils/pdda/pdda.sh catchup     # LLM repo triage and ROUTER.md recommendations — opt-in like doc-ready
 utils/pdda/pdda.sh help        # list every command

@@ -583,92 +583,83 @@ contradictions in prose (two docs stating conflicting policy, a claim that quiet
 judgment call for the LLM layer or a human — see the `/governance-audit` skill, which runs this check
 first and then reads the same doc set for that fuzzier class of inconsistency.
 
-#### J. `pdda.sh release-readiness`
+#### J. `pdda.sh releases`
 
 Purpose:
-- verify that a release doc in `PROJECT/releases/` with `status: RC` is actually ready to publish —
-  all linked marathons completed, all linked issues closed, CHANGELOG updated, GitHub Release created
+- validate `RELEASES.md`, the single forward-looking release-planning ledger — deliberately light.
+  This replaced an earlier per-tag-doc lifecycle (`PROJECT/releases/RELEASE-<tag>.md` with a
+  Draft/RC/Published status, linked marathons, linked issues, and a GitHub release-tag cache) that
+  turned out to be too much data to keep current for an initial release. Fields and checks grow
+  only as a real need shows up — see "RELEASES.md — release ledger" below.
 
-Scope: every `PROJECT/releases/RELEASE-*.md` with `status: Draft` or `status: RC`
-(`roadmap-coverage` tracks both; `release-readiness` focuses on the RC gate).
+Scope: every `Release:` block in `RELEASES.md`.
 
 Minimum behavior:
-- for each RC-status release doc, extract `tag`, `marathons`, `issues_closed`, `gh_release_url` from
-  frontmatter; silently skip docs that are `Published`
-- **marathon check**: for each path listed under `marathons:`, verify the file lives under
-  `PROJECT/3-COMPLETED/` (by full path or basename lookup); `error` if any linked marathon is not yet
-  in the completed bucket
-- **issue check**: for each number listed under `issues_closed:`, resolve its state from the same
-  gh-degrade stack used by `issue-doc-sync`; `error` if any listed issue is still OPEN
-- **changelog check**: `warn` if `CHANGELOG.md` contains no line matching the release `tag` value
-- **gh_release_url check**: `warn` if `gh_release_url` is empty (release not yet published to GitHub)
-- **release cache check** (cache-only cross-check): `warn` if the release tag is not present in
-  `PDDA_GH_RELEASE_CACHE` (release recorded in the doc but not reflected in the synced cache); if the
-  cache is absent/empty, `warn` that the cross-check was **NOT evaluated** (never a silent pass) —
-  prime it with `pdda.sh gh-release-sync`
-- error-level findings block in `full` mode; `observe`/`light` modes report only (warn-only there,
-  same as all new checks entering the suite)
-- like `issue-doc-sync`: flag-only, never creates or publishes a GitHub Release automatically
+- parse `RELEASES.md` into blocks (one per `Release:` line; see format below)
+- **release-value check**: `error` if a block's `Release:` value is empty (a malformed-doc guard,
+  not a readiness gate)
+- **target-date check** (optional field): `warn` if `Target Date` is set but is not a valid
+  `YYYY-MM-DD` calendar date
+- **overdue check**: `warn` if `Target Date` has passed and `Status` doesn't read exactly `Shipped`
+  (case-insensitive) — `Status: Shipped` is the sole "already shipped" signal; a populated `GH_URL`
+  alone does not silence this (it means a Release object exists, not that it shipped)
+- **never blocks, even in `full` mode** — this check does not gate its exit code at all, regardless
+  of findings. The one `error` above (empty `Release:` value) is a malformed-doc guard, surfaced
+  loudly so it isn't missed, but deliberately cannot fail a build
 
-gh-degrade: two distinct paths.
-- **issue check** uses the full `issue-doc-sync` degrade stack — live `gh` when available, else the
-  cached issue state (`PDDA_GH_STATE_CACHE`); a successful live lookup writes that cache; when neither
-  yields state, it emits a `warn` that the issue was **NOT evaluated**.
-- **release-tag cross-check** is **cache-only** — it reads `PDDA_GH_RELEASE_CACHE`
-  (written by `pdda.sh gh-release-sync`) and never self-fetches. An absent/empty cache produces a
-  **NOT evaluated** `warn` rather than a silent pass.
+gh-degrade: none. The check is purely file-driven (no GitHub calls), which is a deliberate
+simplification over the old per-tag-doc check's issue/tag cross-checks against `gh`.
 
-#### `pdda.sh gh-release-sync`
+#### RELEASES.md — release ledger
 
-Purpose:
-- refresh the cached GitHub release-state file (`PDDA_GH_RELEASE_CACHE`, default
-  `.pdda-gh-release-state.tsv`) so `release-readiness` has last-known data when `gh` is offline
+`RELEASES.md` is a first-class root file, like `ROADMAP.md`/`CHANGELOG.md` — a single
+forward-looking planning ledger for major releases, not a lifecycle bucket of per-tag docs.
+Marathon plans and other forward planning cross-reference it for target release names/dates. It is
+not a history of what shipped — that's `CHANGELOG.md`; lessons learned belong there at ship time,
+not duplicated here.
 
-Behavior:
-- calls `gh release list --limit 100 --json tagName` for the current repo, writes one release tag
-  per line (comment-prefixed header + one `tagName` per line; tags carry no whitespace, so no TSV
-  columns are needed)
-- atomic write (temp file + `mv`) so a partial network failure never corrupts the cache
-- run on the same cadence as `gh-refresh` (suggested: hourly, before `pdda.sh run`)
-- `PDDA_GH_RELEASE_CACHE` env var overrides the cache path (same pattern as `PDDA_GH_STATE_CACHE`)
+Format — one flat `Label: value` block per release, blank line between blocks (blank lines are
+just visual spacing; a new block starts at the next `Release:` line):
 
-#### Release doc convention — `PROJECT/releases/RELEASE-<tag>.md`
-
-`PROJECT/releases/` is a lifecycle bucket outside the `1-INBOX/2-WORKING/3-COMPLETED/4-MISC` tree
-because a release is a cross-cutting shipping artifact that bundles multiple completed marathons, not
-a single work item in flight.
-
-Required frontmatter:
-
-```yaml
-title: "Release v1.2.0"
-tag: v1.2.0            # the GitHub release tag
-status: Draft | RC | Published
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
-owner: <person>
-gh_release_url: <url>  # populated when the GitHub Release is created
-marathons:             # one or more marathon plan docs bundled in this release
-  - PROJECT/2-WORKING/MARATHON-PLAN-2026-07-07.md
-issues_closed:         # GH issue numbers this release closes
-  - 11
-  - 21
+```text
+Release: 1.0.0
+Status: Draft
+Target Date: 2026-07-31
+Codename: n/a
+Description:
+GH_URL:
 ```
 
-Body structure:
-- `## What's in this release` — prose summary (used as the GitHub Release body)
-- `## Marathons bundled` — links to the marathon plan docs
-- `## Issues closed` — links to each GH issue
-- `## Release checklist` (deterministic QA gate):
-  - `[ ]` All linked marathons are in `PROJECT/3-COMPLETED/`
-  - `[ ]` All linked issues are closed in GitHub
-  - `[ ]` `CHANGELOG.md` entry exists for this tag
-  - `[ ]` GitHub Release created and `gh_release_url` populated
-- `## Lessons Learned` (same contract as other completed docs)
+Fields:
+- `Release:` (required) — the version being planned
+- `Status:` (optional) — free-text, unvalidated by design (`Draft`, `Working`, `Shipped`, whatever
+  an operator finds useful). **`Status: Shipped` is the sole "already shipped" signal** — both
+  `pdda.sh releases`'s overdue nudge and `pdda.sh releases-current`'s "in progress" filter key off
+  it exclusively. This is a rough signal, not a gated lifecycle — no fixed vocabulary is enforced.
+- `Target Date:` (optional) — `YYYY-MM-DD`; `pdda.sh releases` warns once this passes and `Status`
+  doesn't read `Shipped`
+- `Codename:` (optional) — `n/a` is fine
+- `Description:` (optional) — one line for now; grows into something richer only if needed
+- `GH_URL:` (optional) — populated once *a* GitHub Release object exists, including a draft (see
+  `/release` skill). **This means "a Release object exists," not "shipped"** — a draft's `GH_URL`
+  is real but the release isn't out. Flip `Status: Shipped` yourself (or let `/release` do it on an
+  actual, non-draft publish) when it's really out; `GH_URL` alone no longer implies that.
 
-Status lifecycle: `Draft` → `RC` → `Published`. `release-readiness` gates the RC → Published
-transition. Once `Published`, the doc is removed from the active ROADMAP.md ledger (same convention
-as a project doc moving to `3-COMPLETED`).
+Add new fields only when a real need shows up. This format intentionally started smaller than the
+earlier per-tag-doc convention (status lifecycle, linked marathons, linked issues, a GitHub
+release-tag cache) — that was more data than was practical to keep current for an initial release.
+`Status:` is the first field added back in, deliberately kept unvalidated (baby steps, not a new
+gated lifecycle) rather than reintroducing the old rigid `Draft → RC → Published` enum.
+
+#### `pdda.sh releases-current`
+
+Read-only roll-up (not part of `PDDA_DETERMINISTIC_CHECKS` — emits no findings, never gates): lists
+every `RELEASES.md` entry whose `Status` is empty or not exactly `Shipped`. A rough, non-authoritative
+answer to "what's currently in progress" — for a human, or for another repo's tooling (e.g. the XYZ
+sibling harness) to shell out to instead of re-implementing `RELEASES.md` parsing itself. Because
+`Status` is free-text, this is a best-effort filter, not a guarantee — an entry with a typo'd or
+unconventional `Status` value still shows up (safer default: never silently hide something that
+lacks an explicit `Shipped` signal).
 
 The four-tier shipping chain:
 
@@ -676,7 +667,7 @@ The four-tier shipping chain:
 task/issue  (GH-*.md in 1-INBOX)
   → project (2-WORKING active doc)
     → marathon (marathon/MARATHON-*.yaml + PROJECT/2-WORKING/MARATHON-PLAN-*.md)
-      → release (PROJECT/releases/RELEASE-*.md + GitHub Release tag)
+      → release (RELEASES.md entry + GitHub Release)
 ```
 
 ### 2. LLM-assisted doc readiness review
@@ -892,11 +883,12 @@ Run the deterministic checks every hour in this order:
 6. `pdda.sh changelog`
 7. `pdda.sh stale`
 8. `pdda.sh issue-doc-sync`
-9. `pdda.sh governance`
+9. `pdda.sh releases`
+10. `pdda.sh governance`
 
 Then run:
 
-10. `pdda.sh doc-ready`
+11. `pdda.sh doc-ready`
 
 (`pdda.sh run` runs exactly this sequence and applies the active `PDDA_MODE` gate. Scheduling the
 single aggregate command is the recommended hourly cron entry.)

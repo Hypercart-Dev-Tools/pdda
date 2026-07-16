@@ -1,5 +1,41 @@
 # CHANGELOG.md
 
+## 2026-07-15
+
+### Simplify the release primitive: RELEASES.md replaces the per-tag-doc lifecycle
+
+The GH-35 (2026-07-14) release primitive turned out to be too much data to keep current for an
+initial release — a Draft/RC/Published status lifecycle, linked marathons, linked issues, and a
+GitHub release-tag cache, all per `PROJECT/releases/RELEASE-<tag>.md` doc. Replaced with a single
+lightweight forward-looking ledger; fields/checks grow only as a real need shows up.
+
+- **`RELEASES.md`** — new first-class root file (alongside `ROADMAP.md`/`CHANGELOG.md`), not a
+  lifecycle bucket. One flat `Release:`/`Target Date:`/`Codename:`/`Description:`/`GH_URL:` block
+  per release, blank line between blocks. Lessons learned live in `CHANGELOG.md` at ship time, not
+  duplicated here. Contract in `PROJECT/PDDA.md` → "RELEASES.md — release ledger". `install.sh` now
+  seeds it for target repos.
+
+- **`pdda.sh releases`** replaces `pdda.sh release-readiness` — parses `RELEASES.md` blocks;
+  errors on an empty `Release:` value; warns on a malformed `Target Date`; warns when `Target Date`
+  has passed and `GH_URL` is still empty. Purely file-driven — no `gh` calls, no gh-degrade path
+  (a meaningful simplification over the old marathon/issue/tag cross-checks).
+
+- **Removed**: `PROJECT/releases/` lifecycle bucket, `pdda.sh gh-release-sync` +
+  `utils/pdda/pdda-gh-release-sync.sh`, the `roadmap-coverage` requirement that Draft/RC release
+  docs carry a ROADMAP pointer (RELEASES.md is a root ledger like ROADMAP.md itself — it doesn't
+  need one), and the `PDDA_RELEASES_DIR`/`PDDA_GH_RELEASE_CACHE` env vars (now `PDDA_RELEASES_FILE`).
+
+- **`/release` skill** rewritten: finds a `Release: <version>` block in `RELEASES.md` instead of a
+  `RELEASE-<tag>.md` doc; builds the release body from the block's own `Description:`; writes the
+  published URL back into `GH_URL:` (no `status:` field to flip); nudges the operator to add a
+  `CHANGELOG.md` entry rather than synthesizing one from linked docs (there are none anymore).
+
+- **`install.sh` + `PDDA-INSTALL.md`** updated to match: seed `RELEASES.md` instead of
+  `PROJECT/releases/blank.md`; drop `pdda-gh-release-sync.sh` from the copy/chmod list and
+  `.pdda-gh-release-state.tsv` from the gitignore list.
+
+Verification: `utils/pdda/pdda.sh run` (errors=0; pre-existing warns unrelated to this change).
+
 ## 2026-07-14
 
 ### GH-35: Release primitive — first-class GitHub Releases integration
@@ -596,7 +632,7 @@ The agent then followed the reminder's cheap, checkable directives (run `pdda.sh
 `AGENTS.md`). Compliance with an injected reminder is still voluntary; an agent drops whichever directive
 costs most and is checked least.
 
-## 2026-07-08
+## [1.1.0] - 2026-07-08
 
 ### GH-17 + GH-18 fixed: the two follow-ups GH-15 surfaced, resolved in one pass
 
@@ -1316,7 +1352,7 @@ ready-to-use zero state, and rewrote `README.md` to lead with operator onboardin
 Verification: `./install.sh <throwaway-target>` → target `pdda.sh run` exits 0 (fresh + idempotent
 re-run + `--force`/`--with-startup-docs`/`--mode` exercised); `./utils/pdda.sh run` green in this repo.
 
-## 2026-06-24
+## [1.0.0] - 2026-06-24
 
 ### BREAKING: consolidated `utils/` to 3 files
 

@@ -1,25 +1,23 @@
 ---
 name: release
-description: Turn a PROJECT/releases/RELEASE-<tag>.md doc into a published GitHub Release. Reads all linked marathon plan docs and closed issue docs, synthesizes the GitHub Release body from their Lessons Learned and Quad Concepts sections, previews the draft, then calls `gh release create <tag>` and writes gh_release_url back into the RELEASE-*.md doc. Trigger on /release <tag-or-path>, "publish this release", or "create GitHub release for <tag>".
+description: Turn a planned entry in RELEASES.md into a published GitHub Release. Finds the matching "Release: <version>" block, previews a `gh release create` body built from that block's own Description, then on confirmation publishes it and writes the returned URL back into GH_URL. Trigger on /release <version>, "publish this release", or "create GitHub release for <version>".
 ---
 
-# /release — release doc → published GitHub Release
+# /release — RELEASES.md entry → published GitHub Release
 
-Give it a release tag (e.g. `v1.2.0`) or the path to a `PROJECT/releases/RELEASE-*.md` doc. It runs
-the release-gate checks, synthesizes a GitHub Release body from the linked marathon and issue docs,
-previews everything, and — on one confirmation — publishes the GitHub Release and writes
-`gh_release_url` back into the doc.
+Give it a release version (e.g. `1.0.0`). It finds the matching `Release:` block in `RELEASES.md`,
+previews a `gh release create` command built from that block's own fields, and — on one
+confirmation — publishes the GitHub Release and writes the returned URL back into `GH_URL:`.
 
-This is the **publish** front-door for the release lifecycle. It does not create the release doc (use
-the `RELEASE-<tag>.md` doc convention in `PROJECT/PDDA.md` for that). It does not move marathon docs
-to `3-COMPLETED` (that is a separate step).
+This is the **publish** front-door for a planned release. It does not add new entries to
+`RELEASES.md` (see `PROJECT/PDDA.md` → "RELEASES.md — release ledger" for the format) and it does
+not write `CHANGELOG.md` — that's a separate, operator-owned step (see step 6).
 
 ## Usage
 
 ```
-/release v1.2.0                              # find and publish the matching RELEASE-v1.2.0.md
-/release PROJECT/releases/RELEASE-v1.2.0.md # explicit path
-/release                                     # ask for the tag, then proceed
+/release 1.0.0   # find and publish the "Release: 1.0.0" block in RELEASES.md
+/release         # ask for the version, then proceed
 ```
 
 ## Steps
@@ -29,51 +27,46 @@ to `3-COMPLETED` (that is a separate step).
    - **Tools?** `gh` (auth'd) is required. If a `gh` call fails, retry **unsandboxed** first before
      concluding it is broken. Confirm `gh auth status` succeeds before proceeding.
 
-1. **Locate the release doc.** From the given tag or path, find the matching
-   `PROJECT/releases/RELEASE-<tag>.md`. Error if it doesn't exist or has `status: Published`
-   (already published; nothing to do).
+1. **Locate the release block.** Find the `Release: <version>` block in `RELEASES.md`. Error if no
+   block matches, or if `Status:` already reads `Shipped` (already published; nothing to do). If
+   `GH_URL:` is populated but `Status` isn't `Shipped`, a Release object already exists (likely a
+   draft, e.g. from a manual `gh release create --draft`) — say so and ask the operator how to
+   proceed rather than assuming nothing to do; `gh release create` below will simply fail if the
+   tag/release already exists, which step 5's guardrail already handles.
 
-2. **Run `pdda.sh release-readiness`** to surface any blocking findings before attempting to
-   publish. Report findings to the operator. If error-level findings exist in the current PDDA mode,
-   ask the operator to confirm they want to proceed anyway (never auto-skip deterministic errors).
+2. **Run `pdda.sh releases`** to surface any findings (a malformed block, an invalid `Target Date`)
+   before attempting to publish. Report findings to the operator; this check is warn-only, so use
+   judgment rather than a hard gate.
 
-3. **Synthesize the GitHub Release body.** For each marathon doc listed under `marathons:`:
-   - Read the doc and extract the `## Lessons Learned` section (if present).
-   - Extract `## Quad Concepts` bullets (if present).
-   - Compose a brief "what changed" narrative per marathon.
-   For each issue listed under `issues_closed:`, add a "Fixes #<n>" reference.
-   Combine into a release body: `## What's in this release` (from the doc's own section first, then
-   marathon summaries), `## Lessons Learned`, `## Issues closed`. Keep it factual — never invent
-   content that isn't in the source docs.
+3. **Build the release body from the block's own fields.** Use `Description:` as the body. If
+   `Codename:` is set and isn't `n/a`, mention it. If `Description:` is empty, ask the operator for
+   a short summary rather than inventing one — never fabricate release notes.
 
-4. **Preview the whole release as one bundle, then get ONE confirmation.** Render together:
-   - The `gh release create` command that would be run (tag, title, body)
-   - The synthesized release body (full markdown preview)
-   - The `gh_release_url` write-back that will happen on confirm
+4. **Preview, then get ONE confirmation.** Render together:
+   - The `gh release create` command that would be run (version as tag, title, body)
+   - The release body (full markdown preview)
+   - The `GH_URL:` write-back that will happen on confirm
    Nothing is published before the operator confirms.
 
 5. **On confirm, execute in order:**
-   - `gh release create <tag> --title "<title>" --notes "<body>"` → capture the returned URL.
-   - Update `gh_release_url` in the `RELEASE-<tag>.md` frontmatter with the returned URL.
-   - Update `status: Published` and `updated: <today>` in the frontmatter.
-   - Remove the release's ROADMAP.md pointer from the active ledger (same convention as completing
-     a project doc — the Published release is no longer "in flight").
+   - `gh release create <version> --title "<title>" --notes "<body>"` → capture the returned URL.
+     This publishes live (no `--draft`), so a successful call means the release is genuinely out.
+   - Update `GH_URL:` in the matching `RELEASES.md` block with the returned URL, **and** set
+     `Status: Shipped` — `GH_URL` alone only means "a Release object exists" (see `PROJECT/PDDA.md`
+     → "RELEASES.md — release ledger"); `Status: Shipped` is what the checks treat as authoritative.
 
-6. **Report + verify** with `utils/pdda/pdda.sh release-readiness` (should now pass cleanly with
-   `gh_release_url` populated and `status: Published` excluding it from RC checks).
-   Also run `utils/pdda/pdda.sh roadmap-coverage` (confirms the pointer is no longer required).
-   Report the release URL and the updated doc path.
+6. **Report + nudge.** Run `utils/pdda/pdda.sh releases` to confirm it's clean. Report the release
+   URL and remind the operator to add a `CHANGELOG.md` entry for this release (lessons learned live
+   there, not in `RELEASES.md` — see `PROJECT/PDDA.md` → "RELEASES.md — release ledger"). Do not
+   write the CHANGELOG entry yourself; that's the operator's call on content and timing.
 
 ## Guardrails
 
 - **One preview, one confirmation.** Render the `gh release create` command + full body together and
   publish nothing until the operator confirms once.
 - **Outward-facing steps confirm first.** A GitHub Release is public and durable (`AGENTS.md` #2/#3).
-- **Don't move marathon docs.** This skill publishes the release; verifying that marathons are in
-  `3-COMPLETED` is the operator's job before calling `/release` (or acknowledge the warning and
-  proceed anyway at their discretion).
-- **Never invent release notes.** Synthesize from the actual linked docs. If source docs have no
-  `## Lessons Learned` section, note the gap but don't fabricate content.
+- **Never invent release notes.** Use the block's own `Description:`; if it's empty, ask — don't
+  fabricate.
 - **Repo-relative paths only** in doc edits — no absolute local paths.
-- **If `gh release create` fails**, report the error verbatim and stop. Do not write `gh_release_url`
-  until the create succeeds.
+- **If `gh release create` fails**, report the error verbatim and stop. Do not write `GH_URL:` until
+  the create succeeds.
