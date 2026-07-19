@@ -68,6 +68,10 @@ INFO_COUNT=0
 PDDA_RUN_ERRORS=0
 PDDA_RUN_WARNS=0
 PDDA_RUN_ERROR_CHECKS=""
+# GH-43: the warn total was accumulated below but never read, so a run whose findings were all
+# warn-level printed "all checks passed". Same family, one step further out: PDDA_RUN_ERRORS answers
+# "did anything go wrong", not "did anything need attention" — which is what that line asserts.
+PDDA_RUN_WARN_CHECKS=""
 
 pdda_now_iso() {
   date -u +"%Y-%m-%dT%H:%M:%SZ"
@@ -176,6 +180,9 @@ pdda_emit_summary() {
   PDDA_RUN_WARNS=$((PDDA_RUN_WARNS + WARN_COUNT))
   if [ "$ERROR_COUNT" -gt 0 ]; then
     PDDA_RUN_ERROR_CHECKS="$PDDA_RUN_ERROR_CHECKS $check"
+  fi
+  if [ "$WARN_COUNT" -gt 0 ]; then
+    PDDA_RUN_WARN_CHECKS="$PDDA_RUN_WARN_CHECKS $check"
   fi
 
   if [ "$PDDA_FORMAT" = "json" ]; then

@@ -1085,9 +1085,12 @@ pdda-check-quad-concepts:check_quad_concepts"
     FAILED="$FAILED pdda-doc-ready"
   fi
 
-  # Three outcomes, not two (BUG-001b). "EXIT_CODE is 0" answers "did anything block?", which outside
-  # full mode is always no. Only PDDA_RUN_ERRORS answers "did anything go wrong?" — and that is the
-  # question the closing line claims to be answering.
+  # Four outcomes, not three (GH-43, extending BUG-001b). "EXIT_CODE is 0" answers "did anything
+  # block?", which outside full mode is always no. PDDA_RUN_ERRORS answers "did anything go wrong?".
+  # Neither answers "did anything need attention?" — and that is what "all checks passed" asserts. A
+  # run of nothing but warns took the else branch and printed success over its own findings, which is
+  # how a doc could sit stale-flagged for 12 days while every run reported clean. Warns stay
+  # non-blocking; only the closing line changes.
   runner_say ""
   if [ "$EXIT_CODE" -ne 0 ]; then
     runner_say "PDDA run complete: failures:$FAILED"
@@ -1097,6 +1100,10 @@ pdda-check-quad-concepts:check_quad_concepts"
     runner_say "Run with PDDA_MODE=full (or .pdda-mode) once these are fixed, so they block."
     pdda_log_activity error "pdda-run" "$PDDA_REPO_ROOT" 0 \
       "PDDA run reported $PDDA_RUN_ERRORS error(s) in mode=$PDDA_MODE (non-blocking):$PDDA_RUN_ERROR_CHECKS" "finish"
+  elif [ "$PDDA_RUN_WARNS" -gt 0 ]; then
+    runner_say "PDDA run complete: no errors, $PDDA_RUN_WARNS warning(s) to review —$PDDA_RUN_WARN_CHECKS"
+    pdda_log_activity warn "pdda-run" "$PDDA_REPO_ROOT" 0 \
+      "PDDA run reported $PDDA_RUN_WARNS warning(s) and no errors:$PDDA_RUN_WARN_CHECKS" "finish"
   else
     runner_say "PDDA run complete: all checks passed"
     pdda_log_activity info "pdda-run" "$PDDA_REPO_ROOT" 0 "PDDA run completed successfully" "finish"

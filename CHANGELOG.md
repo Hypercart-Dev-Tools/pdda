@@ -1,5 +1,58 @@
 # CHANGELOG.md
 
+## 2026-07-18
+
+### `run` no longer reports "all checks passed" over its own warnings (GH-43)
+
+`PDDA_RUN_WARNS` had been accumulated in `pdda-lib.sh` since BUG-001b and **never read**. `cmd_run`
+branched only on `EXIT_CODE` and `PDDA_RUN_ERRORS`, so any run whose findings were all warn-level fell
+through to the `else` and printed `all checks passed`. On this repo that meant six warnings on screen —
+three of them stale-doc flags aged 10, 11, and 12 days — under a summary line asserting success.
+
+This is the measured cause of a real stall, not a hypothetical. The 2026-07-17 marathon triage found
+zero of eight lanes ready, with two items undecided for 9 and 11 days (`#11`, `AGENTS-BUILDER-SKILL.md`).
+`pdda-stale-working-docs` had been flagging both the entire time. Detection worked; reporting buried it.
+
+- **Fourth outcome in `cmd_run`.** When nothing blocked and no errors were found but warns were, the
+  closing line now reads `no errors, N warning(s) to review — <checks>`. `all checks passed` is
+  reserved for genuinely clean runs, so it stays meaningful.
+- **`PDDA_RUN_WARN_CHECKS`** added alongside `PDDA_RUN_ERROR_CHECKS`, so the warn line names which
+  checks warned — parity with the error path.
+- **No semantic change.** Exit codes, the mode gate, and warn-vs-error severity are untouched; warns
+  remain non-blocking in every mode, including `full`. This is a reporting fix only.
+- **Test fixture corrected.** `new_clean_sandbox` in `test/pdda-run-mode-reporting.sh` was never clean —
+  it emitted 21 warns (a `CHANGELOG.md` with no dated entry; 20 dead references from writing router
+  lines as bare `pdda.sh`). That was invisible precisely because of this bug. Now genuinely clean, which
+  is what makes the "a clean run still says so" negative control testable at all.
+- Warn-only coverage extended across `observe`/`light`/`full`; suite 29 → 32 assertions.
+
+Extends the GH-23 / GH-27 / BUG-001b family — *a check that could not run, or could not block, must
+never be scored as a check that passed* — with the case those missed: a check that **did** run, **did**
+find something, and was still scored as passed.
+
+### Guiding principles #7 and #8
+
+Two principles added, both derived from the above rather than authored in the abstract:
+
+- **#7 — Default to the reversible action; require evidence for the expensive one.** Closing or parking
+  is cheap and undoable; keeping an item open costs recurring triage attention forever. State a default
+  and the one fact that would overturn it, instead of symmetric options — "close as obsolete, or
+  re-scope?" is how an item sits untouched for nine days.
+- **#8 — A finding that was reported is not a finding that was seen.** If a run's closing line
+  contradicts its own output, the signal is lost however good the detector was. Corollary of #3.
+
+### Myriad and agents-builder resolved
+
+- `README.md` advertised `SKILLS/myriad/` for nine days after `ec886b6` deleted it — a dead reference
+  `check_governance` did not catch (tracked on #41). Bullet removed.
+- `#11` (myriad-review reader) moved to `giant-brains-claude-skills#6` with provenance and porting
+  notes; cross-org `gh issue transfer` is not permitted, so it was recreated, not transferred. Closed
+  here as **moved**, not rejected. Its doc and ROADMAP entry deleted.
+- `AGENTS-BUILDER-SKILL.md` had no linked issue, which left it un-preflightable. Tracking issue #42
+  filed retroactively; stale 2026-07-07 marathon references severed; status `Active` → `Parked`.
+- `GH-21`/`GH-28` capture docs archived to `3-COMPLETED/` and their ROADMAP entries moved to Completed.
+  `marathon-plan.sh` drift `true` → `false`; both `already-closed` flags cleared.
+
 ## 2026-07-15
 
 ### Simplify the release primitive: RELEASES.md replaces the per-tag-doc lifecycle
