@@ -37,21 +37,17 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 ### Queue / parked intake
 - **GH-41 — Marathon triage 2026-07-17 follow-ups** (2026-07-18) - master tracking issue for the
   held candidate pool: 0 of 8 open items are marathon-ready, all failing `swarm-preflight` exit 3 on a
-  missing `## Swarm Preflight Contract` block. Covers two operator decisions (#11's deleted Myriad
-  dependency, `AGENTS-BUILDER-SKILL.md`'s orphaned state), contract authoring for #9/#10/#14 and
-  #13/#36/#40, scope calls on #38/#39, and the held 2026-07-07 marathon-leftover sweep. Triage items
-  1-2 already landed (0fae994). Issue [#41](https://github.com/Hypercart-Dev-Tools/pdda/issues/41). ->
+  missing `## Swarm Preflight Contract` block. Covers `AGENTS-BUILDER-SKILL.md`'s orphaned state,
+  contract authoring for #9/#10/#14 and #13/#36/#40, scope calls on #38/#39, and the held 2026-07-07
+  marathon-leftover sweep. Triage items 1-2 landed in 0fae994; the #11 Myriad decision resolved
+  2026-07-18 (moved to giant-brains). Issue
+  [#41](https://github.com/Hypercart-Dev-Tools/pdda/issues/41). ->
   [PROJECT/1-INBOX/MARATHON-TRIAGE-2026-07-17.md](PROJECT/1-INBOX/MARATHON-TRIAGE-2026-07-17.md)
 - **Marathon Plan (2026-07-07)** (2026-07-07) - the canonical XYZ-format marathon plan doc
   (hand-authored per `.xyz/README.md`'s Option B — the ROADMAP auto-generator, Option A, currently
   reports 0 active lanes) for the two build phases below, distinct from the machine-executable
   `marathon/MARATHON-2026-07-07.yaml`. ->
   [PROJECT/2-WORKING/MARATHON-PLAN-2026-07-07.md](PROJECT/2-WORKING/MARATHON-PLAN-2026-07-07.md)
-- **GH-11 — myriad-review reader** (2026-07-06) - give the `/myriad` parking lot a read path: a tiny
-  read-only `utils/pdda/pdda-myriad.sh review [--weeks N]` that prints open items grouped by week, plus a
-  one-line pointer from `pdda.sh run` so `/pdda` surfaces the backlog transitively. Queued as phase `p1`
-  of the [2026-07-07 marathon](marathon/MARATHON-2026-07-07.yaml). Issue
-  [#11](https://github.com/Hypercart-Dev-Tools/pdda/issues/11). -> [PROJECT/2-WORKING/GH-11-MYRIAD-REVIEW-READER.md](PROJECT/2-WORKING/GH-11-MYRIAD-REVIEW-READER.md)
 - **agents-builder skill** (2026-07-06) - a Claude Code skill that interviews a user (scenario → infer
   camps) and writes an `AGENTS-TEMP.md` from the architectural camps in
   `PROJECT/4-MISC/OPINIONATED-ARCHITECTURE/OPINIONATED-PATTERNS.md`; never touches an existing

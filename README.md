@@ -139,10 +139,6 @@ docs are honest — which is exactly what the deterministic checks are there to 
 
 This repo ships a couple of Claude Code skills under `SKILLS/` for working the PDDA workflow itself:
 
-- **`SKILLS/myriad/`** — end-of-day triage for a messy agent completion message. Sorts it into
-  Completed / Critical Blockers / Awaiting Your Call, reminds you to check `git status`, and parks
-  everything else (ideas, nice-to-haves, dupes) in a dated weekly backlog file via an idempotent,
-  verify-after-write helper so nothing gets lost or double-logged. Trigger: `/myriad`.
 - **`SKILLS/PDDA-EOD/`** — a sequenced end-of-day wrap for this repo: reconciles `PROJECT/**` docs
   with `ROADMAP.md`/`CHANGELOG.md`, checks the git tree is pushed, and offers user-verified closing
   of done GitHub issues. Trigger: `/pdda-eod`.

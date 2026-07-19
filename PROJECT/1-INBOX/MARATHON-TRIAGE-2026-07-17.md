@@ -98,6 +98,24 @@ residuals this doc didn't call out: GH-28's non-goal git-pulse-checkout follow-u
 deliberately **held** rather than swept — those artifacts belong to the marathon whose two
 phases are exactly items 3 and 4, so clearing them would presume those decisions.
 
+**Item 3 (GH-11) resolved 2026-07-18 — closed as moved, not obsolete.** Investigating the
+"what contract does this break?" question showed #11 broke none: `pdda.sh governance` and
+`roadmap-coverage` were both clean with it open. The real break was `README.md`, which
+still advertised `SKILLS/myriad/` as a bundled skill after `ec886b6` deleted it — a dead
+reference the governance dead-ref scan did not catch. That bullet is now removed, the
+proposal moved to
+[giant-brains#6](https://github.com/Claude-AI-Tools-Ventura-County/giant-brains-claude-skills/issues/6)
+(cross-org `gh issue transfer` is not permitted, so it was recreated with provenance and
+porting notes), `#11` closed as moved, and `PROJECT/2-WORKING/GH-11-MYRIAD-REVIEW-READER.md`
+deleted along with its ROADMAP queue entry.
+
+> Two things this leaves open. (a) `marathon/MARATHON-2026-07-07.yaml` and
+> `marathon/briefs/p1-myriad-review-reader.md` still point at the now-deleted GH-11 doc —
+> dangling refs governance also does not catch. They are part of the held item-8 leftover
+> sweep, whose p1 half is now decided even though p2 (agents-builder) is not.
+> (b) `2-WORKING/MYRIAD-WEEK-2026-07-06.md` (status `Active`) stays — the parking-lot data
+> did not follow the skill out, so pdda still holds a backlog no skill here can read.
+
 Harness defect found during this run filed upstream as
 [xyz-3-agents-swarm#247](https://github.com/Claude-AI-Tools-Ventura-County/xyz-3-agents-swarm/issues/247):
 `marathon-triage`'s bare `utils/` script paths don't resolve in a vendored `.xyz/` install,
