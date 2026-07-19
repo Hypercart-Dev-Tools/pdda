@@ -81,3 +81,24 @@ questions below are resolved.
 
 No lane fired, no doc promoted, no issue closed — this doc is a proposal for the operator
 to act on.
+
+## Disposition (2026-07-18)
+
+Acted on. Items 1-2 landed in `0fae994`: GH-21 and GH-28 capture docs archived to
+`3-COMPLETED/`, both ROADMAP entries moved from "Queue / parked intake" to "Completed".
+Verified `pdda.sh governance` and `roadmap-coverage` at errors=0 warns=0, and
+`marathon-plan.sh --dry-run --deep` drift `true -> false` with both `already-closed`
+flags cleared (`held=8` unchanged — those are the NEEDS-CONTRACT items).
+
+Items 3-8 are tracked as a checklist on issue
+[#41](https://github.com/Hypercart-Dev-Tools/pdda/issues/41), which also carries two
+residuals this doc didn't call out: GH-28's non-goal git-pulse-checkout follow-up
+(recorded so archiving didn't bury it) and the ROADMAP ledger-format tidy for the
+2026-06-24 pre-convention entries noted above. Item 8 (marathon leftovers) was
+deliberately **held** rather than swept — those artifacts belong to the marathon whose two
+phases are exactly items 3 and 4, so clearing them would presume those decisions.
+
+Harness defect found during this run filed upstream as
+[xyz-3-agents-swarm#247](https://github.com/Claude-AI-Tools-Ventura-County/xyz-3-agents-swarm/issues/247):
+`marathon-triage`'s bare `utils/` script paths don't resolve in a vendored `.xyz/` install,
+which is why this run required hand-substituting `.xyz/utils/marathon-plan.sh`.

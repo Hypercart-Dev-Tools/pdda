@@ -35,6 +35,13 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 ## Ledger
 
 ### Queue / parked intake
+- **GH-41 — Marathon triage 2026-07-17 follow-ups** (2026-07-18) - master tracking issue for the
+  held candidate pool: 0 of 8 open items are marathon-ready, all failing `swarm-preflight` exit 3 on a
+  missing `## Swarm Preflight Contract` block. Covers two operator decisions (#11's deleted Myriad
+  dependency, `AGENTS-BUILDER-SKILL.md`'s orphaned state), contract authoring for #9/#10/#14 and
+  #13/#36/#40, scope calls on #38/#39, and the held 2026-07-07 marathon-leftover sweep. Triage items
+  1-2 already landed (0fae994). Issue [#41](https://github.com/Hypercart-Dev-Tools/pdda/issues/41). ->
+  [PROJECT/1-INBOX/MARATHON-TRIAGE-2026-07-17.md](PROJECT/1-INBOX/MARATHON-TRIAGE-2026-07-17.md)
 - **Marathon Plan (2026-07-07)** (2026-07-07) - the canonical XYZ-format marathon plan doc
   (hand-authored per `.xyz/README.md`'s Option B — the ROADMAP auto-generator, Option A, currently
   reports 0 active lanes) for the two build phases below, distinct from the machine-executable
