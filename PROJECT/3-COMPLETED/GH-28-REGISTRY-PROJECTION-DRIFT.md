@@ -1,6 +1,6 @@
 ---
 title: Audit & fix registry-to-git-pulse-sync projection drift
-status: Active — Phases 0-2 complete (code + tests + docs landed); one non-code follow-up remains (operator's stalled git-pulse checkout)
+status: Complete — Phases 0-2 landed (code + tests + docs); issue #28 closed. Archived to 3-COMPLETED 2026-07-18. The residual git-pulse-checkout item is an explicit non-goal (see non_goals below), tracked separately, and was never a blocker on closing.
 created: 2026-07-09
 updated: 2026-07-09
 owner: noel

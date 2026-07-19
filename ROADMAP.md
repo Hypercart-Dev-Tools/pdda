@@ -35,19 +35,6 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 ## Ledger
 
 ### Queue / parked intake
-- **GH-28 — Audit & fix registry-to-git-pulse-sync projection drift** (2026-07-09) - Phase 0 found
-  `install.sh`'s projection write is actually correct; the real gap is it never warns when the
-  git-pulse checkout it targets is dirty/behind and never reaching origin (confirmed: 650 commits
-  behind, 5 rows stuck uncommitted since 2026-07-02 on this device). Phase 1 adds that warning. Feature,
-  2 phases. Captured via /idea. Issue [#28](https://github.com/Hypercart-Dev-Tools/pdda/issues/28). ->
-  [PROJECT/2-WORKING/GH-28-REGISTRY-PROJECTION-DRIFT.md](PROJECT/2-WORKING/GH-28-REGISTRY-PROJECTION-DRIFT.md)
-
-- **GH-21 — SKILLS/PDDA-hook opt-in SessionStart doc-governance reminder** (2026-07-08) - new bundled
-  skill that installs a `SessionStart` hook re-anchoring `ROUTER.md`/`AGENTS.md`/`PROJECT/PDDA.md` at
-  every context boundary (startup/resume/clear/compact), auto-scoped via `PROJECT/PDDA.md` detection,
-  global- or repo-local-scoped, propose-then-confirm, never touches a repo's committed `settings.json`.
-  Implemented same-session as capture. Issue [#21](https://github.com/Hypercart-Dev-Tools/pdda/issues/21). ->
-  [PROJECT/1-INBOX/GH-21-PDDA-HOOK-SKILL.md](PROJECT/1-INBOX/GH-21-PDDA-HOOK-SKILL.md)
 - **Marathon Plan (2026-07-07)** (2026-07-07) - the canonical XYZ-format marathon plan doc
   (hand-authored per `.xyz/README.md`'s Option B — the ROADMAP auto-generator, Option A, currently
   reports 0 active lanes) for the two build phases below, distinct from the machine-executable
@@ -109,6 +96,21 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Completed
 
+- **GH-28 — Audit & fix registry-to-git-pulse-sync projection drift** (2026-07-09 → closed) - Phase 0
+  found `install.sh`'s projection write is actually correct; the real gap was that it never warned when
+  the git-pulse checkout it targets is dirty/behind and never reaching origin. Phase 1 added
+  `warn_stale_projection_destination()` + 4 test cases (21/21 passing); Phase 2 documented it in
+  `PDDA-INSTALL.md` and `install.sh --help`. The residual operator git-pulse-checkout item is an
+  explicit non-goal of this doc, not owed work here. Issue
+  [#28](https://github.com/Hypercart-Dev-Tools/pdda/issues/28). ->
+  [PROJECT/3-COMPLETED/GH-28-REGISTRY-PROJECTION-DRIFT.md](PROJECT/3-COMPLETED/GH-28-REGISTRY-PROJECTION-DRIFT.md)
+- **GH-21 — SKILLS/PDDA-hook opt-in SessionStart doc-governance reminder** (2026-07-08 → closed) - new
+  bundled skill that installs a `SessionStart` hook re-anchoring `ROUTER.md`/`AGENTS.md`/`PROJECT/PDDA.md`
+  at every context boundary (startup/resume/clear/compact), auto-scoped via `PROJECT/PDDA.md` detection,
+  global- or repo-local-scoped, propose-then-confirm, never touches a repo's committed `settings.json`.
+  Implemented same-session as capture; shipped as `SKILLS/PDDA-hook/`. Issue
+  [#21](https://github.com/Hypercart-Dev-Tools/pdda/issues/21). ->
+  [PROJECT/3-COMPLETED/GH-21-PDDA-HOOK-SKILL.md](PROJECT/3-COMPLETED/GH-21-PDDA-HOOK-SKILL.md)
 - **GH-17 — PROJECT/PDDA.md dead-references RECAP.md/REAL-AGENT-OBSERVATIONS.md** (2026-07-08) - two
   claims in `PROJECT/PDDA.md`'s CHANGELOG section didn't match reality. Root cause found: both filenames
   are real artifacts in the sibling `xyz-3-agents-swarm` repo this standalone repo's docs were extracted

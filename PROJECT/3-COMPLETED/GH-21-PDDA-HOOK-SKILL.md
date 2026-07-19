@@ -2,7 +2,7 @@
 gh_issue: 21
 source: https://github.com/Hypercart-Dev-Tools/pdda/issues/21
 title: "Add SKILLS/PDDA-hook: opt-in SessionStart doc-governance reminder skill"
-status: Proposed (1-INBOX — not yet active)
+status: Complete — shipped as SKILLS/PDDA-hook/ (implemented same session as capture); issue #21 closed. Archived to 3-COMPLETED 2026-07-18.
 created: 2026-07-08
 doc_type: feedback
 context_tags: [skills, hooks, governance, session-start]
