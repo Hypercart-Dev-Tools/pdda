@@ -1,9 +1,11 @@
 ---
 title: agents-builder skill — interview a user's architectural style into an AGENTS-TEMP.md
-status: Active — planned; queued for the 2026-07-07 marathon (phase p2)
+status: Parked — design locked, nothing built. Was queued for the 2026-07-07 marathon, which never fired; that link is severed and the work is unscheduled.
 created: 2026-07-06
-updated: 2026-07-07
+updated: 2026-07-18
 owner: noel
+gh_issue: 42
+source: https://github.com/Hypercart-Dev-Tools/pdda/issues/42
 doc_type: project
 effort: 3
 complexity: 3
@@ -32,7 +34,7 @@ how they actually build. The user then hand-merges it; the skill **never** touch
 
 | What was just completed | What's next |
 |---|---|
-| Planned with the operator; three design forks locked (scenario→infer interview, full directives+playbooks output, global skill with embedded camps content). Queued as phase `p2` of the [2026-07-07 marathon](../../marathon/MARATHON-2026-07-07.yaml). | Build `skills/agents-builder/` (SKILL.md + reference/camps.md + scripts/build_agents_temp.py) + `test/agents-builder.sh`; then hand-install to `~/.claude/skills/`. |
+| Planned with the operator; three design forks locked (scenario→infer interview, full directives+playbooks output, global skill with embedded camps content). Tracking issue [#42](https://github.com/Hypercart-Dev-Tools/pdda/issues/42) filed 2026-07-18. | **Parked — not scheduled.** When picked up: build `skills/agents-builder/` (SKILL.md + reference/camps.md + scripts/build_agents_temp.py) + `test/agents-builder.sh`, then hand-install to `~/.claude/skills/`. Needs a `## Swarm Preflight Contract` block before it can be marathon-ready. |
 
 ## Locked decisions (operator, 2026-07-06)
 
@@ -62,7 +64,7 @@ how they actually build. The user then hand-merges it; the skill **never** touch
 
 ## Build shape
 
-Because a marathon runs inside this repo and can't write outside it, the artifact is **built repo-local**
+Automated work in this repo can't write outside it, so the artifact is **built repo-local**
 under `skills/agents-builder/`, then **installed to the global skills dir by a documented manual step**
 (the skill's runtime home is `~/.claude/skills/agents-builder/`).
 
@@ -84,9 +86,9 @@ under `skills/agents-builder/`, then **installed to the global skills dir by a d
   unselected camps absent); an existing `AGENTS.md` is left byte-for-byte untouched; an existing
   `AGENTS-TEMP.md` is not clobbered.
 
-## Phase p2 — build the skill (repo-local) + tests
+## Phase 1 — build the skill (repo-local) + tests
 
-Deliver the four files above. Manual post-build step (human, out of marathon scope): copy
+Deliver the four files above. Manual post-build step (human, out of automated scope): copy
 `skills/agents-builder/` → `~/.claude/skills/agents-builder/` and smoke-test `/agents-builder` in a
 throwaway repo.
 

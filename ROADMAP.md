@@ -48,11 +48,13 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   reports 0 active lanes) for the two build phases below, distinct from the machine-executable
   `marathon/MARATHON-2026-07-07.yaml`. ->
   [PROJECT/2-WORKING/MARATHON-PLAN-2026-07-07.md](PROJECT/2-WORKING/MARATHON-PLAN-2026-07-07.md)
-- **agents-builder skill** (2026-07-06) - a Claude Code skill that interviews a user (scenario → infer
-  camps) and writes an `AGENTS-TEMP.md` from the architectural camps in
+- **GH-42 — agents-builder skill** (2026-07-06) - a Claude Code skill that interviews a user (scenario →
+  infer camps) and writes an `AGENTS-TEMP.md` from the architectural camps in
   `PROJECT/4-MISC/OPINIONATED-ARCHITECTURE/OPINIONATED-PATTERNS.md`; never touches an existing
-  `AGENTS.md`. Global skill, content embedded; built repo-local then hand-installed.
-  Queued as phase `p2` of the [2026-07-07 marathon](marathon/MARATHON-2026-07-07.yaml). ->
+  `AGENTS.md`. Global skill, content embedded; built repo-local then hand-installed. Design locked,
+  nothing built. Was queued for the 2026-07-07 marathon, which never fired; that link is severed and
+  the work is **parked**. Tracking issue filed retroactively 2026-07-18 — the doc had none, which left
+  it un-preflightable. Issue [#42](https://github.com/Hypercart-Dev-Tools/pdda/issues/42). ->
   [PROJECT/2-WORKING/AGENTS-BUILDER-SKILL.md](PROJECT/2-WORKING/AGENTS-BUILDER-SKILL.md)
 - **GH-9 — weekly progress counter (open GH issues + closed tasks this week)** (2026-07-03) - new
   deterministic `pdda.sh progress` subcommand for maintainer visibility; builds on the existing
