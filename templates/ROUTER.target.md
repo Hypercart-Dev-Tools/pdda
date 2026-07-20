@@ -10,6 +10,7 @@ This file is the first entry point for an AI agent working in this repo: it tell
 - `README.md` = human-facing repo/product overview
 - `ROADMAP.md` = pointer ledger for this repo's own maintenance work
 - `CHANGELOG.md` = the end-of-iteration running log (first-class PDDA artifact; governed by `PROJECT/PDDA.md`)
+- `RELEASES.md` = forward-looking release-planning ledger (first-class PDDA artifact; governed by `PROJECT/PDDA.md`)
 - `PROJECT/PDDA.md` = the canonical PDDA contract and automation rules
 - `utils/pdda/PDDA-INSTALL.md` = the extraction/install manifest PDDA was installed from
 - `utils/pdda/pdda.sh` = the unified runnable surface (dispatcher + every deterministic check + `run`)
@@ -59,6 +60,8 @@ utils/pdda/pdda.sh stale
 utils/pdda/pdda.sh quad-concepts    # opt-in: a "## Quad Concepts" section of 1-4 bullets (lever: .pdda-quad / PDDA_QUAD)
 utils/pdda/pdda.sh glance           # read-only roll-up: title + Quad Concepts for each PROJECT/2-WORKING doc
 utils/pdda/pdda.sh issue-doc-sync   # flag GH-*.md docs drifted from their GitHub issue state (warn-only; gh-degrades to cache)
+utils/pdda/pdda.sh releases    # validate RELEASES.md, the release-planning ledger (warn-only nudge)
+utils/pdda/pdda.sh releases-current  # read-only roll-up: RELEASES.md entries whose Status isn't "Shipped"
 utils/pdda/pdda.sh governance  # governance-doc cross-reference + doc/code drift (this file, AGENTS.md, CLAUDE.md, ...)
 utils/pdda/pdda.sh gh-refresh  # refresh the cached GitHub issue-state file issue-doc-sync reads offline (needs gh)
 utils/pdda/pdda.sh doc-ready   # LLM readiness review — set PDDA_LLM_BIN (codex/claude/agy) for recommendations, else it self-skips

@@ -10,7 +10,7 @@ complexity: 1
 risk: 1
 effort: 1
 phases: 1
-ratings_provisional: true
+ratings_provisional: false
 non_goals:
   - Reworking how install.sh derives ROUTER.md from the template
   - Auditing every other subcommand for template coverage beyond releases/releases-current
@@ -57,12 +57,31 @@ template while fixing releases.
 > (`PROJECT/PDDA.md` → Discovery & spike phases).
 
 ### Checklist
-- [ ] Diff `pdda.sh` subcommand list against `templates/ROUTER.target.md` — confirm releases/releases-current are the only gap
-- [ ] Name the concrete deliverable + write-set (expected: edit `templates/ROUTER.target.md` only)
-- [ ] Reuse the existing ROUTER release wording rather than authoring new copy (`/ponytail`)
-- [ ] Clear `ratings_provisional` once the write-set is confirmed a 1-file doc edit
+- [x] Diff `pdda.sh` subcommand list against `templates/ROUTER.target.md` — confirm releases/releases-current are the only gap
+- [x] Name the concrete deliverable + write-set (expected: edit `templates/ROUTER.target.md` only)
+- [x] Reuse the existing ROUTER release wording rather than authoring new copy (`/ponytail`)
+- [x] Clear `ratings_provisional` once the write-set is confirmed a 1-file doc edit
+
+### Findings
+Reproduced the check's own extraction logic (`pdda.sh` § "subcommand drift", the `case "$cmd" in`
+awk scan minus `run|help|-h|--help|*`): `pdda.sh` ships **16** dispatcher subcommands. Cross-referenced
+against `templates/ROUTER.target.md` — `releases` and `releases-current` were the **only** two missing,
+matching the install-time governance report exactly. No other subcommand had drifted.
+
+Write-set was a single file, `templates/ROUTER.target.md`, with two verbatim grafts from the canonical
+`ROUTER.md`:
+- **Command rails** — added the `releases` and `releases-current` lines (canonical L81–82) before
+  `governance`. This is the edit that clears the two governance errors.
+- **Role split** — added the `RELEASES.md` legend line (canonical L27). `install.sh` seeds a
+  `RELEASES.md` into every target, so the router should name the file it ships; this keeps the
+  template honest, not just green.
+
+Verified by a fresh `install.sh --with-startup-docs --mode observe --no-register` into a scratch git
+repo: `pdda-check-governance` went from `errors=2` to `errors=0`. (The scratch run shows 2 unrelated
+`README.md` dead-reference *warnings* only because the empty scratch repo has no README; a real target
+does.)
 
 ### QA checklist — Phase 0
-- [ ] The scope is grounded in real code/history, not a hypothetical
-- [ ] Composes with existing commands rather than adding a parallel path
-- [ ] A human checkpoint remains before anything fires
+- [x] The scope is grounded in real code/history, not a hypothetical
+- [x] Composes with existing commands rather than adding a parallel path
+- [x] A human checkpoint remains before anything fires

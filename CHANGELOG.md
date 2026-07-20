@@ -1,5 +1,27 @@
 # CHANGELOG.md
 
+## 2026-07-20
+
+### Target-router template now documents `releases` / `releases-current` (GH-45)
+
+`templates/ROUTER.target.md` — the source `install.sh --with-startup-docs` writes a target's
+`ROUTER.md` from — had drifted out of lockstep with `utils/pdda/pdda.sh`. The template predated the
+`releases` and `releases-current` subcommands (last touched at GH-23 P1, `f2bd80b`) and never picked
+them up, while the canonical `ROUTER.md` did. Because `pdda-check-governance` asserts every dispatcher
+subcommand is named in the router, **every** `--with-startup-docs` install reported two errors on its
+very first `pdda.sh run` — a defect the target's maintainer neither introduced nor could easily explain.
+Surfaced while vendoring PDDA into an external repo.
+
+- **Command rails** — added the `releases` and `releases-current` lines (verbatim from the canonical
+  `ROUTER.md`) before `governance`. This is the edit that clears the two governance errors.
+- **Role split** — added the `RELEASES.md` legend line. `install.sh` seeds a `RELEASES.md` into every
+  target, so the shipped router should name the file it ships, not just satisfy the token check.
+- **Verified** by a fresh scratch install: `pdda-check-governance` `errors=2` → `errors=0`.
+
+Same drift class as GH-18 (ROUTER subcommand drift) and GH-23 (dead-reference self-check on the written
+router): a shipped governance doc named a surface it was out of step with. Frontmatter was left
+untouched — the template deliberately carries none.
+
 ## 2026-07-18
 
 ### `run` no longer reports "all checks passed" over its own warnings (GH-43)
