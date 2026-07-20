@@ -22,6 +22,10 @@ Same drift class as GH-18 (ROUTER subcommand drift) and GH-23 (dead-reference se
 router): a shipped governance doc named a surface it was out of step with. Frontmatter was left
 untouched — the template deliberately carries none.
 
+Closed out via PR #46 (merged); issue #45 closed. The capture went capture → fix → merge in one
+session without passing through `2-WORKING`, so its doc moved straight from `1-INBOX` to `3-COMPLETED`
+with the ROADMAP pointer retargeted from Queue to Completed.
+
 ## 2026-07-18
 
 ### `run` no longer reports "all checks passed" over its own warnings (GH-43)

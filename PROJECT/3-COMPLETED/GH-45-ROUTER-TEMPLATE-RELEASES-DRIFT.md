@@ -1,6 +1,6 @@
 ---
 title: ROUTER.target.md template drifted from pdda.sh releases subcommands
-status: Proposed (1-INBOX — not yet active)
+status: Completed (2026-07-20 → PR #46 merged, issue #45 closed)
 created: 2026-07-20
 owner: Noel Saw
 gh_issue: 45
@@ -25,9 +25,10 @@ goal: >
 
 # GH-45 — ROUTER.target.md template drifted from pdda.sh releases subcommands
 
-> **1-INBOX capture**, not the active-work doc — no `## Status` table yet. On promotion to
-> `PROJECT/2-WORKING/`, add the status table + per-phase QA gates and carry `gh_issue` forward
-> (`PROJECT/PDDA.md` → GitHub issue intake).
+> **Completed.** A one-file bugfix that went capture → fix → merge in a single session, so it never
+> passed through `PROJECT/2-WORKING/` — the write-set was scoped and verified from the capture itself.
+> Landed in PR [#46](https://github.com/Hypercart-Dev-Tools/pdda/pull/46) (merged), issue
+> [#45](https://github.com/Hypercart-Dev-Tools/pdda/issues/45) closed.
 
 ## Key concepts
 - `install.sh --with-startup-docs` writes a target's `ROUTER.md` from `templates/ROUTER.target.md`

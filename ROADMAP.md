@@ -35,11 +35,6 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 ## Ledger
 
 ### Queue / parked intake
-- **GH-45 — ROUTER.target.md releases drift** (2026-07-20) - quick fix: template omits the
-  `releases`/`releases-current` subcommands documented in the canonical ROUTER.md, so every
-  `--with-startup-docs` install fails pdda-check-governance on first run. Captured via /idea. Issue
-  [#45](https://github.com/Hypercart-Dev-Tools/pdda/issues/45). ->
-  [PROJECT/1-INBOX/GH-45-ROUTER-TEMPLATE-RELEASES-DRIFT.md](PROJECT/1-INBOX/GH-45-ROUTER-TEMPLATE-RELEASES-DRIFT.md)
 - **GH-41 — Marathon triage 2026-07-17 follow-ups** (2026-07-18) - master tracking issue for the
   held candidate pool: 0 of 8 open items are marathon-ready, all failing `swarm-preflight` exit 3 on a
   missing `## Swarm Preflight Contract` block. Covers `AGENTS-BUILDER-SKILL.md`'s orphaned state,
@@ -106,6 +101,13 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Completed
 
+- **GH-45 — ROUTER.target.md releases drift** (2026-07-20 → closed) - quick fix: the target-router
+  template omitted the `releases`/`releases-current` subcommands the canonical ROUTER.md documents, so
+  every `--with-startup-docs` install failed pdda-check-governance (errors=2) on first run. Grafted both
+  command-rail lines + the RELEASES.md role-split legend verbatim; verified errors=2 → errors=0 via
+  scratch install. Captured via /idea. PR [#46](https://github.com/Hypercart-Dev-Tools/pdda/pull/46),
+  issue [#45](https://github.com/Hypercart-Dev-Tools/pdda/issues/45). ->
+  [PROJECT/3-COMPLETED/GH-45-ROUTER-TEMPLATE-RELEASES-DRIFT.md](PROJECT/3-COMPLETED/GH-45-ROUTER-TEMPLATE-RELEASES-DRIFT.md)
 - **GH-28 — Audit & fix registry-to-git-pulse-sync projection drift** (2026-07-09 → closed) - Phase 0
   found `install.sh`'s projection write is actually correct; the real gap was that it never warned when
   the git-pulse checkout it targets is dirty/behind and never reaching origin. Phase 1 added
