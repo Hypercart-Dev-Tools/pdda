@@ -35,6 +35,11 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 ## Ledger
 
 ### Queue / parked intake
+- **GH-45 — ROUTER.target.md releases drift** (2026-07-20) - quick fix: template omits the
+  `releases`/`releases-current` subcommands documented in the canonical ROUTER.md, so every
+  `--with-startup-docs` install fails pdda-check-governance on first run. Captured via /idea. Issue
+  [#45](https://github.com/Hypercart-Dev-Tools/pdda/issues/45). ->
+  [PROJECT/1-INBOX/GH-45-ROUTER-TEMPLATE-RELEASES-DRIFT.md](PROJECT/1-INBOX/GH-45-ROUTER-TEMPLATE-RELEASES-DRIFT.md)
 - **GH-41 — Marathon triage 2026-07-17 follow-ups** (2026-07-18) - master tracking issue for the
   held candidate pool: 0 of 8 open items are marathon-ready, all failing `swarm-preflight` exit 3 on a
   missing `## Swarm Preflight Contract` block. Covers `AGENTS-BUILDER-SKILL.md`'s orphaned state,
