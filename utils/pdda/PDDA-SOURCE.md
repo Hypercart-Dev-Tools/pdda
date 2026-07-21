@@ -13,23 +13,34 @@ any such copy can find the canonical repo without guessing.
 
 ## Is *this* copy the canonical repo?
 
-Check for `pdda-sync.sh` next to this file. It is canonical-only tooling, deliberately excluded from
-every install and vendored copy (see `pdda-sync-manifest.conf`), so its presence is what distinguishes
-the canonical repo from any copy of it. If `utils/pdda/pdda-sync.sh` exists here, this already is the
-canonical repo — stop.
+Check for `pdda-sync.sh` in the same directory as this file (its canonical checkout path is
+`utils/pdda/pdda-sync.sh`). It is canonical-only tooling, deliberately excluded from every install and
+vendored copy (see `pdda-sync-manifest.conf`), so its presence is what distinguishes the canonical repo
+from any copy of it. If `pdda-sync.sh` is sitting right here, this already is the canonical repo — stop.
 
 ## Locating the canonical repo on this machine
+
+Both recipes below print a match and nothing else on failure — don't gate on the exit status: `find`
+can exit non-zero from an unrelated permission-denied subtree (e.g. a Photos library) while still
+printing a correct match, so check whether the output is non-empty instead of chaining `&&`.
+
+`-maxdepth` isn't strict POSIX but is near-universal (GNU/BSD/macOS find all ship it) and is kept
+deliberately: an unbounded `find "$HOME" ...` measured 2+ minutes / hung outright on a real machine with
+a large `~/Library/Mobile Documents` (iCloud Drive) tree under `$HOME` — `-maxdepth 6` cut the same
+search to ~15s. A depth-bounded, slightly-non-POSIX command that actually returns beats a portable one
+that hangs.
 
 1. Exact-name search, filtered to real canonical checkouts (skips renamed installs and copies):
 
    ```
-   find ~ -maxdepth 6 -type d -name pdda -exec test -f "{}/utils/pdda/pdda-sync.sh" \; -print 2>/dev/null
+   find "$HOME" -maxdepth 6 -type d -name pdda -exec sh -c 'test -f "$1/utils/pdda/pdda-sync.sh"' sh {} \; -print 2>/dev/null
    ```
 
-2. Fuzzy fallback if the clone folder was renamed:
+2. Fuzzy fallback if the clone folder was renamed (a bracket-expression pattern stands in for
+   case-insensitive `-iname`, which isn't POSIX):
 
    ```
-   find ~ -maxdepth 6 -type d -iname "*pdda*" -exec test -f "{}/utils/pdda/pdda-sync.sh" \; -print 2>/dev/null
+   find "$HOME" -maxdepth 6 -type d -name '*[pP][dD][dD][aA]*' -exec sh -c 'test -f "$1/utils/pdda/pdda-sync.sh"' sh {} \; -print 2>/dev/null
    ```
 
 3. If neither finds it (different machine, CI, fresh checkout), clone it fresh:
