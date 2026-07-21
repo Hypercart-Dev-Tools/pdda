@@ -116,6 +116,7 @@ utils/pdda/pdda-catchup.sh
 utils/pdda/pdda-gh-refresh.sh
 utils/pdda/pdda-edit-doc-hook.sh
 utils/pdda/pdda-stop-doc-health.sh
+utils/pdda/PDDA-SOURCE.md
 ```
 
 The shipped runtime lives in its own `utils/pdda/` subfolder so it never mixes with a target repo's
@@ -132,7 +133,10 @@ consumers — chiefly the `Stop` hook — have last-known state without anyone r
 `utils/pdda/pdda-stop-doc-health.sh` (tier 2, a `Stop` consolidated full-scan) are the optional
 doc-health hooks — installs receive the scripts but **opt in by wiring them in their own
 `.claude/settings.json`** (see PROJECT/PDDA.md → "Doc-health hooks"); nothing is written into the
-target's hook config automatically.
+target's hook config automatically. `utils/pdda/PDDA-SOURCE.md` is a static resolver doc, not a
+script — it ships with every install (and rides along into any nested vendored copy, e.g.
+`.xyz/utils/pdda/`) so an agent standing in a copy can trace back to this canonical repo; see that
+file for the lookup recipe.
 
 ## Files to create in the target repo
 
