@@ -889,8 +889,14 @@ _pdda_gov_glob_escape() {
   printf '%s' "$out"
 }
 
+# Derive a bare name's cache key (a checksum of the name; collisions are possible and handled by the
+# caller, which always verifies the stored name before trusting the stored path).
+_pdda_gov_cache_key() {
+  printf '%s' "$1" | cksum | awk '{print $1}'
+}
+
 _pdda_gov_resolve_ref() {
-  local ref="$1" from_dir="$2" cache_dir="${3:-}" path candidate found p esc key cache_entry cached
+  local ref="$1" from_dir="$2" cache_dir="${3:-}" path candidate found p esc key name_file path_file cached_name
   path="${ref%%#*}"
   case "$path" in
     http://*|https://*|//*) return 1 ;;
@@ -900,40 +906,37 @@ _pdda_gov_resolve_ref() {
     *)
       candidate="$PDDA_REPO_ROOT/$path"
       if [ ! -f "$candidate" ]; then
-        # GH-48: this used to be a bash `while read` scan of the WHOLE repo tree, run fresh for every
-        # unresolved bare name (and every dead one never early-exits the loop) — a multi-minute stall
-        # on a real-world repo with tens of thousands of files. Two changes fix that without changing
-        # what gets matched:
-        #  1. Let `find -name` do the matching natively (fast C-level fnmatch during the SAME single
-        #     traversal) instead of a bash-level basename compare per entry. No `-type` filter is
-        #     applied — same as before, so a directory or a symlink-to-a-file can still be the first
-        #     traversal match, and the caller's `[ -f "$resolved" ]` is still what ultimately decides
-        #     live vs dead, exactly as before an earlier version of this fix restricted the match to
-        #     `-type f` and changed which entry could win. `$path` is glob-escaped first (GH-34) so a
-        #     ref like `build[1].sh` still can't be misread as a pattern. Consumed via the exact same
-        #     NUL-delimited `-print0` + `read -r -d ''` this replaces — NUL is the one byte a path can
-        #     never contain, so this is fully lossless even when a path embeds a literal tab or newline
-        #     (an earlier version of this fix stored one path per line in an index file, which truncated
-        #     a path whose directory contained a real newline byte — the same class of bug, worse).
-        #  2. Memoize by bare name for the run, in a directory of small files (one per unique name,
-        #     keyed by a checksum of the name) rather than one shared multi-record index/cache file —
-        #     each cache entry is a single whole file read, so there is no record delimiter to get
-        #     wrong a second time. A collision would only affect this best-effort, warn-only cache.
         found=""
-        cached=""
         if [ -n "$cache_dir" ] && [ -d "$cache_dir" ]; then
-          key="$(printf '%s' "$path" | cksum | awk '{print $1}')"
-          cache_entry="$cache_dir/$key"
-          [ -f "$cache_entry" ] && cached="$(cat "$cache_entry" 2>/dev/null)"
-        fi
-        if [ -n "$cached" ]; then
-          [ "$cached" != "-" ] && found="$cached"
+          # GH-48 (round 4): check_governance already ran ONE whole-tree `find` for every unique bare
+          # name across the whole run and populated this cache — a pure read here, no traversal. Each
+          # entry is TWO files (the verbatim looked-up name + its resolved path/"-" sentinel), never one
+          # file with an internal delimiter — the cache key is a 32-bit checksum, which *can* collide
+          # for two different names, and a delimiter-based format would then either merge or corrupt
+          # both entries. Two whole-file reads instead: read the stored name back and compare it to
+          # `$path` before trusting the stored path; on a mismatch (a genuine collision) this cache
+          # entry just isn't usable for `$path` — same effect as a cache miss, never a wrong answer.
+          key="$(_pdda_gov_cache_key "$path")"
+          name_file="$cache_dir/$key.name"
+          path_file="$cache_dir/$key.path"
+          if [ -f "$name_file" ]; then
+            cached_name="$(cat "$name_file" 2>/dev/null)"
+            if [ "$cached_name" = "$path" ]; then
+              found="$(cat "$path_file" 2>/dev/null)"
+              [ "$found" = "-" ] && found=""
+            fi
+          fi
         else
+          # No usable cache (mktemp/find failed building it, or check_governance's caller didn't build
+          # one at all) — fall back to the pre-GH-48 full-tree scan so a bare ref still resolves
+          # correctly. Slower, but correctness-preserving; the batch cache above is what the speed fix
+          # actually relies on. `$path` is glob-escaped (GH-34) so it still can't be misread as a
+          # pattern, and no `-type` filter is applied (first traversal match wins, any type — see
+          # check_governance's batch build for the full rationale, which applies identically here).
           esc="$(_pdda_gov_glob_escape "$path")"
           while IFS= read -r -d '' p; do
             found="$p"; break
           done < <(find "$PDDA_REPO_ROOT" -not -path '*/.git/*' -name "$esc" -print0 2>/dev/null)
-          [ -n "$cache_dir" ] && [ -n "${cache_entry:-}" ] && printf '%s' "${found:--}" > "$cache_entry" 2>/dev/null
         fi
         [ -n "$found" ] && candidate="$found"
       fi
@@ -968,10 +971,73 @@ check_governance() {
   # warn-only: markdown-reference extraction from free-form prose is inherently more heuristic than
   # the mechanical checks above (frontmatter, status-table), so a false flag costs one ignorable line
   # rather than blocking a build even in full mode — same calibration as check_stale/check_changelog.
-  # GH-48: a per-run memoization cache for _pdda_gov_resolve_ref's bare-filename fallback — one small
-  # file per unique bare name looked up this run (see its comment for the full rationale).
-  local gov_ref_cache_dir=""
+  # GH-48 (round 4): batch-resolve every unique bare (no-directory-component) reference across ALL
+  # scanned docs in exactly ONE whole-tree `find` call, before doing anything else — the DoD is one
+  # traversal per check_governance run, not one per unique name (a per-name `find`, even memoized,
+  # still multiplies with the number of DISTINCT dead names on a doc set with many different missing
+  # bare mentions). Pass 1 below just extracts and collects candidate names (cheap text processing on
+  # a handful of small governance docs — re-running it is not the expensive part, the tree walk is);
+  # pass 2, further down, is the existing per-ref loop, unchanged except it now reads a fully-populated
+  # cache instead of resolving anything itself.
+  local gov_ref_cache_dir="" gov_names_file="" gov_uniq_names_file=""
+  local gov_find_args gov_name gov_p gov_bn gov_key
   gov_ref_cache_dir="$(mktemp -d 2>/dev/null || true)"
+  if [ -n "$gov_ref_cache_dir" ]; then
+    gov_names_file="$(mktemp 2>/dev/null || true)"
+    if [ -n "$gov_names_file" ]; then
+      for doc in $present_docs; do
+        abs_file="$PDDA_REPO_ROOT/$doc"
+        is_shipped_doc=0
+        case " $shipped_docs " in *" $doc "*) is_shipped_doc=1 ;; esac
+        while IFS=$'\t' read -r line_no text; do
+          [ -n "$line_no" ] || continue
+          while IFS= read -r ref; do
+            [ -n "$ref" ] || continue
+            if [ "$is_shipped_doc" -eq 1 ]; then
+              ref_path="${ref%%#*}"
+              while :; do
+                case "$ref_path" in
+                  ../*) ref_path="${ref_path#../}" ;;
+                  ./*) ref_path="${ref_path#./}" ;;
+                  *) break ;;
+                esac
+              done
+              case " $ref_exempt " in *" $ref_path "*) continue ;; esac
+            fi
+            case "$ref" in
+              http://*|https://*|//*|/*|./*|../*|*/*) continue ;;   # not a bare-name fallback candidate
+            esac
+            ref_path="${ref%%#*}"
+            [ -f "$PDDA_REPO_ROOT/$ref_path" ] && continue          # resolves directly, no lookup needed
+            printf '%s\n' "$ref_path" >> "$gov_names_file"
+          done <<< "$(_pdda_gov_extract_refs "$text")"
+        done < <(_pdda_gov_scannable_lines "$abs_file")
+      done
+      if [ -s "$gov_names_file" ]; then
+        gov_uniq_names_file="$(mktemp 2>/dev/null || true)"
+        if [ -n "$gov_uniq_names_file" ]; then
+          LC_ALL=C sort -u "$gov_names_file" > "$gov_uniq_names_file"
+          gov_find_args=()
+          while IFS= read -r gov_name; do
+            [ -n "$gov_name" ] || continue
+            [ ${#gov_find_args[@]} -gt 0 ] && gov_find_args+=(-o)
+            gov_find_args+=(-name "$(_pdda_gov_glob_escape "$gov_name")")
+          done < "$gov_uniq_names_file"
+          if [ ${#gov_find_args[@]} -gt 0 ]; then
+            while IFS= read -r -d '' gov_p; do
+              gov_bn="${gov_p##*/}"
+              gov_key="$(_pdda_gov_cache_key "$gov_bn")"
+              [ -f "$gov_ref_cache_dir/$gov_key.name" ] && continue   # first traversal match wins
+              printf '%s' "$gov_bn" > "$gov_ref_cache_dir/$gov_key.name"
+              printf '%s' "$gov_p"  > "$gov_ref_cache_dir/$gov_key.path"
+            done < <(find "$PDDA_REPO_ROOT" -not -path '*/.git/*' \( "${gov_find_args[@]}" \) -print0 2>/dev/null)
+          fi
+          rm -f "$gov_uniq_names_file"
+        fi
+      fi
+      rm -f "$gov_names_file"
+    fi
+  fi
   for doc in $present_docs; do
     abs_file="$PDDA_REPO_ROOT/$doc"
     from_dir="$(dirname "$abs_file")"
