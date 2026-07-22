@@ -875,8 +875,22 @@ _pdda_gov_extract_refs() {
 # folders) aren't precise path claims, so only a filename absent everywhere counts as truly dead. A
 # ref WITH a directory component stays a precise claim: if that exact path is wrong, that IS the bug
 # (e.g. a doc pointing at PROJECT/2-WORKING/X.md after X.md was completed and moved to 3-COMPLETED/).
+# Escape a literal string so it can be handed to `find -name` without being read as a glob pattern
+# (backslash and the four fnmatch metacharacters). Used only for GH-34-safe bare-filename lookups.
+_pdda_gov_glob_escape() {
+  local s="$1" out="" i c
+  for (( i = 0; i < ${#s}; i++ )); do
+    c="${s:i:1}"
+    case "$c" in
+      '\'|'*'|'?'|'['|']') out+="\\$c" ;;
+      *) out+="$c" ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+
 _pdda_gov_resolve_ref() {
-  local ref="$1" from_dir="$2" index_file="${3:-}" path candidate found p
+  local ref="$1" from_dir="$2" cache_dir="${3:-}" path candidate found p esc key cache_entry cached
   path="${ref%%#*}"
   case "$path" in
     http://*|https://*|//*) return 1 ;;
@@ -886,31 +900,40 @@ _pdda_gov_resolve_ref() {
     *)
       candidate="$PDDA_REPO_ROOT/$path"
       if [ ! -f "$candidate" ]; then
+        # GH-48: this used to be a bash `while read` scan of the WHOLE repo tree, run fresh for every
+        # unresolved bare name (and every dead one never early-exits the loop) — a multi-minute stall
+        # on a real-world repo with tens of thousands of files. Two changes fix that without changing
+        # what gets matched:
+        #  1. Let `find -name` do the matching natively (fast C-level fnmatch during the SAME single
+        #     traversal) instead of a bash-level basename compare per entry. No `-type` filter is
+        #     applied — same as before, so a directory or a symlink-to-a-file can still be the first
+        #     traversal match, and the caller's `[ -f "$resolved" ]` is still what ultimately decides
+        #     live vs dead, exactly as before an earlier version of this fix restricted the match to
+        #     `-type f` and changed which entry could win. `$path` is glob-escaped first (GH-34) so a
+        #     ref like `build[1].sh` still can't be misread as a pattern. Consumed via the exact same
+        #     NUL-delimited `-print0` + `read -r -d ''` this replaces — NUL is the one byte a path can
+        #     never contain, so this is fully lossless even when a path embeds a literal tab or newline
+        #     (an earlier version of this fix stored one path per line in an index file, which truncated
+        #     a path whose directory contained a real newline byte — the same class of bug, worse).
+        #  2. Memoize by bare name for the run, in a directory of small files (one per unique name,
+        #     keyed by a checksum of the name) rather than one shared multi-record index/cache file —
+        #     each cache entry is a single whole file read, so there is no record delimiter to get
+        #     wrong a second time. A collision would only affect this best-effort, warn-only cache.
         found=""
-        if [ -n "$index_file" ] && [ -f "$index_file" ]; then
-          # GH-48: was a `find` + bash `while read` scan of the WHOLE repo tree, run fresh for every
-          # unresolved bare name (and every dead one never early-exits the bash loop). On a real-world
-          # repo with tens of thousands of files, that turned into a multi-minute stall. $index_file is
-          # a pre-built, one-path-per-line list of the whole tree (see check_governance), built once via
-          # native `find` — no bash loop over the tree at all. A lookup is one fast awk pass over it,
-          # splitting each line on `/` and comparing only the last field (the basename) to `$path`.
-          # `$NF` is the LAST slash-split field, not a whole-line field split — so a path whose
-          # directory portion happens to contain a literal tab is still matched and printed intact (an
-          # earlier version of this fix stored "basename<TAB>path" and split on tab, which truncated
-          # any path containing a real tab byte). `k` is passed via `-v`, never interpolated into the
-          # awk program text, so `$NF==k` is a literal string compare — a ref like `build[1].sh` still
-          # can't be misread as a glob (same safety property this replaces, GH-34). Index build order
-          # preserves "first traversal match wins" (GH-34's `| head -1` semantics), since awk exits on
-          # the first matching line.
-          found="$(awk -F/ -v k="$path" '$NF==k{print; exit}' "$index_file" 2>/dev/null)"
+        cached=""
+        if [ -n "$cache_dir" ] && [ -d "$cache_dir" ]; then
+          key="$(printf '%s' "$path" | cksum | awk '{print $1}')"
+          cache_entry="$cache_dir/$key"
+          [ -f "$cache_entry" ] && cached="$(cat "$cache_entry" 2>/dev/null)"
+        fi
+        if [ -n "$cached" ]; then
+          [ "$cached" != "-" ] && found="$cached"
         else
-          # GH-48: index build can fail (mktemp or find erroring/unavailable) — rather than silently
-          # treating every unresolved bare ref as dead in that rare case, fall back to the pre-GH-48
-          # full-tree scan. Slower, but correctness-preserving; the index path above is the one that
-          # actually matters for speed on the common (working) case.
+          esc="$(_pdda_gov_glob_escape "$path")"
           while IFS= read -r -d '' p; do
-            if [ "${p##*/}" = "$path" ]; then found="$p"; break; fi
-          done < <(find "$PDDA_REPO_ROOT" -not -path '*/.git/*' -print0 2>/dev/null)
+            found="$p"; break
+          done < <(find "$PDDA_REPO_ROOT" -not -path '*/.git/*' -name "$esc" -print0 2>/dev/null)
+          [ -n "$cache_dir" ] && [ -n "${cache_entry:-}" ] && printf '%s' "${found:--}" > "$cache_entry" 2>/dev/null
         fi
         [ -n "$found" ] && candidate="$found"
       fi
@@ -945,20 +968,10 @@ check_governance() {
   # warn-only: markdown-reference extraction from free-form prose is inherently more heuristic than
   # the mechanical checks above (frontmatter, status-table), so a false flag costs one ignorable line
   # rather than blocking a build even in full mode — same calibration as check_stale/check_changelog.
-  # GH-48: pre-build a whole-tree, one-path-per-line index once for this run, via native find — feeds
-  # _pdda_gov_resolve_ref's bare-filename fallback (see its comment for why this replaced a
-  # per-lookup, per-line bash tree-walk).
-  local gov_file_index=""
-  gov_file_index="$(mktemp 2>/dev/null || true)"
-  if [ -n "$gov_file_index" ]; then
-    if ! find "$PDDA_REPO_ROOT" -not -path '*/.git/*' -type f > "$gov_file_index" 2>/dev/null; then
-      # A failed build must not silently masquerade as "found nothing" — that would flag every bare
-      # ref as dead. Drop it so _pdda_gov_resolve_ref's is-usable check fails closed and its
-      # full-tree-scan fallback takes over instead.
-      rm -f "$gov_file_index"
-      gov_file_index=""
-    fi
-  fi
+  # GH-48: a per-run memoization cache for _pdda_gov_resolve_ref's bare-filename fallback — one small
+  # file per unique bare name looked up this run (see its comment for the full rationale).
+  local gov_ref_cache_dir=""
+  gov_ref_cache_dir="$(mktemp -d 2>/dev/null || true)"
   for doc in $present_docs; do
     abs_file="$PDDA_REPO_ROOT/$doc"
     from_dir="$(dirname "$abs_file")"
@@ -981,14 +994,14 @@ check_governance() {
           done
           case " $ref_exempt " in *" $ref_path "*) continue ;; esac
         fi
-        resolved="$(_pdda_gov_resolve_ref "$ref" "$from_dir" "$gov_file_index")" || continue
+        resolved="$(_pdda_gov_resolve_ref "$ref" "$from_dir" "$gov_ref_cache_dir")" || continue
         [ -f "$resolved" ] && continue
         pdda_record_finding warn "$CHECK_NAME" "$abs_file" "$line_no" \
           "dead reference '$ref' — no file at $(pdda_relpath "$resolved")" "fix-dead-reference"
       done <<< "$(_pdda_gov_extract_refs "$text")"
     done < <(_pdda_gov_scannable_lines "$abs_file")
   done
-  [ -n "$gov_file_index" ] && rm -f "$gov_file_index"
+  [ -n "$gov_ref_cache_dir" ] && rm -rf "$gov_ref_cache_dir"
 
   # --- (2) orphan governance docs: a present doc the index doc never points at --------------------
   index_abs="$PDDA_REPO_ROOT/$index_doc"
