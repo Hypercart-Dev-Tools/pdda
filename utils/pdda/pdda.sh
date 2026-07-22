@@ -876,7 +876,7 @@ _pdda_gov_extract_refs() {
 # ref WITH a directory component stays a precise claim: if that exact path is wrong, that IS the bug
 # (e.g. a doc pointing at PROJECT/2-WORKING/X.md after X.md was completed and moved to 3-COMPLETED/).
 _pdda_gov_resolve_ref() {
-  local ref="$1" from_dir="$2" path candidate found p
+  local ref="$1" from_dir="$2" index_file="${3:-}" path candidate found
   path="${ref%%#*}"
   case "$path" in
     http://*|https://*|//*) return 1 ;;
@@ -885,15 +885,17 @@ _pdda_gov_resolve_ref() {
     */*) candidate="$PDDA_REPO_ROOT/$path" ;;
     *)
       candidate="$PDDA_REPO_ROOT/$path"
-      if [ ! -f "$candidate" ]; then
-        # basename match must be LITERAL, not a glob: `find -name "$path"` would read a markdown-link
-        # ref of `build[1].sh` (whose extraction class admits [ ] * ?) as a pattern and resolve it
-        # against a DIFFERENT file `build1.sh`, scoring a dead ref live. Compare basenames as strings.
-        # First traversal match wins, preserving the previous `| head -1` semantics. GH-34.
-        found=""
-        while IFS= read -r -d '' p; do
-          if [ "${p##*/}" = "$path" ]; then found="$p"; break; fi
-        done < <(find "$PDDA_REPO_ROOT" -not -path '*/.git/*' -print0 2>/dev/null)
+      if [ ! -f "$candidate" ] && [ -n "$index_file" ] && [ -f "$index_file" ]; then
+        # GH-48: was a `find` + bash `while read` scan of the WHOLE repo tree, run fresh for every
+        # unresolved bare name (and every dead one never early-exits the bash loop). On a real-world
+        # repo with tens of thousands of files, that turned into a multi-minute stall. $index_file is a
+        # pre-built "basename<TAB>path" index of the whole tree (see check_governance), built once via
+        # native `find`+`awk` — no bash loop over the tree at all. A lookup is one fast awk pass. `$1==k`
+        # is a literal string compare (k passed via -v, never interpolated into the awk program text),
+        # so a ref like `build[1].sh` still can't be misread as a glob — same safety property as the
+        # basename-string-compare this replaces (GH-34). Index build order preserves "first traversal
+        # match wins" (GH-34's `| head -1` semantics), since awk exits on the first matching line.
+        found="$(awk -F'\t' -v k="$path" '$1==k{print $2; exit}' "$index_file" 2>/dev/null)"
         [ -n "$found" ] && candidate="$found"
       fi
       ;;
@@ -927,6 +929,15 @@ check_governance() {
   # warn-only: markdown-reference extraction from free-form prose is inherently more heuristic than
   # the mechanical checks above (frontmatter, status-table), so a false flag costs one ignorable line
   # rather than blocking a build even in full mode — same calibration as check_stale/check_changelog.
+  # GH-48: pre-build a whole-tree "basename<TAB>path" index once for this run, via native find+awk —
+  # feeds _pdda_gov_resolve_ref's bare-filename fallback (see its comment for why this replaced a
+  # per-lookup, per-line bash tree-walk).
+  local gov_file_index=""
+  gov_file_index="$(mktemp 2>/dev/null || true)"
+  if [ -n "$gov_file_index" ]; then
+    find "$PDDA_REPO_ROOT" -not -path '*/.git/*' -type f 2>/dev/null \
+      | awk -F/ '{print $NF "\t" $0}' > "$gov_file_index"
+  fi
   for doc in $present_docs; do
     abs_file="$PDDA_REPO_ROOT/$doc"
     from_dir="$(dirname "$abs_file")"
@@ -949,13 +960,14 @@ check_governance() {
           done
           case " $ref_exempt " in *" $ref_path "*) continue ;; esac
         fi
-        resolved="$(_pdda_gov_resolve_ref "$ref" "$from_dir")" || continue
+        resolved="$(_pdda_gov_resolve_ref "$ref" "$from_dir" "$gov_file_index")" || continue
         [ -f "$resolved" ] && continue
         pdda_record_finding warn "$CHECK_NAME" "$abs_file" "$line_no" \
           "dead reference '$ref' — no file at $(pdda_relpath "$resolved")" "fix-dead-reference"
       done <<< "$(_pdda_gov_extract_refs "$text")"
     done < <(_pdda_gov_scannable_lines "$abs_file")
   done
+  [ -n "$gov_file_index" ] && rm -f "$gov_file_index"
 
   # --- (2) orphan governance docs: a present doc the index doc never points at --------------------
   index_abs="$PDDA_REPO_ROOT/$index_doc"

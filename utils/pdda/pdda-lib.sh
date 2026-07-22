@@ -97,7 +97,19 @@ pdda_trim() {
 }
 
 pdda_json_escape() {
-  node -e 'process.stdout.write(JSON.stringify(process.argv[1]).slice(1, -1))' "$1"
+  if command -v node >/dev/null 2>&1; then
+    node -e 'process.stdout.write(JSON.stringify(process.argv[1]).slice(1, -1))' "$1"
+  else
+    # GH-48: node isn't guaranteed on PATH (e.g. a launchd/cron caller with a minimal PATH) — degrade
+    # to a pure-shell escape instead of silently emitting nothing (which corrupted activity-log JSON).
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+  fi
 }
 
 # Build one JSON object (the canonical finding shape) and print it to stdout.
