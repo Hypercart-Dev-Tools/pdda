@@ -1039,6 +1039,20 @@ check_governance() {
               printf '%s' "$gov_p"  > "$gov_ref_cache_dir/$gov_key.path"
             done < <(find "$PDDA_REPO_ROOT" -not -path '*/.git/*' \( "${gov_find_args[@]}" \) -print0 2>/dev/null)
           fi
+          # GH-48 (round 5 follow-up): `find` only ever reports MATCHES, so a genuinely dead name never
+          # got a cache entry above — every confirmed-dead reference still re-triggered its own fallback
+          # `find` in _pdda_gov_resolve_ref, the exact per-name traversal cost this fix exists to remove.
+          # Second pass: any unique name still without an entry after the batch find truly has no match
+          # anywhere (or lost a same-key collision to a different name, in which case it correctly falls
+          # back on lookup regardless — same as a live colliding name) — cache it as a verified "-" miss
+          # so a repeat mention of the same dead name doesn't re-scan either.
+          while IFS= read -r gov_name; do
+            [ -n "$gov_name" ] || continue
+            gov_key="$(_pdda_gov_cache_key "$gov_name")"
+            [ -f "$gov_ref_cache_dir/$gov_key.name" ] && continue
+            printf '%s' "$gov_name" > "$gov_ref_cache_dir/$gov_key.name"
+            printf '%s' "-"         > "$gov_ref_cache_dir/$gov_key.path"
+          done < "$gov_uniq_names_file"
           rm -f "$gov_uniq_names_file"
         fi
       fi
