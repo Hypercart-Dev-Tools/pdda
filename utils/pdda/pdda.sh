@@ -657,7 +657,7 @@ check_releases() {
   local CHECK_NAME="pdda-check-releases" rc=0
   local RELEASES_FILE_EFF="${PDDA_RELEASES_FILE:-$PDDA_REPO_ROOT/RELEASES.md}"
   local release status target_date codename description gh_url line_no target_epoch today_epoch
-  local status_lc
+  local status_lc front_door shakedown license_file qa_field qa_label qa_value qa_value_lc
 
   if [ ! -f "$RELEASES_FILE_EFF" ]; then
     pdda_record_finding info "$CHECK_NAME" "$RELEASES_FILE_EFF" 0 \
@@ -666,13 +666,29 @@ check_releases() {
     return "$(pdda_gated_exit 0)"
   fi
 
-  while IFS=$'\037' read -r release status target_date codename description gh_url line_no; do
+  while IFS=$'\037' read -r release status target_date codename description gh_url \
+    front_door shakedown license_file line_no; do
     if [ -z "$(pdda_trim "$release")" ]; then
       pdda_record_finding error "$CHECK_NAME" "$RELEASES_FILE_EFF" "$line_no" \
         "a 'Release:' block near line $line_no has no version" "fix-release-value"
       rc=1
       continue
     fi
+
+    # Front-door reviewed / Shakedown reviewed / License file: optional pre-release QA-gate
+    # checkboxes, warn-only Yes/No like the rest of this check (see PROJECT/PDDA.md "RELEASES.md
+    # — release ledger"). A blank value is fine (not yet answered); only a set-but-invalid value warns.
+    for qa_field in "Front-door reviewed:$front_door" "Shakedown reviewed:$shakedown" "License file:$license_file"; do
+      qa_label="${qa_field%%:*}"
+      qa_value="$(pdda_trim "${qa_field#*:}")"
+      [ -n "$qa_value" ] || continue
+      qa_value_lc="$(printf '%s' "$qa_value" | tr '[:upper:]' '[:lower:]')"
+      case "$qa_value_lc" in
+        yes | no) ;;
+        *) pdda_record_finding warn "$CHECK_NAME" "$RELEASES_FILE_EFF" "$line_no" \
+             "release '$release' $qa_label value '$qa_value' is not exactly Yes or No" "fix-release-yesno-field" ;;
+      esac
+    done
 
     [ -n "$target_date" ] || continue
 
@@ -716,6 +732,7 @@ check_releases() {
 cmd_releases_current() {
   local RELEASES_FILE_EFF="${PDDA_RELEASES_FILE:-$PDDA_REPO_ROOT/RELEASES.md}"
   local release status target_date codename description gh_url line_no status_lc any=0
+  local front_door shakedown license_file
 
   if [ ! -f "$RELEASES_FILE_EFF" ]; then
     printf '%s not found — nothing to report\n' "$(pdda_relpath "$RELEASES_FILE_EFF")"
@@ -723,7 +740,8 @@ cmd_releases_current() {
   fi
 
   printf 'PDDA releases-current — in-progress entries in %s\n' "$(pdda_relpath "$RELEASES_FILE_EFF")"
-  while IFS=$'\037' read -r release status target_date codename description gh_url line_no; do
+  while IFS=$'\037' read -r release status target_date codename description gh_url \
+    front_door shakedown license_file line_no; do
     [ -n "$(pdda_trim "$release")" ] || continue
     status_lc="$(printf '%s' "$(pdda_trim "$status")" | tr '[:upper:]' '[:lower:]')"
     [ "$status_lc" != "shipped" ] || continue

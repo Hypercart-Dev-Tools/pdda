@@ -427,7 +427,8 @@ pdda_write_gh_state_cache() {  # <table>
 # such line or EOF (blank lines between blocks are just visual spacing, not parsed).
 
 # List releases as rows of
-#   <release><US><status><US><target_date><US><codename><US><description><US><gh_url><US><line>
+#   <release><US><status><US><target_date><US><codename><US><description><US><gh_url><US>
+#   <front_door><US><shakedown><US><license_file><US><line>
 # (US = ASCII unit separator 0x1F, not tab — bash's `read` collapses empty fields around literal
 # tabs since tab counts as "IFS whitespace" regardless of IFS's contents, which would silently
 # misalign every block with a blank Description/GH_URL, i.e. the common case here). One row per
@@ -435,23 +436,29 @@ pdda_write_gh_state_cache() {  # <table>
 #
 # `Status:` is free-text (Draft/Working/Shipped/... — whatever an operator writes) and unvalidated
 # by design: it's a rough, non-authoritative signal for "what's in progress," not a gated lifecycle
-# field. See PROJECT/PDDA.md "RELEASES.md — release ledger".
+# field. `Front-door reviewed:`/`Shakedown reviewed:`/`License file:` are optional Yes/No QA-gate
+# fields (`pdda.sh releases` warns on a non-Yes/No value). See PROJECT/PDDA.md "RELEASES.md —
+# release ledger".
 pdda_releases_list() {
   local file="$1"
   [ -f "$file" ] || return 0
   awk '
     function flush() {
       if (has_release) {
-        printf "%s\037%s\037%s\037%s\037%s\037%s\037%d\n", release, status, target_date, codename, description, gh_url, release_line
+        printf "%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\037%d\n", release, status, target_date, codename, description, gh_url, front_door, shakedown, license_file, release_line
       }
-      release=""; status=""; target_date=""; codename=""; description=""; gh_url=""; release_line=0; has_release=0
+      release=""; status=""; target_date=""; codename=""; description=""; gh_url=""
+      front_door=""; shakedown=""; license_file=""; release_line=0; has_release=0
     }
-    /^Release:/      { flush(); v=$0; sub(/^Release:[[:space:]]*/, "", v); release=v; has_release=1; release_line=NR; next }
-    /^Status:/       { v=$0; sub(/^Status:[[:space:]]*/, "", v); status=v; next }
-    /^Target Date:/  { v=$0; sub(/^Target Date:[[:space:]]*/, "", v); target_date=v; next }
-    /^Codename:/     { v=$0; sub(/^Codename:[[:space:]]*/, "", v); codename=v; next }
-    /^Description:/  { v=$0; sub(/^Description:[[:space:]]*/, "", v); description=v; next }
-    /^GH_URL:/       { v=$0; sub(/^GH_URL:[[:space:]]*/, "", v); gh_url=v; next }
+    /^Release:/             { flush(); v=$0; sub(/^Release:[[:space:]]*/, "", v); release=v; has_release=1; release_line=NR; next }
+    /^Status:/              { v=$0; sub(/^Status:[[:space:]]*/, "", v); status=v; next }
+    /^Target Date:/         { v=$0; sub(/^Target Date:[[:space:]]*/, "", v); target_date=v; next }
+    /^Codename:/             { v=$0; sub(/^Codename:[[:space:]]*/, "", v); codename=v; next }
+    /^Description:/         { v=$0; sub(/^Description:[[:space:]]*/, "", v); description=v; next }
+    /^GH_URL:/               { v=$0; sub(/^GH_URL:[[:space:]]*/, "", v); gh_url=v; next }
+    /^Front-door reviewed:/ { v=$0; sub(/^Front-door reviewed:[[:space:]]*/, "", v); front_door=v; next }
+    /^Shakedown reviewed:/  { v=$0; sub(/^Shakedown reviewed:[[:space:]]*/, "", v); shakedown=v; next }
+    /^License file:/        { v=$0; sub(/^License file:[[:space:]]*/, "", v); license_file=v; next }
     END { flush() }
   ' "$file"
 }

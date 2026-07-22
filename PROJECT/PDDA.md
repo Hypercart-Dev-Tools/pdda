@@ -603,6 +603,9 @@ Minimum behavior:
 - **overdue check**: `warn` if `Target Date` has passed and `Status` doesn't read exactly `Shipped`
   (case-insensitive) — `Status: Shipped` is the sole "already shipped" signal; a populated `GH_URL`
   alone does not silence this (it means a Release object exists, not that it shipped)
+- **QA-gate field check** (optional fields): `warn` if `Front-door reviewed`, `Shakedown reviewed`,
+  or `License file` is set but its value isn't exactly `Yes` or `No` (case-insensitive); a blank
+  value is fine (not yet answered)
 - **never blocks, even in `full` mode** — this check does not gate its exit code at all, regardless
   of findings. The one `error` above (empty `Release:` value) is a malformed-doc guard, surfaced
   loudly so it isn't missed, but deliberately cannot fail a build
@@ -628,6 +631,9 @@ Target Date: 2026-07-31
 Codename: n/a
 Description:
 GH_URL:
+Front-door reviewed:
+Shakedown reviewed:
+License file:
 ```
 
 Fields:
@@ -644,12 +650,19 @@ Fields:
   `/release` skill). **This means "a Release object exists," not "shipped"** — a draft's `GH_URL`
   is real but the release isn't out. Flip `Status: Shipped` yourself (or let `/release` do it on an
   actual, non-draft publish) when it's really out; `GH_URL` alone no longer implies that.
+- `Front-door reviewed:` / `Shakedown reviewed:` / `License file:` (optional) — pre-release QA-gate
+  checkboxes: has the `/front-door` onboarding audit run, has the `/shakedown` script-path audit
+  run, is a `LICENSE` file present. `Yes` or `No`; `pdda.sh releases` warns on any other non-blank
+  value. A blank value just means not yet answered, not a failure.
 
 Add new fields only when a real need shows up. This format intentionally started smaller than the
 earlier per-tag-doc convention (status lifecycle, linked marathons, linked issues, a GitHub
 release-tag cache) — that was more data than was practical to keep current for an initial release.
 `Status:` is the first field added back in, deliberately kept unvalidated (baby steps, not a new
-gated lifecycle) rather than reintroducing the old rigid `Draft → RC → Published` enum.
+gated lifecycle) rather than reintroducing the old rigid `Draft → RC → Published` enum. The three
+QA-gate fields are the second: a real pre-release checklist need (open-sourcing a release means a
+front-door pass, a shakedown pass, and a `LICENSE` file all need to be true before shipping) that,
+unlike `Status`, has an unambiguous right answer — so they're validated `Yes`/`No` rather than free-text.
 
 Two skills operate on this file: `/release-plan` **authors** entries (interviews the operator,
 proposes a canonical version by cross-referencing `CHANGELOG.md`, previews, appends on confirmation)
