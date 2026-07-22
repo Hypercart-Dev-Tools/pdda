@@ -490,5 +490,93 @@ out="$(run_check)"
 assert_absent "$out" "dead reference 'pdda-lib.sh'" \
   "a bare filename that exists elsewhere still resolves under literal matching (GH-34 no regression)"
 
+# ==================================================================================================
+# GH-48 — the bare-filename fallback re-walked the whole repo tree in a bash `while read` loop, once
+# per LINE mentioning an unresolved bare name (not deduped per run). On a large real repo with a
+# common bare command name (e.g. `pdda.sh`) mentioned on dozens of lines, that multiplied into a
+# multi-minute stall. Fixed by collecting every unique unresolved bare name across all scanned docs
+# first, then resolving all of them in exactly ONE whole-tree `find` call (glob-escaped names OR'd
+# together, GH-34-safe) — one traversal per check_governance RUN, not one per name and not one per
+# mention. See test/pdda-governance-cache-fallback.sh for the per-name cache's collision/failure
+# fallback behavior (that cache is what pass 2 reads; it's a pure reader, no traversal of its own).
+# ==================================================================================================
+
+# --- REGRESSION: a bare filename resolves correctly even when its directory contains a literal tab --
+# The first fix attempt stored "basename<TAB>path" and split lookups on tab — a path whose directory
+# portion itself contained a real tab byte then got truncated by that split, so a real, existing file
+# was scored as a dead reference. The index must preserve the whole path untouched.
+new_sandbox
+tabdir="$SBOX/some$(printf '\t')dir"
+mkdir -p "$tabdir"
+: > "$tabdir/pdda-lib.sh"
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+The helpers live in `pdda-lib.sh`.
+EOF
+out="$(run_check)"
+assert_absent "$out" "dead reference 'pdda-lib.sh'" \
+  "a bare filename resolves correctly even when its directory contains a literal tab byte (GH-48)"
+
+# --- REGRESSION: a `find` permission error elsewhere in the tree doesn't stop a real bare ref from --
+# --- resolving. Each lookup runs its own `find -name` (see _pdda_gov_resolve_ref) with stderr
+# --- suppressed; BSD find keeps emitting entries it CAN reach and only its exit status reflects the
+# --- error, so a real match outside the blocked subtree must still be found.
+if [ "$(id -u 2>/dev/null)" = "0" ]; then
+  pass "find-permission-error case skipped — running as root, chmod 000 can't simulate a denial"
+else
+  new_sandbox
+  mkdir -p "$SBOX/utils/pdda"
+  : > "$SBOX/utils/pdda/pdda-lib.sh"
+  cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+The helpers live in `pdda-lib.sh`.
+EOF
+  noexec_dir="$SBOX/unreadable"
+  mkdir -p "$noexec_dir"
+  chmod 000 "$noexec_dir"
+  out="$(PDDA_REPO_ROOT="$SBOX" PDDA_MODE=full PDDA_FORMAT=text bash "$PDDA" governance 2>&1)"
+  chmod 755 "$noexec_dir"   # restore before cleanup can remove it
+  assert_absent "$out" "dead reference 'pdda-lib.sh'" \
+    "a find permission error elsewhere in the tree still resolves a real bare ref found outside it (GH-48)"
+fi
+
+# --- REGRESSION: first-traversal-match-wins is preserved even when the first match is a directory --
+# A second-attempt fix added `-type f` to the lookup, which changed WHICH entry `find` could return:
+# the old bash loop (and this fix) can match a directory whose basename equals the bare ref first, and
+# only the caller's `[ -f "$resolved" ]` decides it's dead — same as before. `-type f` would instead
+# skip past that directory to a later real file and wrongly call the ref live.
+new_sandbox
+mkdir -p "$SBOX/aaa/target.md" "$SBOX/zzz"     # "aaa/target.md" (a DIR) sorts before "zzz/target.md"
+: > "$SBOX/zzz/target.md"                      # a real FILE with the same basename, later in traversal
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+See `target.md` for details.
+EOF
+out="$(run_check)"
+assert_contains "$out" "dead reference 'target.md'" \
+  "a same-named directory earlier in traversal order still shadows a later real file (GH-48, no -type f)"
+
+# --- REGRESSION: a bare filename resolves correctly even when its directory contains a literal
+# --- newline byte. The index-file version of this fix stored one path per line — a path whose
+# --- directory portion itself contained a real newline byte then split into two records, corrupting
+# --- it. `find -name` + NUL-delimited `-print0`/`read -r -d ''` can't split on a byte a path can't
+# --- contain, so this can't happen.
+new_sandbox
+nldir="$SBOX/some
+dir"
+mkdir -p "$nldir"
+: > "$nldir/pdda-lib.sh"
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+The helpers live in `pdda-lib.sh`.
+EOF
+out="$(run_check)"
+assert_absent "$out" "dead reference 'pdda-lib.sh'" \
+  "a bare filename resolves correctly even when its directory contains a literal newline byte (GH-48)"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

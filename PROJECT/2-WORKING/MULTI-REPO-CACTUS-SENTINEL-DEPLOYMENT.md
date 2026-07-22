@@ -37,6 +37,24 @@ context_tags: [sentinel, cactus, multi-repo, enforcement, learning-loop]
 |---|---|
 | Deployment contract authored from the existing PDDA mode ladder, the completed PDDA runtime-sync design, and the live Cactus observer/router shape. It deliberately separates repository observation from Sentinel write automation and model training. | **Phase 0:** open the implementation issue, inventory candidate repositories, and select the first two explicit opt-in targets; do not install or enable another watcher yet. |
 
+## Table of contents
+
+- [Quad Concepts](#quad-concepts)
+- [Preflight contract](#preflight-contract)
+- [What already exists—and what does not](#what-already-exists-and-what-does-not)
+- [Deployment topology](#deployment-topology)
+  - [Per-target isolation contract](#per-target-isolation-contract)
+- [Observe, light, and strict/full enforcement](#observe-light-and-strictfull-enforcement)
+- [Required run record](#required-run-record)
+- [Cactus learning loop and its boundary](#cactus-learning-loop-and-its-boundary)
+- [Phase 0 — Issue, target inventory, and preflight](#phase-0--issue-target-inventory-and-preflight)
+- [Phase 1 — First target in observe-and-log](#phase-1--first-target-in-observe-and-log)
+- [Phase 2 — Second target and isolation proof](#phase-2--second-target-and-isolation-proof)
+- [Phase 3 — Light-mode triage](#phase-3--light-mode-triage)
+- [Phase 4 — Full enforcement at a real gate](#phase-4--full-enforcement-at-a-real-gate)
+- [Phase 5 — Opt-in learning evaluation](#phase-5--opt-in-learning-evaluation)
+- [Stop conditions and next decision](#stop-conditions-and-next-decision)
+
 ## Quad Concepts
 
 - One shared local model stack must not turn into one shared repository boundary → run one explicitly configured watcher per target and keep target logs/state separate.
@@ -65,8 +83,9 @@ context_tags: [sentinel, cactus, multi-repo, enforcement, learning-loop]
 
 This repository already has a completed distribution plan for the **PDDA runtime**:
 [`PDDA-SYNC-TO-OTHER-REPOS.md`](../3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md) defines registration and
-push-based updates for `utils/pdda/` plus the PDDA contract. It intentionally does not deploy Cactus
-Sentinel, LaunchAgents, local models, or multi-target watcher configuration.
+push-based updates for `utils/pdda/` plus the PDDA contract, with its own optional `install-agent`
+LaunchAgent that only re-runs `pdda-sync.sh push` on a schedule. It intentionally does not deploy Cactus
+Sentinel, Sentinel-specific LaunchAgents, local models, or multi-target watcher configuration.
 
 The active [GH-10 Sentinel plan](GH-10-SENTINEL.md) defines a separate PDDA-native, merge-triggered
 recommend → worktree → gate → PR/trust progression. It is not the current always-on Cactus watcher
