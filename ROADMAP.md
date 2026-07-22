@@ -98,6 +98,11 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   after a GLM 5.2 review). **Phase 1 shipped** (dry-run orchestrator `sentinel/run.sh`, 26/26 tests);
   Phase 2 (worktree apply) next. Issue [#10](https://github.com/Hypercart-Dev-Tools/pdda/issues/10).
   -> [PROJECT/2-WORKING/GH-10-SENTINEL.md](PROJECT/2-WORKING/GH-10-SENTINEL.md)
+- **Multi-repository Cactus Sentinel deployment** (2026-07-21) - active deployment specification for
+  one isolated, opt-in observer per PDDA-managed repository: begin observe-and-log, then graduate a
+  target through `light` to `full` only at a real CI/hook gate. It keeps Cactus training opt-in,
+  provenance-tagged, and separate from target documents; no Sentinel writes are in scope. ->
+  [PROJECT/2-WORKING/MULTI-REPO-CACTUS-SENTINEL-DEPLOYMENT.md](PROJECT/2-WORKING/MULTI-REPO-CACTUS-SENTINEL-DEPLOYMENT.md)
 
 ### Completed
 

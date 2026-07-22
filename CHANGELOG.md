@@ -1,5 +1,23 @@
 # CHANGELOG.md
 
+## 2026-07-21
+
+### Specify isolated multi-repository Cactus Sentinel deployment
+
+Added `PROJECT/2-WORKING/MULTI-REPO-CACTUS-SENTINEL-DEPLOYMENT.md`, the active deployment
+specification for running the Cactus observer across explicitly opted-in PDDA repositories. It keeps
+one watcher, log stream, mode selection, and rollback path per target; defines the existing PDDA
+`observe` → `light` → `full` ladder in Sentinel terms; and requires strict/full enforcement to happen
+at a target CI or hook, since a post-change watcher cannot block the already-made edit.
+
+- **Read-only rollout.** The first rollout is observe-and-log only. Sentinel-authored document edits,
+  commits, PRs, and installer changes remain out of scope; those stay governed by GH-10.
+- **Learning boundary.** Cactus's disagreement/retraining flywheel is acknowledged but target
+  observations are not training data by default. Cross-repository learning requires target consent,
+  provenance/minimization, target-stratified evaluation, and an explicit human checkpoint promotion.
+- **Verified.** The new active document has a roadmap pointer and will be checked by the deterministic
+  PDDA suite in this iteration.
+
 ## 2026-07-20
 
 ### Target-router template now documents `releases` / `releases-current` (GH-45)
