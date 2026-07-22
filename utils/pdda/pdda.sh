@@ -876,7 +876,7 @@ _pdda_gov_extract_refs() {
 # ref WITH a directory component stays a precise claim: if that exact path is wrong, that IS the bug
 # (e.g. a doc pointing at PROJECT/2-WORKING/X.md after X.md was completed and moved to 3-COMPLETED/).
 _pdda_gov_resolve_ref() {
-  local ref="$1" from_dir="$2" index_file="${3:-}" path candidate found
+  local ref="$1" from_dir="$2" index_file="${3:-}" path candidate found p
   path="${ref%%#*}"
   case "$path" in
     http://*|https://*|//*) return 1 ;;
@@ -885,17 +885,33 @@ _pdda_gov_resolve_ref() {
     */*) candidate="$PDDA_REPO_ROOT/$path" ;;
     *)
       candidate="$PDDA_REPO_ROOT/$path"
-      if [ ! -f "$candidate" ] && [ -n "$index_file" ] && [ -f "$index_file" ]; then
-        # GH-48: was a `find` + bash `while read` scan of the WHOLE repo tree, run fresh for every
-        # unresolved bare name (and every dead one never early-exits the bash loop). On a real-world
-        # repo with tens of thousands of files, that turned into a multi-minute stall. $index_file is a
-        # pre-built "basename<TAB>path" index of the whole tree (see check_governance), built once via
-        # native `find`+`awk` — no bash loop over the tree at all. A lookup is one fast awk pass. `$1==k`
-        # is a literal string compare (k passed via -v, never interpolated into the awk program text),
-        # so a ref like `build[1].sh` still can't be misread as a glob — same safety property as the
-        # basename-string-compare this replaces (GH-34). Index build order preserves "first traversal
-        # match wins" (GH-34's `| head -1` semantics), since awk exits on the first matching line.
-        found="$(awk -F'\t' -v k="$path" '$1==k{print $2; exit}' "$index_file" 2>/dev/null)"
+      if [ ! -f "$candidate" ]; then
+        found=""
+        if [ -n "$index_file" ] && [ -f "$index_file" ]; then
+          # GH-48: was a `find` + bash `while read` scan of the WHOLE repo tree, run fresh for every
+          # unresolved bare name (and every dead one never early-exits the bash loop). On a real-world
+          # repo with tens of thousands of files, that turned into a multi-minute stall. $index_file is
+          # a pre-built, one-path-per-line list of the whole tree (see check_governance), built once via
+          # native `find` — no bash loop over the tree at all. A lookup is one fast awk pass over it,
+          # splitting each line on `/` and comparing only the last field (the basename) to `$path`.
+          # `$NF` is the LAST slash-split field, not a whole-line field split — so a path whose
+          # directory portion happens to contain a literal tab is still matched and printed intact (an
+          # earlier version of this fix stored "basename<TAB>path" and split on tab, which truncated
+          # any path containing a real tab byte). `k` is passed via `-v`, never interpolated into the
+          # awk program text, so `$NF==k` is a literal string compare — a ref like `build[1].sh` still
+          # can't be misread as a glob (same safety property this replaces, GH-34). Index build order
+          # preserves "first traversal match wins" (GH-34's `| head -1` semantics), since awk exits on
+          # the first matching line.
+          found="$(awk -F/ -v k="$path" '$NF==k{print; exit}' "$index_file" 2>/dev/null)"
+        else
+          # GH-48: index build can fail (mktemp or find erroring/unavailable) — rather than silently
+          # treating every unresolved bare ref as dead in that rare case, fall back to the pre-GH-48
+          # full-tree scan. Slower, but correctness-preserving; the index path above is the one that
+          # actually matters for speed on the common (working) case.
+          while IFS= read -r -d '' p; do
+            if [ "${p##*/}" = "$path" ]; then found="$p"; break; fi
+          done < <(find "$PDDA_REPO_ROOT" -not -path '*/.git/*' -print0 2>/dev/null)
+        fi
         [ -n "$found" ] && candidate="$found"
       fi
       ;;
@@ -929,14 +945,19 @@ check_governance() {
   # warn-only: markdown-reference extraction from free-form prose is inherently more heuristic than
   # the mechanical checks above (frontmatter, status-table), so a false flag costs one ignorable line
   # rather than blocking a build even in full mode — same calibration as check_stale/check_changelog.
-  # GH-48: pre-build a whole-tree "basename<TAB>path" index once for this run, via native find+awk —
-  # feeds _pdda_gov_resolve_ref's bare-filename fallback (see its comment for why this replaced a
+  # GH-48: pre-build a whole-tree, one-path-per-line index once for this run, via native find — feeds
+  # _pdda_gov_resolve_ref's bare-filename fallback (see its comment for why this replaced a
   # per-lookup, per-line bash tree-walk).
   local gov_file_index=""
   gov_file_index="$(mktemp 2>/dev/null || true)"
   if [ -n "$gov_file_index" ]; then
-    find "$PDDA_REPO_ROOT" -not -path '*/.git/*' -type f 2>/dev/null \
-      | awk -F/ '{print $NF "\t" $0}' > "$gov_file_index"
+    if ! find "$PDDA_REPO_ROOT" -not -path '*/.git/*' -type f > "$gov_file_index" 2>/dev/null; then
+      # A failed build must not silently masquerade as "found nothing" — that would flag every bare
+      # ref as dead. Drop it so _pdda_gov_resolve_ref's is-usable check fails closed and its
+      # full-tree-scan fallback takes over instead.
+      rm -f "$gov_file_index"
+      gov_file_index=""
+    fi
   fi
   for doc in $present_docs; do
     abs_file="$PDDA_REPO_ROOT/$doc"

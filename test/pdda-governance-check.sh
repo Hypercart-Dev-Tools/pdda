@@ -490,5 +490,48 @@ out="$(run_check)"
 assert_absent "$out" "dead reference 'pdda-lib.sh'" \
   "a bare filename that exists elsewhere still resolves under literal matching (GH-34 no regression)"
 
+# ==================================================================================================
+# GH-48 — the bare-filename fallback re-walked the whole repo tree in a bash `while read` loop, once
+# per LINE mentioning an unresolved bare name (not deduped per run). On a large real repo with a
+# common bare command name (e.g. `pdda.sh`) mentioned on dozens of lines, that multiplied into a
+# multi-minute stall. Fixed by building a one-path-per-line index once per check_governance run (native
+# `find`, no bash loop) and looking each ref up with a single `awk` pass.
+# ==================================================================================================
+
+# --- REGRESSION: a bare filename resolves correctly even when its directory contains a literal tab --
+# The first fix attempt stored "basename<TAB>path" and split lookups on tab — a path whose directory
+# portion itself contained a real tab byte then got truncated by that split, so a real, existing file
+# was scored as a dead reference. The index must preserve the whole path untouched.
+new_sandbox
+tabdir="$SBOX/some$(printf '\t')dir"
+mkdir -p "$tabdir"
+: > "$tabdir/pdda-lib.sh"
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+The helpers live in `pdda-lib.sh`.
+EOF
+out="$(run_check)"
+assert_absent "$out" "dead reference 'pdda-lib.sh'" \
+  "a bare filename resolves correctly even when its directory contains a literal tab byte (GH-48)"
+
+# --- REGRESSION: an index-build failure falls back to the correctness-preserving scan, not a false
+# --- positive flood. Simulate failure by making `find` itself fail (a directory find can't traverse).
+new_sandbox
+mkdir -p "$SBOX/utils/pdda"
+: > "$SBOX/utils/pdda/pdda-lib.sh"
+cat > "$SBOX/ROUTER.md" <<'EOF'
+# ROUTER.md
+
+The helpers live in `pdda-lib.sh`.
+EOF
+noexec_dir="$SBOX/unreadable"
+mkdir -p "$noexec_dir"
+chmod 000 "$noexec_dir"
+out="$(PDDA_REPO_ROOT="$SBOX" PDDA_MODE=full PDDA_FORMAT=text bash "$PDDA" governance 2>&1)"
+chmod 755 "$noexec_dir"   # restore before cleanup can remove it
+assert_absent "$out" "dead reference 'pdda-lib.sh'" \
+  "a find error during index build still resolves a real bare ref via the fallback scan, not a false dead-ref (GH-48)"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -102,13 +102,26 @@ pdda_json_escape() {
   else
     # GH-48: node isn't guaranteed on PATH (e.g. a launchd/cron caller with a minimal PATH) — degrade
     # to a pure-shell escape instead of silently emitting nothing (which corrupted activity-log JSON).
-    local s="$1"
+    local s="$1" out="" i c ord
     s="${s//\\/\\\\}"
     s="${s//\"/\\\"}"
     s="${s//$'\n'/\\n}"
     s="${s//$'\r'/\\r}"
     s="${s//$'\t'/\\t}"
-    printf '%s' "$s"
+    s="${s//$'\b'/\\b}"
+    s="${s//$'\f'/\\f}"
+    # JSON forbids any other raw C0 control byte (0x00-0x1F) in a string literal too — a real path or
+    # message is very unlikely to carry one, but the degrade path must still emit valid JSON when it
+    # does, not just for the common cases above. \0 can't occur (bash strings can't hold a NUL byte).
+    for (( i = 0; i < ${#s}; i++ )); do
+      c="${s:i:1}"
+      ord="$(printf '%d' "'$c" 2>/dev/null)"
+      if [ -n "$ord" ] && [ "$ord" -lt 32 ]; then
+        printf -v c '\\u%04x' "$ord"
+      fi
+      out+="$c"
+    done
+    printf '%s' "$out"
   fi
 }
 
