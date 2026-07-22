@@ -494,9 +494,11 @@ assert_absent "$out" "dead reference 'pdda-lib.sh'" \
 # GH-48 — the bare-filename fallback re-walked the whole repo tree in a bash `while read` loop, once
 # per LINE mentioning an unresolved bare name (not deduped per run). On a large real repo with a
 # common bare command name (e.g. `pdda.sh`) mentioned on dozens of lines, that multiplied into a
-# multi-minute stall. Fixed by letting `find -name` (glob-escaped, GH-34-safe) do the matching natively
-# during ONE traversal per unique bare name (memoized per run in a small per-name cache directory)
-# instead of a bash-level basename compare against every entry in the tree.
+# multi-minute stall. Fixed by collecting every unique unresolved bare name across all scanned docs
+# first, then resolving all of them in exactly ONE whole-tree `find` call (glob-escaped names OR'd
+# together, GH-34-safe) — one traversal per check_governance RUN, not one per name and not one per
+# mention. See test/pdda-governance-cache-fallback.sh for the per-name cache's collision/failure
+# fallback behavior (that cache is what pass 2 reads; it's a pure reader, no traversal of its own).
 # ==================================================================================================
 
 # --- REGRESSION: a bare filename resolves correctly even when its directory contains a literal tab --

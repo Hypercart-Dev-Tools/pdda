@@ -896,7 +896,7 @@ _pdda_gov_cache_key() {
 }
 
 _pdda_gov_resolve_ref() {
-  local ref="$1" from_dir="$2" cache_dir="${3:-}" path candidate found p esc key name_file path_file cached_name
+  local ref="$1" from_dir="$2" cache_dir="${3:-}" path candidate found p esc key name_file path_file cached_name cache_hit
   path="${ref%%#*}"
   case "$path" in
     http://*|https://*|//*) return 1 ;;
@@ -907,6 +907,7 @@ _pdda_gov_resolve_ref() {
       candidate="$PDDA_REPO_ROOT/$path"
       if [ ! -f "$candidate" ]; then
         found=""
+        cache_hit=0
         if [ -n "$cache_dir" ] && [ -d "$cache_dir" ]; then
           # GH-48 (round 4): check_governance already ran ONE whole-tree `find` for every unique bare
           # name across the whole run and populated this cache — a pure read here, no traversal. Each
@@ -914,8 +915,7 @@ _pdda_gov_resolve_ref() {
           # file with an internal delimiter — the cache key is a 32-bit checksum, which *can* collide
           # for two different names, and a delimiter-based format would then either merge or corrupt
           # both entries. Two whole-file reads instead: read the stored name back and compare it to
-          # `$path` before trusting the stored path; on a mismatch (a genuine collision) this cache
-          # entry just isn't usable for `$path` — same effect as a cache miss, never a wrong answer.
+          # `$path` before trusting the stored path.
           key="$(_pdda_gov_cache_key "$path")"
           name_file="$cache_dir/$key.name"
           path_file="$cache_dir/$key.path"
@@ -924,16 +924,23 @@ _pdda_gov_resolve_ref() {
             if [ "$cached_name" = "$path" ]; then
               found="$(cat "$path_file" 2>/dev/null)"
               [ "$found" = "-" ] && found=""
+              cache_hit=1
             fi
+            # else: a genuine collision (this key's slot holds a DIFFERENT name) — fall through to the
+            # single-name scan below rather than treating $path as confirmed-dead. Round 4 review caught
+            # that the previous version stopped here and silently reported a real, colliding file dead.
           fi
-        else
-          # No usable cache (mktemp/find failed building it, or check_governance's caller didn't build
-          # one at all) — fall back to the pre-GH-48 full-tree scan so a bare ref still resolves
-          # correctly. Slower, but correctness-preserving; the batch cache above is what the speed fix
-          # actually relies on. `$path` is glob-escaped (GH-34) so it still can't be misread as a
-          # pattern, and no `-type` filter is applied (first traversal match wins, any type — see
-          # check_governance's batch build for the full rationale, which applies identically here).
+        fi
+        if [ "$cache_hit" != "1" ]; then
+          # Either no usable batch cache (mktemp/find failed building it, check_governance didn't build
+          # one, or this specific key collided with a different name) — fall back to a single-name
+          # `find` so `$path` still resolves correctly. Slower than the batch cache for this one name,
+          # but correctness-preserving; the batch cache is what the speed fix actually relies on for the
+          # common (no collision, cache built fine) case. `$path` is glob-escaped (GH-34) so it still
+          # can't be misread as a pattern, and no `-type` filter is applied (first traversal match wins,
+          # any type — see check_governance's batch build for the full rationale, identical here).
           esc="$(_pdda_gov_glob_escape "$path")"
+          found=""
           while IFS= read -r -d '' p; do
             found="$p"; break
           done < <(find "$PDDA_REPO_ROOT" -not -path '*/.git/*' -name "$esc" -print0 2>/dev/null)
