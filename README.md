@@ -149,6 +149,11 @@ This repo ships a couple of Claude Code skills under `SKILLS/` for working the P
   propose-then-confirm, and only ever writes to the operator's own `~/.claude/settings.json` or a
   repo's gitignored `.claude/settings.local.json` — never a repo's committed settings. Trigger:
   `/pdda-hook`.
+- **`SKILLS/PDDA-STATUS/`** — builds a confidence-scored matrix reconciling the 10 most recently
+  updated GitHub issues against `PROJECT/**` lifecycle state (folder, frontmatter `status:`,
+  checklist-vs-commit evidence), saved to a dated `PROJECT/4-MISC/PDDA-STATUS-<date>.md` doc.
+  Propose-then-confirm only — every recommended `status:` edit, `git mv`, and `ROADMAP.md` pointer
+  move is previewed as one bundle and never auto-applied. Trigger: `/pdda-status`.
 
 ## Maintaining this repo (contributors)
 

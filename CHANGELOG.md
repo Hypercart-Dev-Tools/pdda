@@ -1,5 +1,30 @@
 # CHANGELOG.md
 
+## 2026-07-23
+
+### New skill: `/pdda-status` — confidence-scored issue/doc reconciliation, propose-then-confirm only
+
+Added `SKILLS/PDDA-STATUS/SKILL.md` (canonical source, same convention as `SKILLS/PDDA-EOD/` and
+`SKILLS/PDDA-hook/` — not duplicated under `.claude/skills/`) and symlinked it device-wide to
+`~/.claude/skills/pdda-status`, making it available in every repo on this device. Builds a temp matrix
+over the 10 most recently updated GitHub issues (GH state, doc bucket, frontmatter `status:`,
+checklist-vs-commit evidence, a 0-5 confidence tally) and saves it to a dated
+`PROJECT/4-MISC/PDDA-STATUS-<date>.md` doc, following the `/pdda-eod` EOD-doc precedent. README's
+"Bundled Claude Code skills" section updated with a matching entry.
+
+The original spec asked the skill to auto-write the frontmatter `status:` and auto-`git mv` the doc
+once evidence hit 3/5. That's the one thing every existing PDDA mechanic deliberately avoids —
+`pdda.sh stale` flags without moving, `pdda.sh issue-doc-sync` warns without closing an issue
+("detect deterministically, act only with a yes") — and a flat 3/5 threshold is the same
+frozen-composite-score anti-pattern the triage-ratings section already rejects for `risk`. Reworked to
+propose-then-confirm instead: every recommended edit (status line + `git mv` + the matching
+`ROADMAP.md` ledger move) is drafted and previewed as one bundle, same posture as `/idea`, and nothing
+writes until the operator confirms. The skill also shells out to `pdda.sh issue-doc-sync` +
+`gh-refresh` for the GH-state half of the signal rather than re-deriving it, and names GH-9 (queued
+weekly progress counter) and GH-51 (queued device-wide doc-index spike) as related, unbuilt, unreplaced
+work rather than silently overlapping them. Verified: `utils/pdda/pdda.sh run` — 0 errors after the
+change, `pdda-check-governance` 0/0.
+
 ## 2026-07-22
 
 ### First `/pdda-eod` wrap: inbox reconciled against evidence, not against the check
