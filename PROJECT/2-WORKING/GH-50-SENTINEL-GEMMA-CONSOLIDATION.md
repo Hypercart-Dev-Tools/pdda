@@ -1,6 +1,6 @@
 ---
 title: Consolidate the doc-governance sentinel onto 3-Eyes + Gemma, and retire the Needle stack
-status: Active (2-WORKING)
+status: Active (2-WORKING) — Phase 0 complete (bake-off GO verdict); Phases 1-5 not started
 created: 2026-07-22
 updated: 2026-07-22
 owner: noel
@@ -22,7 +22,13 @@ context_tags: [sentinel, 3-eyes, needle, gemma, tech-debt, consolidation]
 
 | What was just completed | What's next |
 |---|---|
-| Promoted to 2-WORKING. Ratings confirmed. | Executed Fair Phase 0 bake-off spike. Result: GO for Phase 1. |
+| **Phase 0 shipped 2026-07-22** (PR [#52](https://github.com/Hypercart-Dev-Tools/pdda/pull/52), commit `d3a931f`). The three-arm bake-off ran over the frozen replay corpus and returned a **GO** verdict for Gemma; findings written back to this doc. Both blocking gates cleared: safety-path recall $\ge$ Needle's, and the memory envelope measured. Doc promoted to 2-WORKING with ratings confirmed. | **Phase 1 — adopt the cactus agents into the 3-Eyes TOML job registry.** Phase 1 is model-independent and ships regardless of the verdict. Phases 2-5 (routing on Gemma, doc review on Gemma, absorb the multi-repo contract, retire the Needle stack) remain unstarted; Phase 4 is where `MULTI-REPO-CACTUS-SENTINEL-DEPLOYMENT.md` is superseded. |
+
+> **Issue lifecycle note (2026-07-22).** [#50](https://github.com/Hypercart-Dev-Tools/pdda/issues/50)
+> was closed as `COMPLETED` when Phase 0's GO verdict landed. That was premature: Phase 0 is a
+> *blocking gate* on the consolidation, not the consolidation itself, and Phases 1-5 are unstarted.
+> The issue was reopened during the `/pdda-eod` wrap. #50 is the master tracking issue for all six
+> phases and closes only when Phase 5 retires the Needle stack.
 
 ## Ask
 

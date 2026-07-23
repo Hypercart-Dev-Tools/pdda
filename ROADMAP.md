@@ -41,6 +41,13 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Queue / parked intake
 
+- **GH-55 — skills invoke `utils/pdda/pdda.sh` by bare CWD-relative path** (2026-07-22) - the same
+  defect as [#47](https://github.com/Hypercart-Dev-Tools/pdda/issues/47), in the `PDDA-EOD` skill
+  shipped by PR #54. From any subdirectory the call fails, and the skill's "PDDA is not installed
+  here, stop" guardrail turns that into a confident false negative rather than an error. Worse here
+  than in #47 because PDDA-EOD is symlinked device-wide. Both should take one shared
+  `git rev-parse --show-toplevel` helper so the fix doesn't drift. Issue
+  [#55](https://github.com/Hypercart-Dev-Tools/pdda/issues/55). -> no capture doc yet
 - **GH-51 — device-wide PDDA doc index spike (SQLite + local embeddings)** (2026-07-22) - a derived,
   gitignored SQLite index over all 37 PDDA installs on this device (1,856 docs / 24.6MB), enumerated
   by filesystem and named via HQ, to reconcile the four claims each doc makes about itself (folder vs
@@ -64,11 +71,12 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   2026-07-18 (moved to giant-brains). Issue
   [#41](https://github.com/Hypercart-Dev-Tools/pdda/issues/41). ->
   [PROJECT/1-INBOX/MARATHON-TRIAGE-2026-07-17.md](PROJECT/1-INBOX/MARATHON-TRIAGE-2026-07-17.md)
-- **Marathon Plan (2026-07-07)** (2026-07-07) - the canonical XYZ-format marathon plan doc
-  (hand-authored per `.xyz/README.md`'s Option B — the ROADMAP auto-generator, Option A, currently
-  reports 0 active lanes) for the two build phases below, distinct from the machine-executable
-  `marathon/MARATHON-2026-07-07.yaml`. ->
-  [PROJECT/2-WORKING/MARATHON-PLAN-2026-07-07.md](PROJECT/2-WORKING/MARATHON-PLAN-2026-07-07.md)
+- **Marathon Plan (2026-07-07)** (2026-07-07) - the canonical XYZ-format marathon plan doc for the two
+  build phases below, distinct from the machine-executable `marathon/MARATHON-2026-07-07.yaml`.
+  **Archived 2026-07-22 — never fired, both lanes overtaken by events:** p1 (myriad reader) shipped and
+  [#11](https://github.com/Hypercart-Dev-Tools/pdda/issues/11) is closed; p2 (agents-builder) moved to
+  its own capture under [#42](https://github.com/Hypercart-Dev-Tools/pdda/issues/42). ->
+  [PROJECT/4-MISC/MARATHON-PLAN-2026-07-07.md](PROJECT/4-MISC/MARATHON-PLAN-2026-07-07.md)
 - **GH-42 — agents-builder skill** (2026-07-06) - a Claude Code skill that interviews a user (scenario →
   infer camps) and writes an `AGENTS-TEMP.md` from the architectural camps in
   `PROJECT/4-MISC/OPINIONATED-ARCHITECTURE/OPINIONATED-PATTERNS.md`; never touches an existing
@@ -89,9 +97,10 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   master tracking issue, 6 phases. Retires ~60KB of bespoke shell/Python, a 50.2MB finetuned
   checkpoint, a second ML runtime (needle venv + JAX), and three hand-authored launchd plists, moving
   doc-governance review onto `gemma4:12b-mlx` under the 3-Eyes registry. Driver is tech debt, not
-  model quality. **Phase 0 is a blocking three-arm bake-off** (Needle vs Gemma vs deterministic-only)
-  — nothing model-related starts until it returns a verdict; Phase 1 (supervision migration) is
-  model-independent and ships regardless. Supersedes
+  model quality. **Phase 0 (blocking three-arm bake-off) completed 2026-07-22 with a GO verdict**
+  (PR #52); Phases 1-5 not started, next is Phase 1 (supervision migration, model-independent). The
+  issue was closed on the Phase 0 verdict and **reopened 2026-07-22** — Phase 0 gates the
+  consolidation, it is not the consolidation. Supersedes
   `MULTI-REPO-CACTUS-SENTINEL-DEPLOYMENT.md` at Phase 4. Issue [#50](https://github.com/Hypercart-Dev-Tools/pdda/issues/50). ->
   [PROJECT/2-WORKING/GH-50-SENTINEL-GEMMA-CONSOLIDATION.md](PROJECT/2-WORKING/GH-50-SENTINEL-GEMMA-CONSOLIDATION.md)
 
