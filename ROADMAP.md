@@ -2,7 +2,7 @@
 title: PDDA Standalone Roadmap
 status: Active
 created: 2026-06-24
-updated: 2026-07-07
+updated: 2026-07-22
 branch: main
 goal: >
   Canonical pointer ledger for the standalone PDDA installer repo. This file tracks the repo's
@@ -33,6 +33,11 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 | **GH-35 shipped (2026-07-14): Release primitive — first-class GitHub Releases integration.** `PROJECT/releases/` lifecycle bucket; `pdda.sh release-readiness` (new deterministic check); `pdda.sh gh-release-sync` (parallel to `gh-refresh`); `roadmap-coverage` extended to cover release docs; `/release` skill; `install.sh` + `PDDA-INSTALL.md` + `.gitignore` updated. Four-tier chain: task/issue → project → marathon → release. Additive, non-breaking. Earlier: **GH-23 shipped and closed (P1–P4, PR #32 → 5ef638a)**; follow-ups **#33 + #34** landed 2026-07-11; governance suite 41 → 47. | **Repair the `LTVera-Pandas` install** — it still carries the pre-P1 verbatim router; needs an explicit `install.sh --with-startup-docs --force` (`pdda-sync.sh push` cannot reach a target's `ROUTER.md`), backing up its 60KB `AGENTS.md` first (tracked as [BinoidCBD/LTVera-Pandas#49](https://github.com/BinoidCBD/LTVera-Pandas/issues/49)). **GH-10 Sentinel** is the other active build — Phase 3 replay/eval harness next. |
 
 ## Ledger
+
+> **External producer note (2026-07-22) — 3-Eyes.** 3-Eyes (GH-195, rebalance-OS) is a new automated
+> producer of provisional `PROJECT/1-INBOX/` captures. Its `pdda-inbox` route drafts PDDA-shaped docs
+> with `ratings_provisional: true`; they follow the normal lifecycle and a human owns promotion. No
+> PDDA changes required — recorded here because a machine author in `1-INBOX` is otherwise unexplained.
 
 ### Queue / parked intake
 - **GH-41 — Marathon triage 2026-07-17 follow-ups** (2026-07-18) - master tracking issue for the

@@ -1,5 +1,24 @@
 # CHANGELOG.md
 
+## 2026-07-22
+
+### Recorded: 3-Eyes is now a machine author of provisional `1-INBOX` captures
+
+3-Eyes — the local job supervisor built in `rebalance-OS` under GH-195 (merged there via PR #196,
+`fa7920c`) and now active on the maintainer's Mac Studio — has a `pdda-inbox` route that drafts
+PDDA-shaped captures into a repo's `PROJECT/1-INBOX/`. This is a documentation-only iteration: the
+captures are ordinary PDDA docs, so no PDDA code, check, or contract changed.
+
+- **Always provisional.** Machine-drafted captures carry `ratings_provisional: true`, which
+  `PROJECT/PDDA.md` already treats as an eligibility gate, not metadata — `eligible = risk <= 2 AND
+  not ratings_provisional`. A 3-Eyes capture therefore can never be auto-selected; a human promotes it
+  through the normal lifecycle.
+- **Recorded in three places** so the provenance survives a fresh session: a ROADMAP ledger carve-out
+  note, a `ROUTER.md` routing hint telling an agent what an author-less provisional capture is and to
+  triage it like an `/idea` intake, and this entry.
+- **Verified.** `utils/pdda/pdda.sh roadmap` and `governance` both `errors=0`; the single roadmap warn
+  (file length > 200 lines) predates this change.
+
 ## 2026-07-21
 
 ### Specify isolated multi-repository Cactus Sentinel deployment

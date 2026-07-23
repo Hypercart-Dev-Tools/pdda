@@ -104,6 +104,10 @@ utils/pdda/pdda-sync.sh status                          # read-only drift report
   rationale in `PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md`, usage in `utils/pdda/PDDA-INSTALL.md`.
 - If the task is about document quality, active-doc lifecycle, roadmap sprawl, or automation policy, start in `PROJECT/PDDA.md`.
 - If the task is about repo-local maintenance state, start in `ROADMAP.md`.
+- If a `PROJECT/1-INBOX/` capture arrives with `ratings_provisional: true` and no human author, it is a
+  machine-drafted capture from 3-Eyes (the local job supervisor in the `rebalance-OS` repo, GH-195).
+  Triage and promote it the same way you would an `/idea` intake (`.claude/skills/idea/SKILL.md`); it is
+  never auto-selected, because PDDA's selection rule requires `risk <= 2` **and** not `ratings_provisional`.
 - If the task is about the changelog, provenance, or end-of-iteration logging, the governance is in `PROJECT/PDDA.md` (the "CHANGELOG.md — end-of-iteration record" contract).
 - If the task involves a Marathon or the wider XYZ harness (Consult/Relay/Swarm/Marathon), do not
   re-derive the format here — it's owned upstream, not by PDDA. Canonical docs live in the
