@@ -2,6 +2,36 @@
 
 ## 2026-07-23
 
+### `/pdda-status` QA pass — Codex review via `/relay-xyz`, 3 blockers fixed
+
+Ran a Codex QA review of `SKILLS/PDDA-STATUS/SKILL.md` at the operator's request. The tick-mediated
+`relay-drive.sh` path hit a real harness bug first: in this repo's vendored-`.xyz`, same-repo-lane
+config, `tick`'s lock file lives at the outer repo root (`pdda/.tick/locks/`), but Codex's sandbox
+(both worktree-isolated and `RELAY_WORKTREE_ISOLATION=0`) only allowlists paths under `.xyz/` or the
+ephemeral worktree — every claim attempt died `EPERM: open .../pdda/.tick/locks/claim.lock`. Fell back
+to `relay-automation/consult.sh` (a one-shot Codex review with no `tick`/worktree dependency) to still
+get the review done; filed the harness defect separately via `/file-xyz-bug`.
+
+Codex's verdict: **Changes requested** — 3 Blockers, 4 Shoulds, 3 Pass. All three Blockers verified
+directly against `utils/pdda/pdda.sh` before trusting them (not taken on faith):
+
+- Step 6 could propose a `2-WORKING → 3-COMPLETED` move without the `## Lessons Learned (For Future
+  Agents)` section `PROJECT/PDDA.md` requires first, and no listed re-check would have caught the gap.
+- Confidence signal 5 ("`issue-doc-sync` reports no drift warn") silently over-counted: `check_issue_doc_sync()`
+  only scans `2-WORKING`/`3-COMPLETED` — confirmed by reading `utils/pdda/pdda.sh` — so a doc in
+  `1-INBOX`/`4-MISC`/missing entirely was never evaluated, not "agreed with."
+- No bucket-specific move rules — a closed, never-actioned `1-INBOX` capture could be proposed straight
+  to `3-COMPLETED` instead of `4-MISC`.
+
+Also fixed all 4 Shoulds: `issue-doc-sync`'s GH-state source described as live-with-cache-fallback, not
+just "cached"; signal 4's terminal-word list now references `PDDA_TERMINAL_STATUS_WORDS` in
+`utils/pdda/pdda.sh` instead of a hand-copied list (confirmed the real list includes `completed`, which
+the copy had dropped); Step 1 now also pulls issue comments and searches PR title+body, matching what
+signals 2/3 actually claim to check; the "Never auto-write" guardrail reworded to scope it to
+lifecycle/frontmatter/ROADMAP mutations, since it read as contradicting Step 8's own (intentional,
+`/pdda-eod`-precedented) direct write of the dated matrix doc. Verified: `utils/pdda/pdda.sh run` and
+`pdda.sh governance` both clean after the edit.
+
 ### New skill: `/pdda-status` — confidence-scored issue/doc reconciliation, propose-then-confirm only
 
 Added `SKILLS/PDDA-STATUS/SKILL.md` (canonical source, same convention as `SKILLS/PDDA-EOD/` and

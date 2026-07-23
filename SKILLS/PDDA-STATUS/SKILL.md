@@ -14,9 +14,16 @@ flag-only; `pdda.sh issue-doc-sync` is warn-only and "detect deterministically, 
 
 **Do not re-derive GH-state detection this skill already has a check for.** The GH-state half of the
 signal (issue CLOSED but doc still in `2-WORKING`; issue OPEN but doc's status reads done) is exactly
-what `utils/pdda/pdda.sh issue-doc-sync` already computes, deterministically, against the cached
-gh-state file. Call it; don't reimplement it. This skill adds three things `issue-doc-sync` does not do:
-the 10-issue recency scope, the confidence score, and the checklist-vs-commit evidence read.
+what `utils/pdda/pdda.sh issue-doc-sync` already computes, deterministically, against **live `gh` when
+reachable, falling back to the cached gh-state file otherwise** (`PDDA_ISSUE_SYNC_SOURCE=auto` default —
+see `PROJECT/PDDA.md` → "gh-degrade"). Call it; don't reimplement it. This skill adds three things
+`issue-doc-sync` does not do: the 10-issue recency scope, the confidence score, and the
+checklist-vs-commit evidence read.
+
+**Scope limit inherited from `issue-doc-sync`:** that check only ever scans `PROJECT/2-WORKING` and
+`PROJECT/3-COMPLETED` — it has no opinion on a doc in `1-INBOX`, `4-MISC`, or a missing doc. Step 4's
+signal 5 below carries this same limit forward explicitly; don't let a doc outside those two buckets
+silently read as "the check agrees."
 
 **Related, not superseded.** `ROADMAP.md` already queues **GH-9** (a weekly progress counter — open
 issues + closed tasks) and **GH-51** (a device-wide doc-index spike reconciling the same four claims —
@@ -45,10 +52,18 @@ gh issue list --state all --limit 10 --search "sort:updated-desc" \
   --json number,title,state,url,updatedAt,body
 ```
 
-For each issue, also pull linked/referencing activity:
+Also pull each issue's comments — signal 2 (step 4) needs them for a stated reason behind an unchecked
+box, and a plain `body` fetch above does not include them:
 
 ```bash
-gh pr list --search "<n> in:body" --state all --json number,title,state,mergedAt,url
+gh issue view <n> --json comments
+```
+
+For each issue, also pull linked/referencing activity — search **both** title and body for the PR, and
+grep commit subjects (which cover title-equivalent text) for the issue reference:
+
+```bash
+gh pr list --search "<n> in:title,body" --state all --json number,title,body,state,mergedAt,url
 git log --all --oneline --grep "#<n>\|GH-<n>"
 ```
 
@@ -84,14 +99,18 @@ visible in the matrix, not just the sum:
 
 1. GH issue `state` is `CLOSED`.
 2. The issue body's GFM checklist (`- [ ]`/`- [x]`) is at or near fully checked (all, or all-but-one with
-   a stated reason in comments).
+   a stated reason — check the checklist in the body **and** the comments pulled in step 1).
 3. At least one merged PR or `main`-branch commit references the issue number (`Fixes #<n>`, `#<n>` in a
-   commit/PR title or body, or a `GH-<n>` mention).
-4. The local doc's own `status:` **lead word** already reads as done (`complete`, `done`, `shipped`,
-   `fixed`, `closed`, `merged`, `resolved`, `landed`) — same lead-word anchor `issue-doc-sync` uses, so a
-   mid-sentence "Phase 2 complete" inside an otherwise-active status never over-counts.
-5. `issue-doc-sync` (step 3) reports **no drift warn** for this doc — the deterministic check already
-   agrees nothing is wrong.
+   commit subject or PR title/body, or a `GH-<n>` mention).
+4. The local doc's own `status:` **lead word** already reads as done — use `issue-doc-sync`'s own
+   terminal-word list (`PDDA_TERMINAL_STATUS_WORDS` in `utils/pdda/pdda.sh`), not a hand-copied one; a
+   list re-typed here would drift the moment the real one changes. Same lead-word anchor `issue-doc-sync`
+   uses, so a mid-sentence "Phase 2 complete" inside an otherwise-active status never over-counts.
+5. **Only when the doc is in `2-WORKING` or `3-COMPLETED`** (the two buckets `issue-doc-sync` actually
+   scans — see the scope-limit note above): it reports **no drift warn** for this doc. **If the doc is in
+   `1-INBOX`, `4-MISC`, or doesn't exist, this signal is `n/a`, not true** — `issue-doc-sync` never
+   evaluated it, so silence there is "not checked," not "agrees." Score it as 0 toward the tally and mark
+   it `n/a` in the matrix (step 5) rather than counting a pass.
 
 **3/5 is "high confidence" — propose the action in step 6.** Below 3/5, the matrix still shows the score
 and the evidence, but step 6 proposes nothing for that row beyond "insufficient evidence, no action
@@ -112,14 +131,24 @@ saved doc (that's step 8):
 ### 6. Preview one bundled proposal, then get ONE confirmation
 
 For every row scoring **≥3/5 where the recommended action is a real change** (frontmatter status word
-and/or lifecycle-bucket move), draft the exact diff — do not apply anything yet:
+and/or lifecycle-bucket move), draft the exact diff — do not apply anything yet. **The target bucket is
+not generic — pick it from the row's actual situation, not a default "promote toward completed":**
+
+| From bucket | Situation | Target | Extra requirement |
+|---|---|---|---|
+| `2-WORKING` | issue CLOSED, work genuinely done | `3-COMPLETED` | **`## Lessons Learned (For Future Agents)` must be drafted and included in the diff** — `PROJECT/PDDA.md`'s active-doc contract requires it before this move, and `pdda.sh frontmatter` only scans `2-WORKING` so it will *not* catch a missing one after the move |
+| `1-INBOX` | issue CLOSED, capture never actioned (no real work started) | `4-MISC` | remove its `ROADMAP.md` queue pointer entirely (per `PROJECT/PDDA.md` → "GitHub issue intake" lifecycle) — **never** promote an un-actioned capture straight to `3-COMPLETED` |
+| `3-COMPLETED` | issue still OPEN | *(no bucket move)* | recommend `gh issue close <n>` instead — this is `issue-doc-sync`'s own direction-(c) finding, not a file move |
+
+For every proposed move, draft:
 
 - the frontmatter `status:` before → after (one line, not a full rewrite)
+- for a `2-WORKING → 3-COMPLETED` move: the actual `## Lessons Learned` section text (from the doc's own
+  content — don't invent claims), included as part of the same diff
 - the exact `git mv PROJECT/<from-bucket>/GH-<n>-*.md PROJECT/<to-bucket>/GH-<n>-*.md`
 - the matching `ROADMAP.md` edit: moving a doc out of `2-WORKING` means its ledger line must also move
-  out of "In progress" into "Completed"/"Deferred" (`ROADMAP.md` coverage rule, `PROJECT/PDDA.md` →
-  "ROADMAP.md contract") — draft this in the same bundle so the move can't silently leave a stale
-  pointer behind
+  out of "In progress" into "Completed"/"Deferred"/removed (per the table above) — draft this in the
+  same bundle so the move can't silently leave a stale pointer behind
 
 Render every proposed row together as a single preview (same pattern as `/idea`'s "one preview, one
 confirmation"). Apply **nothing** until the operator confirms — a batch "yes to all" or per-row picks
@@ -155,10 +184,13 @@ entry per `AGENTS.md` #7; don't skip that because a matrix doc exists.
 
 ## Guardrails
 
-- **Never auto-write.** Steps 6→7 are separate for a reason: nothing moves or edits until the operator
-  has seen the full bundled diff and confirmed. This is the one non-negotiable carried over from
-  `PROJECT/PDDA.md`'s stance across every other check in the repo — `pdda.sh stale` flags, it doesn't
-  move; `issue-doc-sync` warns, it doesn't close.
+- **Never auto-apply a lifecycle/frontmatter/ROADMAP change.** Steps 6→7 are separate for a reason:
+  no doc's `status:`, no `git mv`, no `ROADMAP.md` line changes until the operator has seen the full
+  bundled diff and confirmed. This is the one non-negotiable carried over from `PROJECT/PDDA.md`'s stance
+  across every other check in the repo — `pdda.sh stale` flags, it doesn't move; `issue-doc-sync` warns,
+  it doesn't close. (This does not extend to step 8's own matrix doc — writing a *new*, dated report file
+  is the report itself, not a mutation of an existing doc; same posture as `/pdda-eod`'s EOD doc, which
+  is also written directly.)
 - **The confidence score is a checklist tally, not a blended metric.** Show the five raw signals in the
   matrix, not just the number — a reader should be able to see *why* something scored 3/5, not trust a
   black box.
