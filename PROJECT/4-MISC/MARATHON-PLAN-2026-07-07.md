@@ -1,8 +1,8 @@
 ---
 title: Marathon Plan (2026-07-07) — myriad-review reader (GH-11) + agents-builder skill
-status: Ready to fire (2-WORKING) — docs authored, briefed, not yet fired
+status: Archived (4-MISC) 2026-07-22 — never fired; both lanes overtaken by events
 created: 2026-07-07
-updated: 2026-07-07
+updated: 2026-07-22
 owner: noel
 branch: main
 doc_type: project
@@ -23,7 +23,7 @@ goal: >
 
 | What was just completed | What's next |
 |---|---|
-| Both lanes planned and briefed (`marathon/MARATHON-2026-07-07.yaml` + `marathon/briefs/`). p2's brief and content source resynced 2026-07-07 after the agents-builder camps-taxonomy SSOT consolidation. | Fire the marathon: `bash .xyz/relay-automation/marathon.sh --plan marathon/MARATHON-2026-07-07.yaml --builder agy` (see the YAML's header comment for the full env). |
+| **Archived 2026-07-22 without ever firing.** Both lanes were planned and briefed (`marathon/MARATHON-2026-07-07.yaml` + `marathon/briefs/`), then overtaken by events: lane p1 (myriad-review reader) shipped independently and issue [#11](https://github.com/Hypercart-Dev-Tools/pdda/issues/11) is CLOSED; lane p2 (agents-builder skill) moved to its own tracked capture, [AGENTS-BUILDER-SKILL.md](../2-WORKING/AGENTS-BUILDER-SKILL.md) under open issue [#42](https://github.com/Hypercart-Dev-Tools/pdda/issues/42). | Nothing — this plan is superseded. Live agents-builder work continues under #42; do not fire this YAML. |
 
 ## Why this exists
 

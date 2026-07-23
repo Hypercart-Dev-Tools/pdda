@@ -2,6 +2,30 @@
 
 ## 2026-07-22
 
+### First `/pdda-eod` wrap: inbox reconciled against evidence, not against the check
+
+Ran the newly shipped `/pdda-eod` against this repo and acted on what it found. The wrap produced the
+repo's first EOD summary, [PROJECT/4-MISC/EOD-2026-07-22.md](PROJECT/4-MISC/EOD-2026-07-22.md).
+
+- **Reopened [#50](https://github.com/Hypercart-Dev-Tools/pdda/issues/50) against the check's own
+  recommendation.** `issue-doc-sync` flagged "issue CLOSED but doc still in 2-WORKING" and recommended
+  archiving the doc. The evidence inverted that: #50 was closed when Phase 0's GO verdict landed, but
+  Phase 0 is a blocking *gate* on the consolidation and Phases 1-5 are unstarted. Issue reopened, doc
+  kept active, `status:` corrected, and its Status table un-inverted (the completed work had been
+  sitting in the "What's next" column). This is the propose-then-confirm layer earning its keep — a
+  deterministic recommendation, followed blindly, would have buried five unstarted phases.
+- **Stale-doc triage on evidence rather than age.** Of three docs flagged stale, two are live work and
+  stay active: GH-10 (Phase 2b of 8, #10 open, running in observe mode) and GH-14 (Phase 1 shipped,
+  Phase 2 open). `MARATHON-PLAN-2026-07-07.md` was archived to `4-MISC` — never fired, both lanes
+  overtaken: p1 shipped and #11 is closed, p2 moved to its own capture under #42.
+- **Filed [#55](https://github.com/Hypercart-Dev-Tools/pdda/issues/55)**, cross-linked to #47: both the
+  `pdda` and `PDDA-EOD` skills invoke `utils/pdda/pdda.sh` by bare CWD-relative path.
+
+**Finding worth carrying:** `pdda.sh run` executed without network reported `issue-doc-sync
+errors=0 warns=0`, while the same check run standalone with `gh` reachable reported the real #50 drift.
+It did not degrade to the documented "state unavailable … sync NOT evaluated" path — it reported clean.
+An unevaluated check summarized as passing is live evidence for GH-14 Phase 2 / #43.
+
 ### PDDA-EOD: end-to-end delivery closure
 
 Hardened `/pdda-eod` from a loose sequence of cleanup reminders into one verified closure flow:
