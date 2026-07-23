@@ -2,6 +2,55 @@
 
 ## 2026-07-22
 
+### PDDA-EOD: end-to-end delivery closure
+
+Hardened `/pdda-eod` from a loose sequence of cleanup reminders into one verified closure flow:
+observe the whole Git state, reconcile docs and ledgers, prepare an exact-path commit, deliver it
+through the correct direct-push or PR route, prove where the commit landed, close issues only after it
+reaches the remote default branch, optionally remove a clean linked worktree, and report the terminal
+state.
+
+- A pushed feature branch with an open PR is now explicitly **review pending**, not shipped. The skill
+  reuses an existing PR, previews any new PR, never duplicates or auto-merges one, and defers issue
+  closure until direct push or merge makes the commit reachable from the remote default branch.
+- Git-tree handling names the exact approved paths, checks, staged diff, commit, upstream, unpushed
+  count, and remaining intentional dirt. Commit, push, PR creation, issue closure, and worktree
+  removal remain separately confirmation-gated.
+- Safe worktree teardown identifies the linked path from porcelain output, proves it has no unique
+  local work, uses `git worktree remove` then `prune`, and never uses filesystem deletion, `--force`,
+  metadata surgery, or branch deletion.
+- The completed GH-6 design, shipped skill, README description, and ROADMAP pointer now describe the
+  same workflow. Bet: a wrap is trustworthy only when it distinguishes local cleanliness, remote
+  branch push, PR state, and default-branch delivery. Reversibility: **Easy** for these documentation
+  changes; the runtime's costly outward actions remain explicit-confirmation gates.
+
+Verification: `utils/pdda/pdda.sh run` completed with `errors=0`; its six warn-level findings are the
+existing ROADMAP size warning, three stale working docs, and two `TBD` release dates.
+
+### Intake: GH-50 — consolidate the sentinel onto 3-Eyes + Gemma, retire the Needle stack
+
+Captured [#50](https://github.com/Hypercart-Dev-Tools/pdda/issues/50) as a 6-phase master tracking
+issue with its `1-INBOX` doc and ROADMAP queue park. The proposal retires the bespoke Needle
+router/serving stack — ~60KB of shell/Python across ten scripts, a 50.2MB finetuned `router.pkl`, a
+second ML runtime (a `needle` venv + JAX serving that one checkpoint), and three hand-authored
+`KeepAlive` launchd plists — moving doc-governance review onto `gemma4:12b-mlx` under the 3-Eyes TOML
+job registry. **The driver is tech debt, not model quality.**
+
+- **The issue lives here, not at a vendor.** PDDA owns the outcome; rebalance-OS/3-Eyes supplies
+  supervision and cactus supplies the incumbent model stack. Both are tooling vendors.
+- **Investigation corrected the framing.** 3-Eyes is a job supervisor, not a reviewer — its only model
+  call (`three_eyes/classify.py`) is a log-line severity tagger. For routing and review this is a build
+  from zero, not a migration, and the capture says so explicitly so the phases aren't under-scoped.
+- **Phase 0 blocks Phases 2–5.** A three-arm bake-off (Needle vs Gemma vs deterministic-only, the
+  floor) over a frozen 1,754-record replay corpus, with two non-negotiable gates: no margin on
+  safety-path recall, and a measured memory envelope — Gemma is 200× Needle's footprint on a box whose
+  supervisor enforces an RSS ceiling. Phase 1 is model-independent and ships regardless of the verdict.
+- **A prior constraint is consciously overridden**, not stepped past:
+  `MULTI-REPO-CACTUS-SENTINEL-DEPLOYMENT.md` gates a central supervisor behind evidence its Phases 1–2
+  never produced. Recorded with its reasoning; that doc is superseded at Phase 4.
+- **Ratings are agent-synthesised** (`ratings_provisional: true`, `risk: 4`), so the capture is not
+  auto-selectable. A human confirms and promotes.
+
 ### Recorded: 3-Eyes is now a machine author of provisional `1-INBOX` captures
 
 3-Eyes — the local job supervisor built in `rebalance-OS` under GH-195 (merged there via PR #196,
