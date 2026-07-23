@@ -139,9 +139,10 @@ docs are honest — which is exactly what the deterministic checks are there to 
 
 This repo ships a couple of Claude Code skills under `SKILLS/` for working the PDDA workflow itself:
 
-- **`SKILLS/PDDA-EOD/`** — a sequenced end-of-day wrap for this repo: reconciles `PROJECT/**` docs
-  with `ROADMAP.md`/`CHANGELOG.md`, checks the git tree is pushed, and offers user-verified closing
-  of done GitHub issues. Trigger: `/pdda-eod`.
+- **`SKILLS/PDDA-EOD/`** — a sequenced iteration wrap for this repo: reconciles `PROJECT/**` docs
+  with `ROADMAP.md`/`CHANGELOG.md`, commits only approved paths, delivers them directly or through a
+  PR as branch policy requires, closes landed issues only after user verification, and optionally
+  tears down a clean, fully pushed linked worktree. Trigger: `/pdda-eod`.
 - **`SKILLS/PDDA-hook/`** — opt-in installer for a `SessionStart` hook that deterministically
   re-anchors `ROUTER.md`/`AGENTS.md`/`PROJECT/PDDA.md` doc-governance rules at every context boundary
   (startup/resume/clear/compact), auto-scoped to repos that carry a `PROJECT/PDDA.md`. Personal,

@@ -1,6 +1,6 @@
 ---
 name: pdda-eod
-description: Run a PDDA iteration wrap for this repo. Use at the end of any unit of work — a task, a phase, a project doc, a marathon, or a day — and especially when `pdda.sh issue-doc-sync` reports reconciliation drift (a doc in 3-COMPLETED whose issue is still open, or a doc that declares itself ready to close). Also use when the operator wants a read-only status report, help reconciling PROJECT docs with ROADMAP.md and CHANGELOG.md, a clean pushed git tree, or user-verified closing of 100%-done GitHub issues. Delegate deterministic checks to utils/pdda/pdda.sh, keep every mutation propose-then-confirm, and degrade cleanly when gh/auth is unavailable.
+description: Run a PDDA iteration wrap for this repo. Use at the end of any unit of work — a task, a phase, a project doc, a marathon, or a day — and especially when `pdda.sh issue-doc-sync` reports reconciliation drift (a doc in 3-COMPLETED whose issue is still open, or a doc that declares itself ready to close). Also use when the operator wants a read-only status report, help reconciling PROJECT docs with ROADMAP.md and CHANGELOG.md, a scoped commit delivered to the remote directly or through a PR, user-verified closing of 100%-done GitHub issues, or safe linked-worktree teardown. Delegate deterministic checks to utils/pdda/pdda.sh, keep every mutation propose-then-confirm, and degrade cleanly when gh/auth is unavailable.
 ---
 
 # /pdda-eod — the iteration wrap for this repo
@@ -39,6 +39,10 @@ into a second plan doc.
   explicit yes.
 - Never force-push. Never close a GitHub issue just because a doc looks done; require user
   verification.
+- Never create a duplicate PR, auto-merge, or call a pushed feature branch "shipped." A unit is
+  delivered only when its commit is on the remote default branch; an open PR is a pending checkpoint.
+- Never remove or move a Git worktree with `rm -rf` or `mv`, or hand-edit `.git/worktrees/` metadata.
+  Treat `--force` on a worktree command as a stop-and-investigate signal, not a cleanup shortcut.
 - If `gh` is unavailable or unauthenticated, continue the local wrap and report what GitHub data was
   skipped.
 - If `utils/pdda/pdda.sh` is absent, PDDA is not installed here; say so and stop.
@@ -62,9 +66,10 @@ into a second plan doc.
    utils/pdda/pdda.sh issue-doc-sync
    ```
 
-   Then gather git state: current branch, `git status --short`, `git status -sb`, unpushed commits,
-   recent commits, and stashes. If `gh` works, gather open/closed issues and relevant PR state for the
-   day window.
+   Then gather the complete delivery state: current branch and worktree, remote default branch,
+   upstream, `git status --short`, `git status -sb`, unpushed commits, recent commits, stashes, and
+   `git worktree list --porcelain`. If `gh` works, gather open/closed issues and any existing PR for
+   the current branch as well as relevant PR activity for the day window.
 
 2. **Print the EOD report before editing anything.**
 
@@ -73,8 +78,10 @@ into a second plan doc.
    - resolved day window
    - deterministic findings verbatim
    - issue/doc sync findings if available
-   - dirty files, untracked files, stashes, current branch, ahead/behind state
+   - dirty files, untracked files, stashes, worktrees, current branch, upstream, and ahead/behind state
    - relevant PR/issue activity if `gh` succeeded
+   - the recommended delivery route: direct-to-default, update an existing PR, create a PR, or stop
+     because remote/auth/divergence state is unresolved
    - the concrete next decisions needed from the operator
 
 3. **Reconcile active project docs.**
@@ -103,19 +110,40 @@ into a second plan doc.
    PROJECT/4-MISC/EOD-YYYY-MM-DD.md
    ```
 
-   It should capture what shipped, what is next, and open findings carried forward. Write it before the
-   final commit so the repo can end clean and the summary lands on the remote with the rest of the wrap.
+   It should capture what shipped, what is next, open findings carried forward, and the expected
+   delivery state (direct push or PR). Write it before the final commit so the repo can end clean and
+   the summary lands on the remote with the rest of the wrap.
 
-6. **Wrap git to a coherent end state.**
+6. **Prepare and commit only the approved Git tree.**
 
-   Propose the exact path set to stage and the commit message. Stage only approved paths; never sweep in
-   unrelated dirty files. On confirmation, commit and push. If the operator leaves unrelated changes
-   unselected, report that the tree is intentionally not fully clean rather than silently absorbing them.
+   Propose the exact path set, summary diff, checks, and commit message. Stage only approved paths with
+   explicit path arguments; never use a broad sweep such as `git add -A`. After confirmation, run the
+   checks, stage those paths, show the staged diff, and ask separately before committing. If no paths
+   were approved or nothing is staged, do not create an empty commit. Leave unrelated changes untouched
+   and classify the tree as intentionally dirty rather than silently absorbing them.
 
-7. **Close GitHub issues last, and only when user-verified.**
+7. **Deliver the commit through the correct remote route.**
 
-   After the push succeeds, present candidate issues that appear 100% done. Close only the ones the
-   user explicitly verifies. Cite the pushed commit/PR and the owning doc in the closing comment.
+   Choose one route from the gathered evidence:
+
+   - **Direct route:** only when the current branch is the remote default branch, repository policy
+     permits direct pushes, and it is not behind or unexpectedly diverged. Show the exact push and ask.
+   - **PR route:** use this when on a non-default branch, the default branch is protected, review is
+     required, or the operator requests it. Push the branch only after confirmation. Reuse and update an
+     existing PR for the same head/base; if none exists, preview the title, body, base, and head, then
+     ask before creating one. Never auto-merge.
+
+   Verify the result instead of inferring it: the committed paths are clean (or remaining dirt is
+   explicitly out of scope), the branch has no unpushed commits, and the exact commit is either
+   reachable from the remote default branch or attached to the named open/merged PR. An open PR means
+   **pushed, review pending**, not shipped; record the PR as `What's next` and stop closure actions that
+   require the work to have landed.
+
+8. **Close GitHub issues only after delivery has landed and the user verifies them.**
+
+   Once the exact commit is reachable from the remote default branch (direct push or merged PR),
+   present candidate issues that appear 100% done. Close only the ones the user explicitly verifies.
+   Cite the landed commit/PR and the owning doc in the closing comment.
 
    **Take the candidates from `issue-doc-sync`, do not re-derive them.** The check already answers this
    deterministically, in both directions:
@@ -131,6 +159,30 @@ into a second plan doc.
    issues went unreconciled rather than reporting a clean wrap.
 
    Never close an issue because a doc *looks* done. Cite the evidence, name the finding, ask.
+
+9. **Offer safe teardown of a completed linked worktree.**
+
+   This is optional and separate from delivery. Offer it only when the linked worktree has no unique
+   local work: approved changes are committed, the branch is fully pushed, and status/untracked checks
+   are clean. An open PR may remain, but say plainly that removing a local worktree neither merges the
+   PR nor deletes its branch. Require explicit confirmation naming the exact worktree. Identify it with
+   `git worktree list --porcelain` (never guess a path or target the primary worktree) and re-check its
+   branch, `git status --short`, untracked files, and unpushed commits. Stashes are shared across
+   worktrees, so never pop or discard one as cleanup.
+
+   On confirmation, run `git worktree remove <validated-absolute-path>`; do **not** add `--force` to
+   bypass dirty-worktree protection. Then run `git worktree prune` to reconcile stale metadata. Never
+   use filesystem deletion or manual `.git/worktrees/` surgery; if a worktree was already moved or is
+   missing, stop and use Git's `repair` or `prune` recovery commands as the evidence dictates. Do not
+   delete the branch as part of worktree teardown.
+
+10. **Print and verify the terminal state.**
+
+    End with one consolidated report naming: committed paths and commit hash; checks run; local
+    clean/intentionally-dirty state; upstream and unpushed count; direct-push or PR URL/state; whether
+    the commit is on the remote default branch; doc/ROADMAP/CHANGELOG disposition; issue actions or
+    deferrals; and worktree retained/removed. Never call the wrap complete when push, PR merge, issue
+    reconciliation, or another required action is still pending.
 
 ## Operating stance
 
