@@ -40,6 +40,22 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 > PDDA changes required — recorded here because a machine author in `1-INBOX` is otherwise unexplained.
 
 ### Queue / parked intake
+
+- **GH-51 — device-wide PDDA doc index spike (SQLite + local embeddings)** (2026-07-22) - a derived,
+  gitignored SQLite index over all 37 PDDA installs on this device (1,856 docs / 24.6MB), enumerated
+  by filesystem and named via HQ, to reconcile the four claims each doc makes about itself (folder vs
+  `status:` vs GH issue state vs ROADMAP pointer). Baseline probe found **144 status/folder mismatches**
+  across 924 lifecycle docs, plus 185 docs with no frontmatter and 241 with no `gh_issue:` — the latter
+  structurally invisible to today's `issue-doc-sync`. Neo4j rejected **for these queries** (joins, not
+  traversals; no JVM in a shell installer) with a named reconsideration trigger. Phase 2 is a hard kill
+  gate; if it passes, the Qwen/MLX embedding layer (1024-d, local, already smoke-tested) is never
+  built. Codex-reviewed over 4 rounds 2026-07-22: **4 blockers + 7 shoulds, all implemented, none
+  declined** — and **all four blockers landed in Phase 2 while Phase 1 drew zero**, so the gate is
+  plausibly over-engineered for its job. Re-rated 3/3/2 -> 5/5/3, Phase 3 estimated separately.
+  **BLOCKED on one operator call** — keep the formal statistical gate, or the simple
+  build-it-and-judge version (recommended); no code starts until that is answered. Issue
+  [#51](https://github.com/Hypercart-Dev-Tools/pdda/issues/51). ->
+  [PROJECT/1-INBOX/GH-51-PDDA-DOC-INDEX-SPIKE.md](PROJECT/1-INBOX/GH-51-PDDA-DOC-INDEX-SPIKE.md)
 - **GH-41 — Marathon triage 2026-07-17 follow-ups** (2026-07-18) - master tracking issue for the
   held candidate pool: 0 of 8 open items are marathon-ready, all failing `swarm-preflight` exit 3 on a
   missing `## Swarm Preflight Contract` block. Covers `AGENTS-BUILDER-SKILL.md`'s orphaned state,
@@ -68,6 +84,16 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
   [#9](https://github.com/Hypercart-Dev-Tools/pdda/issues/9). -> [PROJECT/1-INBOX/GH-9-WEEKLY-PROGRESS-COUNTER.md](PROJECT/1-INBOX/GH-9-WEEKLY-PROGRESS-COUNTER.md)
 
 ### In progress
+
+- **GH-50 — Sentinel consolidation onto 3-Eyes + Gemma, retiring the Needle stack** (2026-07-22) -
+  master tracking issue, 6 phases. Retires ~60KB of bespoke shell/Python, a 50.2MB finetuned
+  checkpoint, a second ML runtime (needle venv + JAX), and three hand-authored launchd plists, moving
+  doc-governance review onto `gemma4:12b-mlx` under the 3-Eyes registry. Driver is tech debt, not
+  model quality. **Phase 0 is a blocking three-arm bake-off** (Needle vs Gemma vs deterministic-only)
+  — nothing model-related starts until it returns a verdict; Phase 1 (supervision migration) is
+  model-independent and ships regardless. Supersedes
+  `MULTI-REPO-CACTUS-SENTINEL-DEPLOYMENT.md` at Phase 4. Issue [#50](https://github.com/Hypercart-Dev-Tools/pdda/issues/50). ->
+  [PROJECT/2-WORKING/GH-50-SENTINEL-GEMMA-CONSOLIDATION.md](PROJECT/2-WORKING/GH-50-SENTINEL-GEMMA-CONSOLIDATION.md)
 
 - **PRD generator skill exploration — PRD-Kimi vs PRD-Perplexity, synthesized into PRD-pdda** (2026-07-08) -
   three draft-stage variants of a not-yet-built `product-prd-builder` skill (structured PRD →
@@ -213,7 +239,7 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 - **Multi-device PDDA status via git-pulse piggyback** (2026-06-30) - `install.sh` now publishes a per-device, **path-normalized** registry projection (repo name + date + source commit + mode, no folder path) into a `pdda/` folder of git-pulse's sync repo on every install/upgrade; git-pulse's existing sync carries it across devices. Best-effort/fail-open, no new command or git logic. 10/10 publish test green; today's ledger backfilled. -> [PROJECT/3-COMPLETED/PDDA-MULTI-DEVICE-STATUS-VIA-GITPULSE.md](PROJECT/3-COMPLETED/PDDA-MULTI-DEVICE-STATUS-VIA-GITPULSE.md)
 
 - **Issue↔doc sync check + two-tier doc-health hooks** (2026-06-29) - new warn-only `pdda.sh issue-doc-sync` flags 2-WORKING/GH-*.md docs drifted from their GitHub issue state (both directions); `pdda.sh gh-refresh` writes the offline gh-state cache; two-tier PostToolUse (single-file lint) + Stop (consolidated full-scan) doc-health hooks. Deterministic, warn-only, fail-open; 31 tests; all phases shipped, committed + pushed. Issue [#5](https://github.com/Hypercart-Dev-Tools/pdda/issues/5) (closed). -> [PROJECT/3-COMPLETED/GH-5-ISSUE-DOC-SYNC.md](PROJECT/3-COMPLETED/GH-5-ISSUE-DOC-SYNC.md)
-- **PDDA-EOD skill — end-of-day wrap** (2026-06-29) - `/pdda-eod` runs hygiene checks, reconciles docs/ROADMAP/CHANGELOG, helps reach a clean/pushed tree, and closes 100%-done issues (user-verified); delegates deterministic work to `pdda.sh`, all propose-then-confirm. Shipped at `SKILLS/PDDA-EOD/SKILL.md`. Issue [#6](https://github.com/Hypercart-Dev-Tools/pdda/issues/6). -> [PROJECT/3-COMPLETED/GH-6-PDDA-EOD.md](PROJECT/3-COMPLETED/GH-6-PDDA-EOD.md)
+- **PDDA-EOD skill — iteration wrap** (2026-06-29; hardened 2026-07-22) - `/pdda-eod` runs hygiene checks, reconciles docs/ROADMAP/CHANGELOG, commits approved paths, chooses direct-push or PR delivery, verifies the remote result before issue closure, and optionally tears down a clean linked worktree; all mutations are propose-then-confirm. Shipped at `SKILLS/PDDA-EOD/SKILL.md`. Issue [#6](https://github.com/Hypercart-Dev-Tools/pdda/issues/6). -> [PROJECT/3-COMPLETED/GH-6-PDDA-EOD.md](PROJECT/3-COMPLETED/GH-6-PDDA-EOD.md)
 - **Sync the PDDA runtime to other repos** (2026-06-27 → completed 2026-06-29) - `utils/pdda/pdda-sync.sh`: canonical → registered-targets, on-demand `push` (manual primary, launchd optional) over an auto-regenerated manifest shared with `install.sh`; content-hash state-stamp copy, delete-mirror with backup, manifest-poisoning guard. Realigned + Codex relay-approved (4 rounds), built in 5 phases, every QA gate green + end-to-end dogfood. -> [PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md](PROJECT/3-COMPLETED/PDDA-SYNC-TO-OTHER-REPOS.md)
 - **Standalone baseline established** (2026-06-24) - repo-facing docs now describe `pdda` itself, placeholder scaffolding is normalized, and the install manifest matches the shipped scripts. -> [PROJECT/PDDA.md](PROJECT/PDDA.md) and [utils/pdda/PDDA-INSTALL.md](utils/pdda/PDDA-INSTALL.md)
 - **`utils/` consolidated to 3 files** (2026-06-24) - the 7 per-check scripts + `pdda-run.sh` collapsed into one `pdda.sh` dispatcher (`pdda.sh run` / `pdda.sh <check>`); `pdda-lib.sh` and the opt-in `pdda-doc-ready.sh` stay separate. Breaking change to the install contract; old filenames removed. -> [utils/pdda/PDDA-INSTALL.md](utils/pdda/PDDA-INSTALL.md)
