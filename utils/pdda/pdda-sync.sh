@@ -283,13 +283,14 @@ cmd_manifest() { pdda_manifest_expand "$SOURCE_DIR"; }
 
 # push [<target>] — distribute the current runtime to one target (or all registered).
 cmd_push() {
-  local DRY=0 ALLOW_DIRTY=0 NO_DELETE=0 FORCE_DELETE=0 ONE_TARGET=""
+  local DRY=0 ALLOW_DIRTY=0 NO_DELETE=0 FORCE_DELETE=0 FORCE_RESYNC=0 ONE_TARGET=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --dry-run) DRY=1; shift ;;
       --allow-dirty) ALLOW_DIRTY=1; shift ;;
       --no-delete) NO_DELETE=1; shift ;;
       --force-delete) FORCE_DELETE=1; shift ;;
+      --force-resync) FORCE_RESYNC=1; shift ;;
       --target) ONE_TARGET="${2:-}"; shift 2 ;;
       -*) warn "push: unknown option $1"; return 2 ;;
       *) ONE_TARGET="$1"; shift ;;
@@ -336,7 +337,7 @@ cmd_push() {
   trap 'release_lock; cleanup_advisory_locks' EXIT INT TERM HUP
 
   local MAX_SHRINK="${PDDA_SYNC_MAX_SHRINK:-25}"
-  local n_new=0 n_upd=0 n_updb=0 n_skip=0 n_del=0 n_miss=0
+  local n_new=0 n_upd=0 n_updb=0 n_skip=0 n_del=0 n_miss=0 n_div=0
   local utc; utc="$(date -u +%Y%m%dT%H%M%SZ)"
   [ "$DRY" -eq 1 ] && log_line "push START (dry-run) — ${#targets[@]} target(s), $cur_count manifest files" \
                     || log_line "push START — ${#targets[@]} target(s), $cur_count manifest files"
@@ -357,20 +358,40 @@ cmd_push() {
         printf '%s\t%s\n' "$rel" "$src_hash" >> "$newstate"; log_line "    new        $rel"; n_new=$((n_new+1)); continue
       fi
       tgt_hash="$(hash_file "$tgt_f")"; last="$(state_get "$statefile" "$rel")"
-      if [ -n "$last" ] && [ "$src_hash" = "$last" ]; then
-        printf '%s\t%s\n' "$rel" "$last" >> "$newstate"; n_skip=$((n_skip+1)); continue   # source unchanged → leave target
-      fi
+
+      # (1) Target already matches source — the only true no-op. Checked FIRST: testing the stamp
+      # before the content is what let a target that had been changed out-of-band report as a clean
+      # skip forever (GH-59).
       if [ "$src_hash" = "$tgt_hash" ]; then
-        printf '%s\t%s\n' "$rel" "$src_hash" >> "$newstate"; n_skip=$((n_skip+1)); continue   # already identical → just stamp
+        printf '%s\t%s\n' "$rel" "$src_hash" >> "$newstate"; n_skip=$((n_skip+1)); continue
       fi
-      # source advanced; decide backup based on whether target diverged from last stamp
+
+      # (2) Source has NOT advanced since the last stamp, yet the target no longer matches it: the
+      # target changed out-of-band. Preserving it is deliberate — PDDA-INSTALL.md documents that
+      # local edits between releases survive — but it is NOT a skip, and must never be summarized as
+      # one (GUIDING-PRINCIPLES #8). `status` calls this "diverged"; so does push now, and the stamp
+      # stays anchored at `last` so the divergence stays detectable on every later run instead of
+      # being laundered into "current".
+      if [ -n "$last" ] && [ "$src_hash" = "$last" ] && [ "$FORCE_RESYNC" -eq 0 ]; then
+        printf '%s\t%s\n' "$rel" "$last" >> "$newstate"
+        log_line "    diverged   $rel (changed out-of-band; preserved — --force-resync to overwrite)"
+        n_div=$((n_div+1)); continue
+      fi
+
+      # (3) Overwrite. tgt_hash != src_hash is guaranteed here, so the target always loses bytes —
+      # back up unconditionally. The backup used to be gated on a stamp existing, which meant a
+      # target with no state (fresh, or a state file cleared to recover from the bug above) was
+      # clobbered with nothing kept, contradicting PDDA-INSTALL.md's "any overwrite of a diverged
+      # target ... is backed up first" (GH-59).
+      if [ "$DRY" -eq 0 ]; then
+        mkdir -p "$(dirname "$BACKUP_DIR/$slug/$utc/$rel")"; cp "$tgt_f" "$BACKUP_DIR/$slug/$utc/$rel"
+        cp "$src" "$tgt_f.pdda-tmp" && mv "$tgt_f.pdda-tmp" "$tgt_f"; case "$rel" in *.sh) chmod +x "$tgt_f" ;; esac
+      fi
+      printf '%s\t%s\n' "$rel" "$src_hash" >> "$newstate"
       if [ -n "$last" ] && [ "$tgt_hash" != "$last" ]; then
-        if [ "$DRY" -eq 0 ]; then mkdir -p "$(dirname "$BACKUP_DIR/$slug/$utc/$rel")"; cp "$tgt_f" "$BACKUP_DIR/$slug/$utc/$rel"; fi
-        if [ "$DRY" -eq 0 ]; then cp "$src" "$tgt_f.pdda-tmp" && mv "$tgt_f.pdda-tmp" "$tgt_f"; case "$rel" in *.sh) chmod +x "$tgt_f" ;; esac; fi
-        printf '%s\t%s\n' "$rel" "$src_hash" >> "$newstate"; log_line "    updated+bak $rel"; n_updb=$((n_updb+1))
+        log_line "    updated+bak $rel"; n_updb=$((n_updb+1))
       else
-        if [ "$DRY" -eq 0 ]; then cp "$src" "$tgt_f.pdda-tmp" && mv "$tgt_f.pdda-tmp" "$tgt_f"; case "$rel" in *.sh) chmod +x "$tgt_f" ;; esac; fi
-        printf '%s\t%s\n' "$rel" "$src_hash" >> "$newstate"; log_line "    updated    $rel"; n_upd=$((n_upd+1))
+        log_line "    updated    $rel"; n_upd=$((n_upd+1))
       fi
     done <<EOF
 $CUR_MANIFEST
@@ -431,7 +452,13 @@ EOF
 
   release_lock; trap - EXIT INT TERM
   local drynote=""; [ "$DRY" -eq 1 ] && drynote=" (dry-run: nothing written)"
-  log_line "push DONE — new=$n_new updated=$n_upd updated+bak=$n_updb skip=$n_skip deleted=$n_del missing=$n_miss$drynote"
+  log_line "push DONE — new=$n_new updated=$n_upd updated+bak=$n_updb skip=$n_skip diverged=$n_div deleted=$n_del missing=$n_miss$drynote"
+  # A run that left targets out of sync must not close on a line that reads like success
+  # (GUIDING-PRINCIPLES #8) — the count above is easy to skim past, so say it in words too.
+  if [ "$n_div" -gt 0 ]; then
+    warn "push: $n_div file(s) left DIVERGED — the target differs from canonical and was preserved, not updated."
+    warn "push: re-run with --force-resync to overwrite them (each is backed up first), or inspect with \`pdda-sync.sh status\`."
+  fi
   return 0
 }
 
@@ -655,6 +682,15 @@ Commands:
   install-agent      Install the optional launchd schedule around `push`.              [Phase 4]
   uninstall-agent    Remove the launchd schedule.                                      [Phase 4]
   help               This message.
+
+push options:
+  --dry-run          Preview copies AND deletions; write nothing.
+  --allow-dirty      Push even though the canonical repo has uncommitted manifest files.
+  --no-delete        Copy/update only; defer canonical-side deletions (kept in the snapshot).
+  --force-delete     Override the manifest-poisoning guard on the delete phase.
+  --force-resync     Overwrite targets reported as DIVERGED (each is backed up first). Without it,
+                     a file whose target copy changed out-of-band is preserved and reported as
+                     `diverged`, never silently skipped.
 
 The registry is machine-local at ${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv (override with
 PDDA_REGISTRY) and is written only by install.sh. State/backups live under temp/ (override PDDA_SYNC_TMP).

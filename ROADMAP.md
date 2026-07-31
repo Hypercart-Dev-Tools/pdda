@@ -41,6 +41,16 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Queue / parked intake
 
+- **GH-59 — `pdda-sync push` silently skips a diverged target, and can overwrite one without a
+  backup** (2026-07-31) - found while propagating GH-381 to all 10 copies (PR #58). `cmd_push` takes
+  its "source unchanged → leave target" branch on `src_hash = last` without ever consulting
+  `tgt_hash`, so a target changed out-of-band (relay containment revert, `git checkout`, manual edit)
+  is counted as `skip` and the `push DONE` line reads clean — while `status` classifies the same file
+  as `diverged`. Preserving local edits is intended and documented; reporting it as a clean skip is
+  not (GUIDING-PRINCIPLES #8). Second defect: the backup is gated on a stamp existing, so an
+  overwrite after a state-cache clear silently skips the backup `PDDA-INSTALL.md:319` promises.
+  Canonical-only file — ships to no target. Issue
+  [#59](https://github.com/Hypercart-Dev-Tools/pdda/issues/59). -> fixed in PR #58; no capture doc
 - **GH-55 — skills invoke `utils/pdda/pdda.sh` by bare CWD-relative path** (2026-07-22) - the same
   defect as [#47](https://github.com/Hypercart-Dev-Tools/pdda/issues/47), in the `PDDA-EOD` skill
   shipped by PR #54. From any subdirectory the call fails, and the skill's "PDDA is not installed

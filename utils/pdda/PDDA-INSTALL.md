@@ -304,6 +304,7 @@ utils/pdda/pdda-sync.sh register [--mode observe|light|full] [--with-startup-doc
 utils/pdda/pdda-sync.sh push [/path/to/repo]
 utils/pdda/pdda-sync.sh push --dry-run        # preview copies AND deletions, write nothing
 utils/pdda/pdda-sync.sh push --no-delete      # copy/update only, skip canonical-side deletions
+utils/pdda/pdda-sync.sh push --force-resync   # overwrite DIVERGED targets (each backed up first)
 
 utils/pdda/pdda-sync.sh list                  # registered targets + mode/source-commit/sync state
 utils/pdda/pdda-sync.sh status [/path/to/repo]# read-only: current/behind/diverged/missing/to-delete
@@ -316,8 +317,12 @@ utils/pdda/pdda-sync.sh uninstall-agent
 ```
 
 **Safety:** `push` only overwrites a file when the canonical repo's copy has genuinely advanced (content hash, not
-mtime), so deliberate local edits between releases are preserved; any overwrite of a *diverged* target
-and any canonical-side deletion is backed up first under `temp/pdda-sync-backups/` (kept to the last
+mtime), so deliberate local edits between releases are preserved. **A preserved file is reported as
+`diverged`, never as a skip** — a target that changed out-of-band (a manual edit, a `git checkout`, an
+agent-harness containment revert) would otherwise stay stale indefinitely behind a summary line that
+reads clean (GH-59). `push DONE` carries a `diverged=N` count and warns in words when it is non-zero;
+`--force-resync` overwrites them. **Every** overwrite is backed up first — as is any canonical-side
+deletion — under `temp/pdda-sync-backups/` (kept to the last
 `PDDA_SYNC_BACKUPS`, default 5). A dirty canonical repo is refused (`--allow-dirty` to override). Canonical-side deletions
 mirror to targets, but a **manifest-poisoning guard** aborts the delete phase before touching any target
 if a declared source root resolves to zero files, the manifest is empty, or it shrank past

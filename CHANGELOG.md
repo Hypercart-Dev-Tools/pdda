@@ -1,5 +1,38 @@
 # CHANGELOG.md
 
+## 2026-07-31
+
+### GH-59: `pdda-sync push` no longer hides a stale target behind a clean summary
+
+Found while propagating the change below to all 10 copies. A sync wrote four files into a target, a
+concurrent agent-harness containment pass reverted them, and **every subsequent `push` reported
+`skip` with a clean summary while that target stayed stale** — recoverable only by deleting the
+per-target state file by hand. Meanwhile `status` correctly called the same file `diverged`, so the
+two subcommands disagreed about it.
+
+- **The skip branch never consulted the target.** `cmd_push` took its "source unchanged → leave
+  target" path on `src_hash = last` alone. Preserving the target is deliberate and documented
+  (`PDDA-INSTALL.md`: local edits between releases survive) — but counting it as `skip` meant a
+  target changed out-of-band was invisible until the source happened to advance again. Now the
+  content check (`src_hash = tgt_hash`) runs **first** as the only true no-op, and the preserved case
+  is reported as `diverged`, counted in `push DONE`, and warned about in words when non-zero. The
+  stamp stays anchored at `last`, so divergence can't launder itself into "current" on a later run.
+  This is GUIDING-PRINCIPLES #8 applied to the sync engine: a run that left targets out of sync must
+  not close on a line that reads like success.
+- **New `--force-resync`** overwrites diverged targets — the escape hatch that previously required
+  hand-deleting a state file.
+- **Every overwrite is now backed up.** The backup was gated on a stamp existing, so a target with no
+  state — fresh, or cleared to recover from the bug above — was clobbered with nothing kept,
+  contradicting the "any overwrite of a diverged target is backed up first" promise in
+  `PDDA-INSTALL.md`. Observed live: the reverted copy survived only because an unrelated tool kept
+  its own backup.
+- New regression test `test/pdda-sync-diverged.sh` (14 assertions), verified in both directions —
+  **5/14 against the pre-fix binary, 14/14 after**, via a `PDDA_SYNC_BIN` override so the proof is
+  repeatable rather than asserted.
+
+`pdda-sync.sh` is canonical-only (excluded from the manifest), so this ships to no target repo.
+Issue [#59](https://github.com/Hypercart-Dev-Tools/pdda/issues/59).
+
 ## 2026-07-30
 
 ### RELEASES.md is optional, and the contract now says so
