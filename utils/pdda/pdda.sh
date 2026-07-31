@@ -652,12 +652,15 @@ check_issue_doc_sync() {
 #   (1) error — a "Release:" block has an empty version
 #   (2) warn  — Target Date is set but not a valid YYYY-MM-DD date
 #   (3) warn  — Target Date has passed and GH_URL is still empty (looks overdue/unshipped)
+#   (4) warn  — Iterations is set but isn't a well-formed "<lo>-<hi>" version band
+#   (5) warn  — a block's version falls inside another block's reserved Iterations band
 check_releases() {
   pdda_reset_counts
   local CHECK_NAME="pdda-check-releases" rc=0
   local RELEASES_FILE_EFF="${PDDA_RELEASES_FILE:-$PDDA_REPO_ROOT/RELEASES.md}"
   local release status target_date codename description gh_url line_no target_epoch today_epoch
   local status_lc front_door shakedown license_file qa_field qa_label qa_value qa_value_lc
+  local iterations milestone rows bands="" band_release band_lo band_hi band_line release_trimmed
 
   if [ ! -f "$RELEASES_FILE_EFF" ]; then
     pdda_record_finding info "$CHECK_NAME" "$RELEASES_FILE_EFF" 0 \
@@ -666,13 +669,64 @@ check_releases() {
     return "$(pdda_gated_exit 0)"
   fi
 
+  # A ledger with no blocks at all (header-only, or empty) is a VALID state under this contract —
+  # sparse is fine — so it reports exactly as clean as it did before this field pair existed. The
+  # guard exists because the here-doc loops below would otherwise see one empty line and fake a
+  # "block near line 0 has no version" error; it deliberately records NO finding of its own.
+  rows="$(pdda_releases_list "$RELEASES_FILE_EFF")"
+  if [ -z "$rows" ]; then
+    pdda_emit_summary "$CHECK_NAME" 0
+    return "$(pdda_gated_exit 0)"
+  fi
+
+  # Pass 1 — validate each Iterations band and remember the well-formed ones. A band reserves patch
+  # numbers that deliberately never get their own block (PROJECT/PDDA.md "RELEASES.md — release
+  # ledger"), which is what lets pass 2 test the admission rule mechanically instead of rhetorically.
   while IFS=$'\037' read -r release status target_date codename description gh_url \
-    front_door shakedown license_file line_no; do
+    front_door shakedown license_file iterations milestone line_no; do
+    iterations="$(pdda_trim "$iterations")"
+    [ -n "$iterations" ] || continue
+    if pdda_is_iteration_band "$iterations"; then
+      bands="${bands}${release}"$'\037'"${iterations%%-*}"$'\037'"${iterations#*-}"$'\037'"${line_no}"$'\n'
+    else
+      pdda_record_finding warn "$CHECK_NAME" "$RELEASES_FILE_EFF" "$line_no" \
+        "release '$release' Iterations '$iterations' is not a valid <lo>-<hi> version band (e.g. 0.2.0-0.2.4)" \
+        "fix-iterations-band"
+    fi
+  done <<EOF
+$rows
+EOF
+
+  while IFS=$'\037' read -r release status target_date codename description gh_url \
+    front_door shakedown license_file iterations milestone line_no; do
     if [ -z "$(pdda_trim "$release")" ]; then
       pdda_record_finding error "$CHECK_NAME" "$RELEASES_FILE_EFF" "$line_no" \
         "a 'Release:' block near line $line_no has no version" "fix-release-value"
       rc=1
       continue
+    fi
+
+    # Admission rule, made mechanical: a version inside another block's reserved band is already
+    # accounted for by that band, so a second block for it is by definition a duplicate. Only plain
+    # dotted-numeric versions are testable this way; anything else is left to human judgment.
+    #
+    # A band's OWNER is inside its own band by construction (0.2.0 owns 0.2.0-0.2.4), so it must not
+    # flag itself. Identity is the block's LINE, not its version text: comparing versions would let a
+    # second, genuinely duplicate `Release: 0.2.0` block hide behind the owner's identical value —
+    # exactly the case the check exists to catch.
+    release_trimmed="$(pdda_trim "$release")"
+    if pdda_is_dotted_version "$release_trimmed"; then
+      while IFS=$'\037' read -r band_release band_lo band_hi band_line; do
+        [ -n "$band_release" ] || continue
+        [ "$band_line" != "$line_no" ] || continue
+        [ "$(pdda_vercmp "$release_trimmed" "$band_lo")" != "-1" ] || continue
+        [ "$(pdda_vercmp "$release_trimmed" "$band_hi")" != "1" ] || continue
+        pdda_record_finding warn "$CHECK_NAME" "$RELEASES_FILE_EFF" "$line_no" \
+          "release '$release_trimmed' is inside the Iterations band $band_lo-$band_hi reserved by release '$(pdda_trim "$band_release")' (line $band_line) — already accounted for; record it in CHANGELOG.md instead of giving it a block" \
+          "in-band-release-block"
+      done <<EOF
+$bands
+EOF
     fi
 
     # Front-door reviewed / Shakedown reviewed / License file: optional pre-release QA-gate
@@ -714,7 +768,9 @@ check_releases() {
         "release '$release' Target Date '$target_date' has passed and Status isn't Shipped — overdue" \
         "overdue-release"
     fi
-  done < <(pdda_releases_list "$RELEASES_FILE_EFF")
+  done <<EOF
+$rows
+EOF
 
   pdda_emit_summary "$CHECK_NAME" "$rc"
   # Warn-only in spirit — never blocks, even in full mode (see PROJECT/PDDA.md section J). The one
@@ -732,7 +788,7 @@ check_releases() {
 cmd_releases_current() {
   local RELEASES_FILE_EFF="${PDDA_RELEASES_FILE:-$PDDA_REPO_ROOT/RELEASES.md}"
   local release status target_date codename description gh_url line_no status_lc any=0
-  local front_door shakedown license_file
+  local front_door shakedown license_file iterations milestone
 
   if [ ! -f "$RELEASES_FILE_EFF" ]; then
     printf '%s not found — nothing to report\n' "$(pdda_relpath "$RELEASES_FILE_EFF")"
@@ -741,7 +797,7 @@ cmd_releases_current() {
 
   printf 'PDDA releases-current — in-progress entries in %s\n' "$(pdda_relpath "$RELEASES_FILE_EFF")"
   while IFS=$'\037' read -r release status target_date codename description gh_url \
-    front_door shakedown license_file line_no; do
+    front_door shakedown license_file iterations milestone line_no; do
     [ -n "$(pdda_trim "$release")" ] || continue
     status_lc="$(printf '%s' "$(pdda_trim "$status")" | tr '[:upper:]' '[:lower:]')"
     [ "$status_lc" != "shipped" ] || continue
@@ -750,7 +806,9 @@ cmd_releases_current() {
     printf '\n• %s' "$release"
     [ -n "$codename" ] && printf ' (%s)' "$codename"
     printf ' — %s\n' "${status:-no Status set}"
+    [ -n "$iterations" ] && printf '    Iterations: %s (reserved; these ship without their own block)\n' "$iterations"
     [ -n "$target_date" ] && printf '    Target Date: %s\n' "$target_date"
+    [ -n "$milestone" ] && printf '    Milestone: %s\n' "$milestone"
     [ -n "$description" ] && printf '    %s\n' "$description"
     [ -n "$gh_url" ] && printf '    %s\n' "$gh_url"
   done < <(pdda_releases_list "$RELEASES_FILE_EFF")

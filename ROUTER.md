@@ -24,7 +24,7 @@ This file is the first entry point for an AI agent working in this repo: it tell
 - `README.md` = human-facing repo/product overview
 - `ROADMAP.md` = pointer ledger for this repo's own maintenance work
 - `CHANGELOG.md` = the end-of-iteration running log (first-class PDDA artifact; governed by `PROJECT/PDDA.md`)
-- `RELEASES.md` = forward-looking release-planning ledger (first-class PDDA artifact; governed by `PROJECT/PDDA.md`)
+- `RELEASES.md` = forward-looking release-planning ledger — **optional**; sparse, stale, or absent are all valid states and the check never blocks. Do not offer to populate it (governed by `PROJECT/PDDA.md`)
 - `PROJECT/PDDA.md` = the canonical PDDA contract and automation rules
 - `utils/pdda/PDDA-INSTALL.md` = the extraction/install manifest for target repos
 - `install.sh` = the executable installer (automates `utils/pdda/PDDA-INSTALL.md`; keep the two in lockstep)

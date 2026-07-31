@@ -1,5 +1,85 @@
 # CHANGELOG.md
 
+## 2026-07-30
+
+### RELEASES.md is optional, and the contract now says so
+
+Upstream response to
+[xyz-3-agents-swarm#381](https://github.com/Claude-AI-Tools-Ventura-County/xyz-3-agents-swarm/issues/381).
+The tooling was already right — `pdda.sh releases` is warn-only, never blocks, and skips a missing
+file — but `PROJECT/PDDA.md` documented the format, every field, and two skills at length without
+ever saying the file was optional. Readers, increasingly LLM maintainers, inferred an obligation and
+kept offering to populate it. Each offer is reasonable; the aggregate is a second hand-maintained
+history that disagrees with `CHANGELOG.md` the first time one is updated and the other isn't.
+
+- **The ledger section now opens with the optionality, phrased as an instruction** ("do not
+  proactively offer to fill it in… do not treat a sparse file as an incomplete one"), because the
+  audience that causes the drift reads that file as instructions rather than description. Mirrored
+  into this repo's own `RELEASES.md` and into the `install.sh` seed, so every new install carries it.
+- **The admission rule is stated as a rule, not left as the adjective "major".** A block earns its
+  place by being worth planning toward; if `Description:` can only restate what changed, it belongs
+  in `CHANGELOG.md` and nowhere else.
+- **New optional `Iterations:` field** — a reserved band of version numbers (`0.2.0-0.2.4`) that are
+  deliberately not enumerated. It gives the excluded thing somewhere to go, which is what stops an
+  admission rule from being broken under deadline, and it makes the rule *checkable*: a version
+  inside an existing band is already accounted for, so a block for it is by definition a duplicate.
+  **Band exhausted → widen it.** Promote to the next release only when the work became a new arc,
+  never merely because the numbers ran out.
+- **New optional `Milestone:` field**, adopted from `xyz-3-agents-swarm`'s local divergence — a
+  GitHub milestone *title* as the release → issue-set join key, so scope can be queried
+  (`gh issue list --milestone "…"`) instead of hand-listed. Free-text and **not** warned on when
+  absent; that repo's local "warn if a dated unshipped block has no milestone" rule was deliberately
+  not adopted, since a nudge recreates the fill-it-in pressure this change exists to remove.
+- **`/release-plan` was the structural driver of the drift and got the deepest edit.** Its stated
+  premise was that `RELEASES.md` "is only useful if it stays populated", and its `backfill` mode
+  diffed `CHANGELOG.md` against the ledger to list "missing" shipped versions — a pre-changelog
+  generator. `backfill` is replaced by `anchor <version> …`, which drafts only versions the operator
+  names and never scans for gaps; the skill now carries an explicit do-not-offer-unprompted rule and
+  an admission-rule stop that declines blocks rather than drafting them anyway. `/release` likewise
+  no longer suggests creating a block when none matches.
+- **`pdda.sh releases` gains two warn-only checks** (malformed band, in-band duplicate) and
+  `releases-current` surfaces both new fields. Additivity verified rather than assumed: the parser
+  ignores unknown labels, absence means "not reserved" / "no milestone", and running the new check
+  against `xyz-3-agents-swarm`'s already-adopted `Iterations:`/`Milestone:` ledger produces zero new
+  findings. New regression test: `test/pdda-releases-iterations.sh` (18 assertions).
+
+**QA'd by a headless Codex review turn** (`relay-xyz` Path A, `--review-once`, exit 5 = changes
+requested) before anything was synced. Five of its six findings were adopted, and two of them
+reversed decisions made in the first draft:
+
+- **A false additivity claim in `pdda_releases_list`.** The comment said new fields were "appended
+  just before `<line>` so existing positional readers only grow at the tail" — self-contradictory,
+  and there is in fact *no* safe position: a field before `<line>` shifts it, one after it gets
+  folded into `<line>` by bash's last-variable-absorbs-the-rest rule. The row shape is now documented
+  as internal-and-breaking-to-extend, with `releases-current` named as the stable external surface,
+  and the field count is pinned by a test so a future addition fails loudly instead of silently
+  misparsing a line number.
+- **The duplicate check compared release *text*, not block identity** — so a second, genuinely
+  duplicate `Release: 0.2.0` block could hide behind the band owner's identical version. It now
+  compares line numbers.
+- **The contract contradicted itself on band owners.** It said versions inside a band "never get a
+  block", while the owner sits inside its own band and keeps one — which the test suite relied on.
+  The exception is now stated. Likewise "a theme, a target date, and a milestone" read as admission
+  *requirements* while both fields are optional; the test is now explicitly the theme, not the
+  paperwork.
+- **A block-less ledger no longer emits an `info` finding.** The first draft's guard against a
+  phantom "block near line 0" error also changed a header-only ledger from `info=0` to `info=1` —
+  a regression against the very claim that sparse is a valid state. It reports exactly clean again.
+- **`/release-plan backfill` is restored, gated, rather than removed.** Deleting it was an
+  unrequested capability removal: optionality forbids *unsolicited* maintenance, but it does not
+  justify declining an explicit operator request. `backfill` now presents a menu rather than a to-do
+  list, never says "missing", excludes band-covered versions, and never self-triggers; `anchor`
+  remains as the narrower named mode. Keeping a gated capability is the reversible choice — a
+  silently deleted skill mode is not something anyone files a bug about.
+- Codex separately *confirmed* the riskiest mechanical change: the process-substitution → here-doc
+  swap in both `while read` loops preserves current-shell execution and final-record handling.
+
+**Propagation:** the change reaches consumers through `pdda-sync.sh` (`PROJECT/PDDA.md` +
+`utils/pdda/**`). `xyz-3-agents-swarm` was deliberately held until `Milestone:` existed upstream, so
+its re-sync no longer deletes the field's documentation — it does still lose that repo's local
+"warn if a dated unshipped block has no `Milestone:`" rule, which was not adopted upstream on purpose
+(a nudge there recreates the fill-it-in pressure this whole change removes).
+
 ## 2026-07-22
 
 ### First `/pdda-eod` wrap: inbox reconciled against evidence, not against the check

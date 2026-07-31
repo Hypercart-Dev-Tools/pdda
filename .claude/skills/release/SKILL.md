@@ -30,7 +30,13 @@ operator-owned step (see step 6).
      concluding it is broken. Confirm `gh auth status` succeeds before proceeding.
 
 1. **Locate the release block.** Find the `Release: <version>` block in `RELEASES.md`. Error if no
-   block matches, or if `Status:` already reads `Shipped` (already published; nothing to do). If
+   block matches, or if `Status:` already reads `Shipped` (already published; nothing to do).
+
+   **If no block matches, do not offer to create one.** Check whether the version falls inside
+   another block's `Iterations:` band — if it does, it is deliberately not tracked here (see
+   `PROJECT/PDDA.md` → "RELEASES.md — release ledger"), and the right move is a `CHANGELOG.md` entry
+   plus a plain `gh release create` if a tag is wanted. A missing block is a valid state, not a gap
+   to fill; suggesting `/release-plan` here is how the ledger turns into a second changelog. If
    `GH_URL:` is populated but `Status` isn't `Shipped`, a Release object already exists (likely a
    draft, e.g. from a manual `gh release create --draft`) — say so and ask the operator how to
    proceed rather than assuming nothing to do; `gh release create` below will simply fail if the
