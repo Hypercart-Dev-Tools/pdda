@@ -378,17 +378,30 @@ cmd_push() {
         n_div=$((n_div+1)); continue
       fi
 
-      # (3) Overwrite. tgt_hash != src_hash is guaranteed here, so the target always loses bytes —
-      # back up unconditionally. The backup used to be gated on a stamp existing, which meant a
-      # target with no state (fresh, or a state file cleared to recover from the bug above) was
-      # clobbered with nothing kept, contradicting PDDA-INSTALL.md's "any overwrite of a diverged
-      # target ... is backed up first" (GH-59).
+      # (3) Overwrite. tgt_hash != src_hash is guaranteed here, so the target always loses bytes.
+      # Back up only when those bytes might be UNRECOVERABLE — i.e. when the target is not provably
+      # something we wrote ourselves:
+      #   - no stamp        → unknown provenance (fresh target, or state cleared to recover from the
+      #                       bug above); this is the case the old code clobbered with nothing kept
+      #   - tgt != last     → the target changed since we wrote it: real local content
+      #   - --force-resync  → divergent by construction (branch 2 was bypassed)
+      # When a stamp exists and tgt = last, the target is byte-for-byte what canonical last pushed,
+      # so it is reproducible from git and a backup buys nothing. Backing it up anyway is NOT free:
+      # prune_backups keeps only the newest PDDA_SYNC_BACKUPS (default 5) snapshot dirs per target,
+      # so five routine releases would evict the one snapshot holding a genuinely diverged target's
+      # local edits — trading the data-loss risk this check exists to prevent for a slower one.
+      local did_backup=0
+      if [ -z "$last" ] || [ "$tgt_hash" != "$last" ] || [ "$FORCE_RESYNC" -eq 1 ]; then
+        did_backup=1
+        [ "$DRY" -eq 0 ] && { mkdir -p "$(dirname "$BACKUP_DIR/$slug/$utc/$rel")"; cp "$tgt_f" "$BACKUP_DIR/$slug/$utc/$rel"; }
+      fi
       if [ "$DRY" -eq 0 ]; then
-        mkdir -p "$(dirname "$BACKUP_DIR/$slug/$utc/$rel")"; cp "$tgt_f" "$BACKUP_DIR/$slug/$utc/$rel"
         cp "$src" "$tgt_f.pdda-tmp" && mv "$tgt_f.pdda-tmp" "$tgt_f"; case "$rel" in *.sh) chmod +x "$tgt_f" ;; esac
       fi
       printf '%s\t%s\n' "$rel" "$src_hash" >> "$newstate"
-      if [ -n "$last" ] && [ "$tgt_hash" != "$last" ]; then
+      # Label by what actually happened, not by a proxy for it: `updated+bak` must mean a backup
+      # exists, or the summary lies about what is recoverable.
+      if [ "$did_backup" -eq 1 ]; then
         log_line "    updated+bak $rel"; n_updb=$((n_updb+1))
       else
         log_line "    updated    $rel"; n_upd=$((n_upd+1))
@@ -688,9 +701,10 @@ push options:
   --allow-dirty      Push even though the canonical repo has uncommitted manifest files.
   --no-delete        Copy/update only; defer canonical-side deletions (kept in the snapshot).
   --force-delete     Override the manifest-poisoning guard on the delete phase.
-  --force-resync     Overwrite targets reported as DIVERGED (each is backed up first). Without it,
-                     a file whose target copy changed out-of-band is preserved and reported as
-                     `diverged`, never silently skipped.
+  --force-resync     Overwrite targets reported as DIVERGED (each is backed up first). Preservation
+                     applies only while canonical has NOT advanced for that file: a target changed
+                     out-of-band is then kept and reported as `diverged`, never silently skipped.
+                     Once canonical advances, the normal update overwrites it (backed up first).
 
 The registry is machine-local at ${XDG_CONFIG_HOME:-$HOME/.config}/pdda/registry.tsv (override with
 PDDA_REGISTRY) and is written only by install.sh. State/backups live under temp/ (override PDDA_SYNC_TMP).

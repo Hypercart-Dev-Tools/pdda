@@ -92,14 +92,37 @@ assert_contains "$out" "left DIVERGED" "a non-zero diverged count also warns in 
 out="$(run_push)"
 assert_contains "$out" "diverged=1" "divergence is still reported on a subsequent run"
 
-# --- 3. --force-resync overwrites it, and backs it up first ---------------------------------------
+# --- 2b. dry-run reports the divergence but writes nothing -----------------------------------------
+before_state="$(cat "$SYNCTMP/pdda-sync-state/"*.tsv 2>/dev/null)"
+before_baks="$(find "$SYNCTMP/pdda-sync-backups" -type f 2>/dev/null | LC_ALL=C sort)"
+out="$(run_push --dry-run)"
+assert_contains "$out" "diverged=1" "dry-run still reports the divergence"
+assert_contains "$out" "nothing written" "dry-run says nothing was written"
+[ "$(cat "$TGT/PROJECT/PDDA.md")" = "reverted-out-of-band" ] \
+  && pass "dry-run leaves the target untouched" || fail "dry-run modified the target"
+[ "$(cat "$SYNCTMP/pdda-sync-state/"*.tsv 2>/dev/null)" = "$before_state" ] \
+  && pass "dry-run leaves the state file untouched" || fail "dry-run rewrote the state file"
+[ "$(find "$SYNCTMP/pdda-sync-backups" -type f 2>/dev/null | LC_ALL=C sort)" = "$before_baks" ] \
+  && pass "dry-run writes no backup" || fail "dry-run wrote a backup"
+
+# --force-resync must ALSO write nothing under --dry-run.
+out="$(run_push --dry-run --force-resync)"
+[ "$(cat "$TGT/PROJECT/PDDA.md")" = "reverted-out-of-band" ] \
+  && pass "dry-run --force-resync leaves the target untouched" || fail "dry-run --force-resync overwrote the target"
+[ "$(find "$SYNCTMP/pdda-sync-backups" -type f 2>/dev/null | LC_ALL=C sort)" = "$before_baks" ] \
+  && pass "dry-run --force-resync writes no backup" || fail "dry-run --force-resync wrote a backup"
+
+# --- 3. --force-resync overwrites it, and backs THAT content up -----------------------------------
 out="$(run_push --force-resync)"
 [ "$(cat "$TGT/PROJECT/PDDA.md")" = "v2" ] \
   && pass "--force-resync restores the target to canonical" || fail "--force-resync did not overwrite"
-if find "$SYNCTMP/pdda-sync-backups" -name 'PDDA.md' 2>/dev/null | grep -q .; then
-  pass "the overwritten diverged copy was backed up"
+# Assert the backup holds the DIVERGED bytes specifically. Merely finding some PDDA.md under the
+# backup root passes even when --force-resync backed up nothing, because an earlier step in this
+# same sandbox may already have left one there.
+if [ -d "$SYNCTMP/pdda-sync-backups" ] && grep -rq 'reverted-out-of-band' "$SYNCTMP/pdda-sync-backups" 2>/dev/null; then
+  pass "the overwritten diverged content is what got backed up"
 else
-  fail "no backup was written for the overwritten diverged copy"
+  fail "--force-resync overwrote the diverged content without backing that content up"
 fi
 out="$(run_push)"
 assert_contains "$out" "diverged=0" "once resynced, the target reports zero diverged"
@@ -130,6 +153,41 @@ new_sandbox
 out="$(run_push)"
 assert_contains "$out" "diverged=0" "an already-current target reports zero diverged"
 assert_absent "$out" "left DIVERGED" "an already-current target does not warn"
+
+# --- 6. a ROUTINE update must NOT consume a backup slot -------------------------------------------
+# prune_backups keeps only PDDA_SYNC_BACKUPS (default 5) snapshot dirs per target. Backing up an
+# in-sync target on every ordinary release would evict the snapshots that hold genuinely
+# unrecoverable local content within five releases — trading the data loss this guards against for a
+# slower one. So: target byte-identical to its stamp => overwrite with NO backup, and labelled
+# `updated`, not `updated+bak`. (Codex review, round 1.)
+new_sandbox
+advance_source "v2"
+run_push >/dev/null                     # target now in sync AND stamped
+advance_source "v3"
+out="$(run_push)"
+[ "$(cat "$TGT/PROJECT/PDDA.md")" = "v3" ] \
+  && pass "a routine update still lands" || fail "a routine update did not land"
+if [ -d "$SYNCTMP/pdda-sync-backups" ] && grep -rq 'v2' "$SYNCTMP/pdda-sync-backups" 2>/dev/null; then
+  fail "a routine in-sync update burned a backup slot (evicts real diverged snapshots)"
+else
+  pass "a routine in-sync update consumes no backup slot"
+fi
+assert_absent "$out" "updated+bak PROJECT/PDDA.md" "a routine update is labelled 'updated', not 'updated+bak'"
+
+# ...and the label must track the ACTUAL backup: an unstamped target that gets backed up must be
+# reported as updated+bak, not laundered as a plain `updated`.
+new_sandbox
+advance_source "v2"
+run_push >/dev/null
+rm -rf "$SYNCTMP/pdda-sync-state"
+printf 'unstamped-local\n' > "$TGT/PROJECT/PDDA.md"
+out="$(run_push)"
+assert_contains "$out" "updated+bak PROJECT/PDDA.md" "an unstamped overwrite is labelled updated+bak because it DID back up"
+if [ -d "$SYNCTMP/pdda-sync-backups" ] && grep -rq 'unstamped-local' "$SYNCTMP/pdda-sync-backups" 2>/dev/null; then
+  pass "the unstamped local content is in the backup the label claims"
+else
+  fail "labelled updated+bak but the content is not in any backup"
+fi
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

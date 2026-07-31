@@ -321,9 +321,14 @@ mtime), so deliberate local edits between releases are preserved. **A preserved 
 `diverged`, never as a skip** — a target that changed out-of-band (a manual edit, a `git checkout`, an
 agent-harness containment revert) would otherwise stay stale indefinitely behind a summary line that
 reads clean (GH-59). `push DONE` carries a `diverged=N` count and warns in words when it is non-zero;
-`--force-resync` overwrites them. **Every** overwrite is backed up first — as is any canonical-side
-deletion — under `temp/pdda-sync-backups/` (kept to the last
-`PDDA_SYNC_BACKUPS`, default 5). A dirty canonical repo is refused (`--allow-dirty` to override). Canonical-side deletions
+`--force-resync` overwrites them. Note the scope of that promise: **preservation lasts only while
+canonical has not advanced for that file.** Once it does, the normal update overwrites the local copy
+(after backing it up) — `diverged` is a "you have unreconciled local content" signal, not an
+indefinite hold. Any overwrite whose target is **not** provably a previous push of ours — no recorded
+stamp, or content changed since that stamp — is backed up first, as is any canonical-side deletion,
+under `temp/pdda-sync-backups/` (kept to the last `PDDA_SYNC_BACKUPS`, default 5; a routine
+already-in-sync update is deliberately *not* backed up, so those five slots keep holding the
+snapshots that actually contain unrecoverable local content). A dirty canonical repo is refused (`--allow-dirty` to override). Canonical-side deletions
 mirror to targets, but a **manifest-poisoning guard** aborts the delete phase before touching any target
 if a declared source root resolves to zero files, the manifest is empty, or it shrank past
 `PDDA_SYNC_MAX_SHRINK`% (default 25) — override only with `--force-delete`.

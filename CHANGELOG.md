@@ -26,9 +26,37 @@ two subcommands disagreed about it.
   contradicting the "any overwrite of a diverged target is backed up first" promise in
   `PDDA-INSTALL.md`. Observed live: the reverted copy survived only because an unrelated tool kept
   its own backup.
-- New regression test `test/pdda-sync-diverged.sh` (14 assertions), verified in both directions —
-  **5/14 against the pre-fix binary, 14/14 after**, via a `PDDA_SYNC_BIN` override so the proof is
-  repeatable rather than asserted.
+- New regression test `test/pdda-sync-diverged.sh` (26 assertions), verified against **three**
+  versions of the engine via a `PDDA_SYNC_BIN` override, so the proof is repeatable rather than
+  asserted: **14/26** on the original code, **24/26** on the first attempt at this fix, **26/26** now.
+
+**A second Codex review caught this commit trading one data-loss risk for another.** The first
+attempt backed up on *every* overwrite. But `prune_backups` keeps only the newest
+`PDDA_SYNC_BACKUPS` (default 5) snapshot directories per target, so five routine releases would have
+evicted the one snapshot holding a genuinely diverged target's local edits — introducing a slower
+version of exactly the irreversible loss this change exists to prevent. Corrected to back up only
+when the target is **not** provably a previous push of ours (no stamp, content changed since the
+stamp, or `--force-resync`); an already-in-sync routine update now consumes no backup slot. Three
+follow-ons from the same review:
+
+- **The label now tracks the actual backup.** `updated+bak` was computed from a stamp comparison
+  rather than from whether a backup was written, so a run could report `updated=1 updated+bak=0`
+  having written one — and, after the fix above, could have claimed the reverse. It is now derived
+  from the write itself, because a summary that misreports what is recoverable is the same class of
+  defect as the silent skip this commit set out to fix.
+- **The preservation promise is scoped.** The help and `PDDA-INSTALL.md` implied a diverged target is
+  preserved indefinitely. It is preserved only while canonical has **not** advanced for that file;
+  once it does, the normal update overwrites it (backed up first). `diverged` is an unreconciled-
+  local-content signal, not a hold.
+- **A false positive in the new test.** The `--force-resync` backup assertion checked that *some*
+  backup file existed, which an earlier step in the same sandbox already satisfied — so it could pass
+  even if `--force-resync` backed up nothing. It now asserts the backup contains the diverged bytes
+  specifically. Dry-run coverage added for both the diverged path and `--dry-run --force-resync`.
+
+Codex separately confirmed the branch reordering changes no case other than the intended one, that
+`--force-resync` bypasses only the preservation branch and still honours `DRY`, and that the residual
+`status`/`push` difference in what each calls "diverged" is defensible rather than a new
+inconsistency.
 
 `pdda-sync.sh` is canonical-only (excluded from the manifest), so this ships to no target repo.
 Issue [#59](https://github.com/Hypercart-Dev-Tools/pdda/issues/59).
