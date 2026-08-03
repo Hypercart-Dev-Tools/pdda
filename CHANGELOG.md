@@ -1,5 +1,46 @@
 # CHANGELOG.md
 
+## 2026-08-03
+
+### Repo-root `2-WORKING/` folded into `PROJECT/2-WORKING/`; `/myriad` made PDDA-aware upstream
+
+The repo root carried a stray `2-WORKING/` holding one tracked file,
+`MYRIAD-WEEK-2026-07-06.md` — six still-open parking-lot items. It looked like a leak but
+wasn't: `2-WORKING/` at the **project root** was the `/myriad` skill's designed output
+location, and the [2026-07-18 triage disposition](PROJECT/1-INBOX/MARATHON-TRIAGE-2026-07-17.md)
+had deliberately left the file in place after the skill itself was unbundled from this repo
+(`ec886b6`) and moved to `giant-brains-claude-skills`, noting "the parking-lot data did not
+follow the skill out, so pdda still holds a backlog no skill here can read."
+
+Spot-checked the six items before touching anything — still live, not stale: `SEARCH_REPLACE`
+is still present in `sentinel/apply.sh`, `PROJECT/2-WORKING/blank.md` still has no frontmatter,
+and `pdda-doc-ready.sh` still has no `<document_content>` delimiters.
+
+- `git mv` of the week file into `PROJECT/2-WORKING/`, retiring the root folder. The move
+  brought it under governance, which surfaced a real `pdda-check-status-table` **error** — the
+  file had never needed a `## Status` table while it sat outside `PROJECT/**`. Added one
+  recording the relocation, and refreshed `updated:` to today (which also cleared its
+  `stale-working-docs` warning: 6 → 5).
+- Fixed the root cause upstream in `giant-brains-claude-skills/05-close/myriad` (symlinked into
+  `~/.claude/skills/myriad`), since the global skill would otherwise recreate root `2-WORKING/`
+  on its next run here. `scripts/log_myriad.py` no longer takes a required `--dir`; it walks up
+  to the git root and resolves the parking lot itself — `PROJECT/2-WORKING/` when a PDDA layout
+  is detected (`PROJECT/PDDA.md` or `PROJECT/2-WORKING/`), repo-root `2-WORKING/` otherwise.
+  **Detection, not dependency:** it never shells out to `pdda.sh` and behaves identically in a
+  plain repo or outside git. Receipts now report `work_dir`, `pdda_detected`, and `resolution`
+  so the choice is visible rather than assumed; PDDA repos also get a `## Status` table seeded
+  on file creation. A `stranded_legacy_files` warning fires when week files are found in a root
+  `2-WORKING/` after PDDA adoption — reported only, never auto-moved.
+
+`pdda.sh run`: errors=0. The 9 remaining warnings are all pre-existing (ROADMAP length, 5 stale
+working docs, `gh` offline, two `TBD` release dates) — none introduced here.
+
+**Left alone deliberately:** `marathon/briefs/p1-myriad-review-reader.md:10` still instructs a
+reader agent to look in repo-root `2-WORKING/` "(NOT `PROJECT/2-WORKING`)". That brief belongs to
+the never-fired 2026-07-07 marathon and is a known dangling ref — item 8 of the triage doc, which
+was explicitly **held** rather than swept. Correcting it here would presume decisions that hold
+was protecting.
+
 ## 2026-07-23
 
 ### `/pdda-status` QA pass — Codex review via `/relay-xyz`, 3 blockers fixed

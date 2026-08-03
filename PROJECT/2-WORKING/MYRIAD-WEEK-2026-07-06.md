@@ -2,7 +2,7 @@
 title: Myriad — Week of 2026-07-06
 status: Active (weekly myriad parking lot)
 created: 2026-07-06
-updated: 2026-07-06
+updated: 2026-08-03
 owner: noelsaw
 goal: >-
   Park non-critical follow-up items from end-of-day agent triage in one
@@ -12,6 +12,12 @@ roadmap_exempt: true
 ---
 
 # Myriad — Week of 2026-07-06
+
+## Status
+
+| What was just completed | What's next |
+|---|---|
+| **Relocated into PDDA governance (2026-08-03).** This week file was written by `/myriad` into a repo-root `2-WORKING/` — the skill's pre-PDDA default — and was left there by the [2026-07-18 triage disposition](../1-INBOX/MARATHON-TRIAGE-2026-07-17.md) because the parking-lot data did not follow the skill out to `giant-brains-claude-skills`. Moved to `PROJECT/2-WORKING/` so the backlog is governed rather than stranded. The `/myriad` skill's `log_myriad.py` now resolves its parking lot PDDA-aware (PDDA repo → `PROJECT/2-WORKING/`, anything else → repo root), so this cannot recur here. | Work off the 6 open items below. They are a **parking lot, not a burndown** — `roadmap_exempt: true`, so no ROADMAP pointer is expected. Retire the file when every box is checked or reassigned to a GH issue. |
 
 ### 2026-07-06
 - [ ] Wire up or delete the dead search/replace fallback in sentinel/apply.sh — the prompt only asks for FULL_FILE, so the SEARCH_REPLACE path is unreachable and untested.
