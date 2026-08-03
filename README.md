@@ -135,6 +135,35 @@ docs are honest — which is exactly what the deterministic checks are there to 
 
 ---
 
+## Part of HiQS — High Quality Signals
+
+[HiQS](https://github.com/HiQS-Suite/HiQS) is the sibling project and the shared thesis: AI output
+should be **trustworthy**, not merely plausible. It states that as four tenets — **Attested, Ranked,
+Fresh, Structured** — and holds them to one rule: *a tenet is a field, a gate, and a detector, never
+a slogan.* HiQS applies them to work **signals**; PDDA applies them to a repo's project **docs**.
+
+The connection runs both ways: HiQS's own dogfooding audit scores the four tenets against its
+product *and* against the process that builds it — and that process is PDDA. So this scorecard is
+the same audit, read from this side. It claims nothing PDDA doesn't already do:
+
+| Tenet | PDDA | Backed by |
+|---|---|---|
+| **Structured** — typed fields, explicit opt-outs | strongest | the [frontmatter contract](PROJECT/PDDA.md), exact `## Status` headers, triage ratings validated `1–5`, JSONL findings with stable `check` ids in `PROJECT/PDDA-ACTIVITY.jsonl`, and `roadmap_exempt` / `pdda_hold` / `quad_exempt` as declared opt-outs |
+| **Fresh** — staleness is visible, never silent | strong | `pdda.sh stale`, `pdda.sh changelog`, `pdda.sh issue-doc-sync`, `pdda.sh governance` |
+| **Attested** — every claim carries receipts | **partial** | outcomes are attested (`CHANGELOG.md`, `## Lessons Learned`, spikes written back into the doc); **decisions are not** — nothing records *who* concluded what, when, on what evidence |
+| **Ranked** — ordered by what you actually owe | **weak** | `ROADMAP.md` is a pointer ledger: a list, not an order |
+
+The last two rows are published unmet on purpose — under HiQS's rule, a tenet a product can't meet
+is a bug or a false claim, not a banner. Closing them is tracked in
+[#60](https://github.com/Hypercart-Dev-Tools/pdda/issues/60) →
+[GH-60-HIQS-TENET-ALIGNMENT.md](PROJECT/1-INBOX/GH-60-HIQS-TENET-ALIGNMENT.md).
+
+The tenets are a **descriptive lens on this page only**. They add no rule. `GUIDING-PRINCIPLES.md`
+stays the north star and `PROJECT/PDDA.md` stays the contract — one canonical place per fact
+(Principle #4), which is exactly what a second parallel framework would break.
+
+---
+
 ## Bundled Claude Code skills
 
 This repo ships a couple of Claude Code skills under `SKILLS/` for working the PDDA workflow itself:

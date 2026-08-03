@@ -2,7 +2,7 @@
 title: PDDA Standalone Roadmap
 status: Active
 created: 2026-06-24
-updated: 2026-07-22
+updated: 2026-08-03
 branch: main
 goal: >
   Canonical pointer ledger for the standalone PDDA installer repo. This file tracks the repo's
@@ -41,6 +41,19 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Queue / parked intake
 
+- **GH-60 — align PDDA principles/tenets wording with HiQS (Attested · Ranked · Fresh · Structured)**
+  (2026-08-03) - messaging/positioning alignment with the sibling
+  [HiQS](https://github.com/HiQS-Suite/HiQS) project, **not** an import of its governance machinery.
+  4 phases. **Phase 1 landed with the capture**: a "Part of HiQS" section in `README.md` carrying a
+  scorecard that maps each tenet to the existing PDDA check behind it — Structured and Fresh are
+  strong, **Attested is partial** (outcomes attested, *decisions* not: no record of who concluded what)
+  and **Ranked is weak** (`ROADMAP.md` is a list, not an order), both published unmet on purpose per
+  HiQS's rule that a tenet is a field/gate/detector, never a slogan. Phases 2-4 (decision attribution,
+  a decision on whether PDDA claims RANKED at all, then a vocabulary pass) not started. Hard anti-goal:
+  no tenets banner in `PROJECT/PDDA.md` or `GUIDING-PRINCIPLES.md` — a second normative framework
+  would violate Principle #4. Issue
+  [#60](https://github.com/Hypercart-Dev-Tools/pdda/issues/60). ->
+  [PROJECT/1-INBOX/GH-60-HIQS-TENET-ALIGNMENT.md](PROJECT/1-INBOX/GH-60-HIQS-TENET-ALIGNMENT.md)
 - **GH-55 — skills invoke `utils/pdda/pdda.sh` by bare CWD-relative path** (2026-07-22) - the same
   defect as [#47](https://github.com/Hypercart-Dev-Tools/pdda/issues/47), in the `PDDA-EOD` skill
   shipped by PR #54. From any subdirectory the call fails, and the skill's "PDDA is not installed

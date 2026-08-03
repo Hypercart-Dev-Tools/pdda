@@ -2,6 +2,38 @@
 
 ## 2026-08-03
 
+### HiQS positioning: front-door tenet scorecard + GH-60 alignment track
+
+Started aligning PDDA's public messaging with the sibling [HiQS](https://github.com/HiQS-Suite/HiQS)
+project's four tenets — **Attested · Ranked · Fresh · Structured** — so the product family speaks one
+vocabulary. The connection already existed in one direction: `HIQS-PROJECT.md` §18 audits those tenets
+against both the product HiQS ships *and* the process that builds it, and that process **is PDDA**. This
+reciprocates the audit from this side.
+
+- **`README.md` — new "Part of HiQS" section** with a four-row scorecard mapping each tenet to the
+  existing PDDA mechanism behind it. **Structured** (frontmatter contract, exact status headers, JSONL
+  findings with stable `check` ids, declared opt-outs) and **Fresh** (`stale` / `changelog` /
+  `issue-doc-sync` / `governance`) are strong. **Attested is published as partial** — outcomes are
+  attested, *decisions* are not: nothing records who concluded what, when, on what evidence. **Ranked is
+  published as weak** — `ROADMAP.md` is a list, not an order.
+- **The two unmet rows are the point, not an oversight.** HiQS §18.4's rule is that a tenet is a field,
+  a gate, and a detector — never a slogan — so a 4/4 clean sweep PDDA hasn't earned would be a false
+  claim, and a scorecard that names its own gaps is the more credible message.
+- **Issue [#60](https://github.com/Hypercart-Dev-Tools/pdda/issues/60)** filed with a 4-phase track
+  (front-door mention → decision attribution → decide whether PDDA claims RANKED at all → vocabulary
+  pass), captured at
+  [`PROJECT/1-INBOX/GH-60-HIQS-TENET-ALIGNMENT.md`](PROJECT/1-INBOX/GH-60-HIQS-TENET-ALIGNMENT.md) and
+  parked in `ROADMAP.md`'s queue. Phase 1 is the README section above.
+
+**Scope boundary held deliberately** (this was the live disagreement — a cross-model review argued for
+skipping the import entirely): the tenets are a **descriptive lens on `README.md` only**. They issue no
+rule, rename no check, and add no enforcement layer. `GUIDING-PRINCIPLES.md` and `PROJECT/PDDA.md` were
+**not touched** and remain the single normative sources. A second parallel framework would violate
+Principle #4 (one canonical place per fact) and recreate HiQS's own L1 failure — two surfaces sharing no
+code — which is the thing that rebuild exists to avoid. The Phase 2 note also flags that a new
+high-risk-attestation warn must *extend* `pdda-doc-ready.sh`'s existing `decisions/` nudge rather than
+sit beside it.
+
 ### Repo-root `2-WORKING/` folded into `PROJECT/2-WORKING/`; `/myriad` made PDDA-aware upstream
 
 The repo root carried a stray `2-WORKING/` holding one tracked file,
