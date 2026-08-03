@@ -151,10 +151,12 @@ the same audit, read from this side. It claims nothing PDDA doesn't already do:
 | **Structured** — typed fields, explicit opt-outs | strongest | the [frontmatter contract](PROJECT/PDDA.md), exact `## Status` headers, triage ratings validated `1–5`, JSONL findings with stable `check` ids in `PROJECT/PDDA-ACTIVITY.jsonl`, and `roadmap_exempt` / `pdda_hold` / `quad_exempt` as declared opt-outs |
 | **Fresh** — staleness is visible, never silent | strong | `pdda.sh stale`, `pdda.sh changelog`, `pdda.sh issue-doc-sync`, `pdda.sh governance` |
 | **Attested** — every claim carries receipts | **partial** | outcomes are attested (`CHANGELOG.md`, `## Lessons Learned`, spikes written back into the doc); **decisions are not** — nothing records *who* concluded what, when, on what evidence |
-| **Ranked** — ordered by what you actually owe | **weak** | `ROADMAP.md` is a pointer ledger: a list, not an order |
+| **Ranked** — ordered by what you actually owe | **specified, not implemented** | the rule is written down — [`PROJECT/PDDA.md`](PROJECT/PDDA.md#how-to-combine-them--derive-dont-store) gates on `risk`, derives `ease` from `effort + complexity`, and holds `ratings_provisional` docs out of auto-selection — but no `pdda.sh` subcommand computes it and `ROADMAP.md` still renders a list |
 
 The last two rows are published unmet on purpose — under HiQS's rule, a tenet a product can't meet
-is a bug or a false claim, not a banner. Closing them is tracked in
+is a bug or a false claim, not a banner. Ranked is the sharper case: the design exists and is
+deliberate, but a rule with a field and no detector is exactly the prose-not-structure failure that
+rule was written to catch. Closing both is tracked in
 [#60](https://github.com/Hypercart-Dev-Tools/pdda/issues/60) →
 [GH-60-HIQS-TENET-ALIGNMENT.md](PROJECT/1-INBOX/GH-60-HIQS-TENET-ALIGNMENT.md).
 

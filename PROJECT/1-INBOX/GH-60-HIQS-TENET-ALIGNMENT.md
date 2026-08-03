@@ -36,7 +36,7 @@ two places where PDDA does *not* yet earn the label.
 | **STRUCTURED** | strongest | frontmatter contract, exact `## Status` headers, triage ratings validated `1–5`, `PROJECT/PDDA-ACTIVITY.jsonl` findings with stable `check` ids, explicit `roadmap_exempt` / `pdda_hold` / `quad_exempt` opt-outs |
 | **FRESH** | strong | `pdda.sh stale`, `changelog`, `issue-doc-sync`, `governance` (dead refs, env-var drift) |
 | **ATTESTED** | **partial** | incidents and outcomes are well attested (`CHANGELOG.md`, `## Lessons Learned`, memory injection); **decision** attribution is not — nothing records *who* concluded what, on what date, on what evidence, beyond a single `owner:` |
-| **RANKED** | **weak** | `ROADMAP.md` is a pointer ledger — a *list, not an order*. Per-doc triage ratings exist, but no cross-doc ordering answers "what should automation pick next" |
+| **RANKED** | **specified, not implemented** | `PROJECT/PDDA.md` ["How to combine them — derive, don't store"](../PDDA.md) already specifies the selection rule (`risk` as a gate not an addend, `ease = effort + complexity`, `ratings_provisional` as an eligibility gate) — but nothing computes it: no `pdda.sh` subcommand, no enforcement of `ratings_provisional`, and `ROADMAP.md` renders a list, not an order |
 
 Shared vocabulary over mechanisms that already exist is positioning. Shared vocabulary over
 mechanisms that don't exist is a slogan. The two weak rows are stated deliberately so the alignment
@@ -87,15 +87,36 @@ plan links no `decisions/` record. Phase 2 must extend that signal, not add a se
 **QA gate:** exactly one warn fires for an unattested high-risk decision (not two); `pdda.sh run`
 clean; the check is deterministic or lives in the LLM layer by explicit choice, not by accident.
 
-### Phase 3 — RANKED: decide whether PDDA claims it
+### Phase 3 — RANKED: implement the rule that already exists, or publish it unmet
+
+**Corrected 2026-08-03.** This phase was first written as "decide whether PDDA claims RANKED,"
+which assumed no ranking design existed. It does. `PROJECT/PDDA.md`'s *"How to combine them — derive,
+don't store"* section already specifies the whole selection rule, with its reasoning:
+
+```text
+eligible = risk <= 2 AND not ratings_provisional   # risk >= 4 => route to a human
+ease     = effort + complexity                     # 2..10, lower = easier
+pick     = among eligible, lowest ease, then fewest phases as the tiebreak
+```
+
+...plus the decision *not* to store a composite score (it would drift from its inputs, violating
+Principle #4), `risk` as a **gate rather than an addend** so a trivial-but-risky task can't slip
+through mid-ranked, and `ratings_provisional` as an eligibility gate rather than metadata. The
+resolved `priority`-field note under "Proposed extensions not yet locked" records the same decision.
+
+So the design is done and deliberate. **What is missing is the detector.** No `pdda.sh` subcommand
+computes the rule, nothing enforces `ratings_provisional` as an eligibility gate, and `ROADMAP.md`
+renders no order. Under HiQS §18.4 that is precisely the failure mode the rule names: a tenet with a
+field but no gate and no detector is prose.
 
 Two acceptable outcomes, one unacceptable one:
 
-- **Claim it** — give `ROADMAP.md`'s working set a deterministic order derived from the existing
-  triage ratings, so "what should automation pick next" has one answer in one place.
-- **Publish it as unmet** — state plainly that PDDA orders by lifecycle folder and recency, not by
-  obligation, and leave it there until a mechanism says otherwise.
-- **Not acceptable:** claiming RANKED in messaging while `ROADMAP.md` stays a list.
+- **Implement it** — a `pdda.sh pick` (or `rank`) subcommand that reads the existing frontmatter
+  ratings across the working set and emits the eligible-and-easiest doc. The logic is already written;
+  this is transcription plus a gate, not design. Smallest honest version of the tenet.
+- **Publish it as unmet** — state plainly that PDDA specifies a selection rule but does not compute
+  one, and that ordering is a human call, until a detector exists.
+- **Not acceptable:** claiming RANKED in messaging on the strength of a rule nothing runs.
 
 This mirrors §7.1's posture in HiQS: a failing tenet changes the claim's wording, not just the
 backlog.
@@ -135,5 +156,8 @@ section.
 
 1. Phase 2: `PROJECT/decisions/` convention, `risk_rationale` field, or both? (Recommend: whichever
    extends the existing high-risk warn rather than sitting beside it.)
-2. Phase 3: does PDDA want to claim RANKED at all, or is "we point, we don't order" the honest
-   permanent position for a doc-hygiene tool?
+2. Phase 3: implement the already-specified selection rule as a `pdda.sh` subcommand, or publish
+   RANKED as unmet? (The design question is settled; only the build-or-declare call is open.)
+3. Does the selection rule belong in `ROADMAP.md` output, a new subcommand, or both? A rendered
+   order in `ROADMAP.md` risks re-storing a derived value — the exact thing "derive, don't store"
+   forbids — so a subcommand that computes it live is the Principle-#4-safe shape.
