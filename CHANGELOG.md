@@ -1,5 +1,17 @@
 # CHANGELOG.md
 
+## 2026-09-14
+
+### `pdda.sh` check_changelog accepts bracketless version headers (#65, #13)
+
+Updated `check_changelog()` in `utils/pdda/pdda.sh` to match both bracketed (`## [x.y.z] - YYYY-MM-DD`)
+and bracketless (`## x.y.z - YYYY-MM-DD`, `## x.y.z.w - YYYY-MM-DD`) version headings before
+the date using paired bracket alternatives: `((\[[^][[:space:]]+\]|[^][[:space:]]+)[[:space:]]*(-|–)[[:space:]]*)?`.
+Terminal date extraction accurately extracts the entry date via `sed` even if the prefix contains a
+date-like string, while unbalanced brackets (`## [1.2.3 - DATE` or `## 1.2.3] - DATE`) are strictly
+rejected. Updated `PROJECT/PDDA.md` specification in lockstep. Verified with 18/18 tests passing in
+`test/pdda-changelog.sh` plus full suite clean pass. Closes #65, closes #13.
+
 ## 2026-08-03
 
 ### HiQS positioning: front-door tenet scorecard + GH-60 alignment track

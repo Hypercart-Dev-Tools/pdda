@@ -84,5 +84,70 @@ assert_contains "$out" "errors=0 warns=0 info=0" "mixed headings use the top sem
 assert_absent "$out" "2026-03-28" "mixed headings do not fall through to a lower legacy date"
 assert_absent "$out" "predates the latest commit" "mixed headings do not false-flag stale freshness"
 
+new_sandbox
+cat > "$SBOX/CHANGELOG.md" <<'EOF'
+# Changelog
+
+## 1.4.211 - 2026-06-30
+
+- bracketless semver heading (GH-13)
+EOF
+out="$(run_check)"
+assert_contains "$out" "errors=0 warns=0 info=0" "bracketless semver heading is accepted"
+assert_absent "$out" "predates the latest commit" "bracketless semver heading stays fresh"
+assert_absent "$out" "no dated" "bracketless semver does not trigger missing dated entry warning"
+
+new_sandbox
+cat > "$SBOX/CHANGELOG.md" <<'EOF'
+# Changelog
+
+## 1.3.5.58 - 2026-06-30
+
+- bracketless quad-version heading
+
+## 2026-03-28
+
+- older bare-date entry
+EOF
+out="$(run_check)"
+assert_contains "$out" "errors=0 warns=0 info=0" "bracketless quad-version heading is accepted"
+assert_absent "$out" "2026-03-28" "bracketless quad-version does not fall through to legacy date"
+assert_absent "$out" "predates the latest commit" "bracketless quad-version stays fresh"
+
+new_sandbox
+cat > "$SBOX/CHANGELOG.md" <<'EOF'
+# Changelog
+
+## [1.2.3 - 2026-06-30
+
+- unbalanced opening bracket
+EOF
+out="$(run_check)"
+assert_contains "$out" "no dated" "unbalanced opening bracket is rejected"
+
+new_sandbox
+cat > "$SBOX/CHANGELOG.md" <<'EOF'
+# Changelog
+
+## 1.2.3] - 2026-06-30
+
+- unbalanced closing bracket
+EOF
+out="$(run_check)"
+assert_contains "$out" "no dated" "unbalanced closing bracket is rejected"
+
+new_sandbox
+cat > "$SBOX/CHANGELOG.md" <<'EOF'
+# Changelog
+
+## 2025-01-01 - 2026-06-30
+
+- date-like prefix before terminal date
+EOF
+out="$(run_check)"
+assert_contains "$out" "errors=0 warns=0 info=0" "date prefix extracts terminal date"
+assert_absent "$out" "2025-01-01" "terminal date used, not prefix date"
+assert_absent "$out" "predates the latest commit" "date prefix heading stays fresh"
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

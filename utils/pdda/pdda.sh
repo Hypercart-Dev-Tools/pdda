@@ -402,8 +402,8 @@ check_changelog() {
     return "$(pdda_gated_exit "$rc")"
   fi
 
-  cl_line="$(grep -Em1 '^##[[:space:]]+(\[[^][]*\][[:space:]]*[-–][[:space:]]*)?[0-9]{4}-[0-9]{2}-[0-9]{2}' "$PDDA_CHANGELOG" 2>/dev/null || true)"
-  cl_date="$(printf '%s' "$cl_line" | grep -Eo '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)"
+  cl_line="$(grep -Em1 '^##[[:space:]]+((\[[^][[:space:]]+\]|[^][[:space:]]+)[[:space:]]*(-|–)[[:space:]]*)?[0-9]{4}-[0-9]{2}-[0-9]{2}' "$PDDA_CHANGELOG" 2>/dev/null || true)"
+  cl_date="$(printf '%s\n' "$cl_line" | sed -E 's/^##[[:space:]]+((\[[^][[:space:]]+\]|[^][[:space:]]+)[[:space:]]*(-|–)[[:space:]]*)?([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\4/' | grep -Eo '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' || true)"
 
   if [ -z "$cl_date" ] || ! pdda_is_real_date "$cl_date"; then
     pdda_record_finding warn "$CHECK_NAME" "$PDDA_CHANGELOG" 1 \

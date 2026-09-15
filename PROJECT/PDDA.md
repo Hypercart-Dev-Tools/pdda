@@ -405,8 +405,8 @@ Purpose:
 - nudge that `CHANGELOG.md` (the first-class end-of-iteration record) was updated this iteration
 
 Minimum behavior:
-- read `CHANGELOG.md` (override via `PDDA_CHANGELOG`); find the newest dated heading, accepting both
-  `## YYYY-MM-DD` and `## [x.y.z] - YYYY-MM-DD`
+- read `CHANGELOG.md` (override via `PDDA_CHANGELOG`); find the newest dated heading, accepting
+  `## YYYY-MM-DD`, `## [x.y.z] - YYYY-MM-DD`, and bracketless `## x.y.z - YYYY-MM-DD` / `## x.y.z.w - YYYY-MM-DD`
 - `warn` (never `error` — does not block, even in `full`) when that entry predates the latest git
   commit by more than `PDDA_CHANGELOG_STALE_DAYS` days (default `0`)
 - `warn` if `CHANGELOG.md` is missing or has no dated entry; emit `info` (skip the compare) when there
@@ -838,7 +838,7 @@ REAL-AGENT-OBSERVATIONS convention used to collect. Durable Costly / one-way-doo
 
 It should contain:
 
-- newest-first, dated sections headed either `## YYYY-MM-DD` or `## [x.y.z] - YYYY-MM-DD`
+- newest-first, dated sections headed `## YYYY-MM-DD`, `## [x.y.z] - YYYY-MM-DD`, or bracketless `## x.y.z - YYYY-MM-DD` / `## x.y.z.w - YYYY-MM-DD`
 - one entry per substantive iteration: what changed, why, and the verification (test / suite result)
 - the bet behind a consequential change when one applies (the call, the expected signal, reversibility)
 

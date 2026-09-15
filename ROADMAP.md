@@ -2,7 +2,7 @@
 title: PDDA Standalone Roadmap
 status: Active
 created: 2026-06-24
-updated: 2026-08-03
+updated: 2026-09-14
 branch: main
 goal: >
   Canonical pointer ledger for the standalone PDDA installer repo. This file tracks the repo's
@@ -159,6 +159,10 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Completed
 
+- **GH-65 / GH-13 — changelog check rejects bracketless version headers** (2026-09-14, closed) -
+  regex fix in `utils/pdda/pdda.sh` to match bracketless `## x.y.z - YYYY-MM-DD` version headers before
+  the date; regression tests in `test/pdda-changelog.sh`. Issues [#65](https://github.com/Hypercart-Dev-Tools/pdda/issues/65) and [#13](https://github.com/Hypercart-Dev-Tools/pdda/issues/13). ->
+  [PROJECT/3-COMPLETED/GH-65-BRACKETLESS-CHANGELOG-REGEX.md](PROJECT/3-COMPLETED/GH-65-BRACKETLESS-CHANGELOG-REGEX.md)
 - **GH-45 — ROUTER.target.md releases drift** (2026-07-20 → closed) - quick fix: the target-router
   template omitted the `releases`/`releases-current` subcommands the canonical ROUTER.md documents, so
   every `--with-startup-docs` install failed pdda-check-governance (errors=2) on first run. Grafted both
