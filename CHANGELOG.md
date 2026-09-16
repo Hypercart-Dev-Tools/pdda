@@ -1,5 +1,14 @@
 # CHANGELOG.md
 
+## 2026-09-16 — Source ownership moved to XYZ Forge
+
+Published the retirement pointer for PDDA #66 / Forge #649. New development,
+installation and update guidance live in Forge; historical code, license and backlog
+remain accessible. No target files, registry or sync jobs changed. Archive mode
+remains subject to the Forge migration guide. Reversibility: Easy — document pointers.
+Verification: targeted governance, changelog and roadmap-coverage checks passed with
+zero errors and zero warnings.
+
 ## 2026-09-14
 
 ### `pdda.sh` check_changelog accepts bracketless version headers (#65, #13)

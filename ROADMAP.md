@@ -41,6 +41,8 @@ This standalone repo exists to keep the PDDA contract, shell checks, and extract
 
 ### Queue / parked intake
 
+- **GH-66 — Forge ownership migration** → [PROJECT/1-INBOX/GH-66-FORGE-OWNERSHIP.md](PROJECT/1-INBOX/GH-66-FORGE-OWNERSHIP.md); canonical execution is [Forge #649](https://github.com/HiQS-Labs/XYZ-forge/issues/649).
+
 - **GH-60 — align PDDA principles/tenets wording with HiQS (Attested · Ranked · Fresh · Structured)**
   (2026-08-03) - messaging/positioning alignment with the sibling
   [HiQS](https://github.com/HiQS-Suite/HiQS) project, **not** an import of its governance machinery.

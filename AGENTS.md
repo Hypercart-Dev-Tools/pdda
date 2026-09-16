@@ -1,5 +1,14 @@
 # AGENTS.md
 
+> **Development moved to [XYZ Forge](https://github.com/HiQS-Labs/XYZ-forge).**
+> PDDA is now Forge's document-governance subsystem. This repository preserves historical
+> source, issues and license notices; it is no longer an independent development or update source.
+> Use the [migration guide and backlog dispositions](https://github.com/HiQS-Labs/XYZ-forge/blob/development/docs/PDDA-MIGRATION.md)
+> before changing existing installs or sync jobs. Canonical decision: [Forge #649](https://github.com/HiQS-Labs/XYZ-forge/issues/649);
+> historical pointer: [PDDA #66](https://github.com/Hypercart-Dev-Tools/pdda/issues/66).
+> GitHub archive mode is a separate final step after the guide's archive gate is satisfied.
+
+
 **On your first action in this repo, follow the startup sequence in `ROUTER.md` before recommending or editing anything.** It names the canonical files and the order to read them. Re-run it (or `/pdda`) when you switch tasks, resume a long session, or feel context has drifted.
 
 See `GUIDING-PRINCIPLES.md` for the repo's north star — the goals and tradeoff lens these rules serve.
@@ -34,7 +43,7 @@ If a PDDA script is added, removed, or behaviorally changed, update the matching
 
 ### 6. Keep this repo about PDDA
 
-This is the standalone PDDA source-of-truth repo. Favor changes to the document contract, install manifest, and shipped shell checks. Do not pull in unrelated runtime or product docs from other repos.
+This is the historical PDDA repository. New implementation, contract changes and bug reports belong in XYZ Forge. Preserve history and existing license notices here; do not restart an independent distribution. The rules below describe the retained historical surface.
 
 ### 7. Record substantive iterations
 

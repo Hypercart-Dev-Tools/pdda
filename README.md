@@ -1,3 +1,11 @@
+> **Development moved to [XYZ Forge](https://github.com/HiQS-Labs/XYZ-forge).**
+> PDDA is now Forge's document-governance subsystem. This repository preserves historical
+> source, issues and license notices; it is no longer an independent development or update source.
+> Use the [migration guide and backlog dispositions](https://github.com/HiQS-Labs/XYZ-forge/blob/development/docs/PDDA-MIGRATION.md)
+> before changing existing installs or sync jobs. Canonical decision: [Forge #649](https://github.com/HiQS-Labs/XYZ-forge/issues/649);
+> historical pointer: [PDDA #66](https://github.com/Hypercart-Dev-Tools/pdda/issues/66).
+> GitHub archive mode is a separate final step after the guide's archive gate is satisfied.
+
 # PDDA — Project-Driven Doc Automation
 
 PDDA keeps a repo's project plans, bug-fix docs, and roadmap honest enough that a human *or an agent*
@@ -6,7 +14,7 @@ need judgment (frontmatter, an exact status table, no hardcoded paths, a pointer
 opt-in LLM pass flags the fuzzier readiness gaps. It starts **non-blocking** and you graduate it onto
 the rails deliberately.
 
-This is the standalone **source-of-truth installer repo**. The repo also dogfoods itself — its own
+The documentation below describes the historical standalone installer. The repo also dogfoods itself — its own
 `ROADMAP.md`, `CHANGELOG.md`, and `PROJECT/**` docs are live PDDA artifacts, so it doubles as a
 working demo.
 
