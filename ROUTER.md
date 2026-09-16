@@ -14,6 +14,15 @@ releases: RELEASES.md  # pointer only â€” forward-looking release-planning ledge
 
 # ROUTER.md
 
+> **Development moved to [XYZ Forge](https://github.com/HiQS-Labs/XYZ-forge).**
+> PDDA is now Forge's document-governance subsystem. This repository preserves historical
+> source, issues and license notices; it is no longer an independent development or update source.
+> Use the [migration guide and backlog dispositions](https://github.com/HiQS-Labs/XYZ-forge/blob/development/docs/PDDA-MIGRATION.md)
+> before changing existing installs or sync jobs. Canonical decision: [Forge #649](https://github.com/HiQS-Labs/XYZ-forge/issues/649);
+> historical pointer: [PDDA #66](https://github.com/Hypercart-Dev-Tools/pdda/issues/66).
+> GitHub archive mode is a separate final step after the guide's archive gate is satisfied.
+
+
 This file is the first entry point for an AI agent working in this repo: it tells you what to read, what to run, and which files are canonical.
 
 ## Role split
@@ -87,7 +96,7 @@ utils/pdda/pdda.sh catchup     # LLM repo triage and ROUTER.md recommendations â
 utils/pdda/pdda.sh help        # list every command
 ```
 
-To distribute this runtime from this clone (the canonical repo) to other registered repos:
+Historical distribution commands (do not start new distribution from this retired source; follow the Forge migration guide above):
 
 ```bash
 utils/pdda/pdda-sync.sh register --yes /path/to/repo   # enroll + initial install
